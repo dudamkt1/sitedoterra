@@ -365,6 +365,17 @@ begin
 end;
 $$;
 
+-- Helper de acesso do Super Admin (usado pelas políticas de RLS).
+create or replace function public.is_superadmin()
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select coalesce((select role = 'superadmin' from public.profiles where user_id = auth.uid()), false);
+$$;
+
 -- ============================ RLS ============================
 alter table public.profiles enable row level security;
 alter table public.tenants enable row level security;
@@ -384,16 +395,6 @@ create policy payment_events_select_admin on public.payment_events
 
 -- Isolamento multi-tenant: cada usuário só acessa os próprios dados.
 -- O papel 'superadmin' acessa tudo. Admin da app usa service_role (bypass RLS).
-
-create or replace function public.is_superadmin()
-returns boolean
-language sql
-security definer
-set search_path = public
-stable
-as $$
-  select coalesce((select role = 'superadmin' from public.profiles where user_id = auth.uid()), false);
-$$;
 
 create policy profiles_select_own on public.profiles
   for select using (user_id = auth.uid() or public.is_superadmin());
