@@ -8,6 +8,7 @@ interface Row {
   profile: any;
   tenant: any;
   subscription: any;
+  activation: any;
   domains: any[];
   registeredAt: string;
   activatedAt: string;
@@ -82,6 +83,7 @@ export function AdminUsers({ rows, plans }: { rows: Row[]; plans: any[] }) {
                 <th>Usuário</th>
                 <th>Status</th>
                 <th>Plano</th>
+                <th>Ativação (R$ 297)</th>
                 <th>Assinatura</th>
                 <th>Site / URL</th>
                 <th>Domínio</th>
@@ -95,6 +97,7 @@ export function AdminUsers({ rows, plans }: { rows: Row[]; plans: any[] }) {
                 const p = r.profile;
                 const s = r.subscription;
                 const dom = r.domains.find((d) => d.status !== "removed");
+                const activation = r.activation;
                 return (
                   <tr key={p.user_id}>
                     <td>
@@ -105,6 +108,14 @@ export function AdminUsers({ rows, plans }: { rows: Row[]; plans: any[] }) {
                     <td>
                       <div className="text-sm">{s?.plan?.name || "—"}</div>
                       <div className="text-xs text-gray-400">{s?.plan ? formatBRL(s.plan.monthly_price_cents) + "/mês" : ""}</div>
+                    </td>
+                    <td>
+                      <div className="text-sm">{activation ? formatBRL(activation.amount_cents) : "—"}</div>
+                      <div className="mt-1">
+                        <span className={`badge ${activation ? "badge-green" : "badge-yellow"}`}>
+                          {activation ? "Pago" : "Pendente"}
+                        </span>
+                      </div>
                     </td>
                     <td><StatusBadge status={s?.status || "awaiting_activation"} /></td>
                     <td>
@@ -157,7 +168,7 @@ export function AdminUsers({ rows, plans }: { rows: Row[]; plans: any[] }) {
                 );
               })}
               {filtered.length === 0 && (
-                <tr><td colSpan={9} className="text-center text-gray-400 py-8">Nenhum usuário encontrado.</td></tr>
+                <tr><td colSpan={10} className="text-center text-gray-400 py-8">Nenhum usuário encontrado.</td></tr>
               )}
             </tbody>
           </table>

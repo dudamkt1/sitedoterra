@@ -4,7 +4,6 @@ import { getStripe } from "@/lib/stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   getOrCreateCustomer,
-  getOrCreateActivationPrice,
   createRecurringSubscription,
   upsertSubscriptionFromStripe,
 } from "@/lib/billing";
@@ -97,13 +96,12 @@ async function handleEvent(event: Stripe.Event) {
 
       const { data: tenant } = await admin.from("tenants").select("*").eq("id", tenantId).single();
       const { data: profile } = await admin.from("profiles").select("*").eq("user_id", tenant.user_id).single();
-      const { data: plan } = planId ? await admin.from("plans").select("*").eq("id", planId).single() : { data: null };
 
-      // Registra pagamento de ativação
+      // Registra pagamento de ativação (R$ 297,00)
       await admin.from("payments").upsert(
         {
           tenant_id: tenantId,
-          stripe_payment_intent_id: session.payment_intent as string | null,
+          stripe_payment_intent_id: (session.payment_intent as string) || null,
           stripe_checkout_session_id: session.id,
           type: "activation",
           amount_cents: session.amount_total || 0,
@@ -115,19 +113,33 @@ async function handleEvent(event: Stripe.Event) {
         { onConflict: "stripe_checkout_session_id", ignoreDuplicates: true }
       );
 
-      if (session.mode === "payment" && plan) {
-        // Cria customer + assinatura recorrente (1ª mensalidade em +30 dias)
-        const customer = await getOrCreateCustomer({
+      // Cria assinatura mensal recorrente (R$ 47,00 — 1ª cobrança em +30 dias)
+      const customerId =
+        (typeof session.customer === "string" ? session.customer : session.customer?.id) || null;
+      const customer = customerId
+        ? ((await stripe.customers.retrieve(customerId)) as Stripe.Customer)
+        : await getOrCreateCustomer({
+            userId: tenant.user_id,
+            tenantId: tenant.id,
+            email: profile.email,
+            name: profile.name,
+          });
+
+      // Evita assinaturas duplicadas: se já houver assinatura ativa para o tenant, não criar outra.
+      const { data: existingActive } = await admin
+        .from("subscriptions")
+        .select("id")
+        .eq("tenant_id", tenantId)
+        .eq("status", "active")
+        .maybeSingle();
+
+      if (!existingActive) {
+        const subscription = await createRecurringSubscription(customer.id, {
           userId: tenant.user_id,
           tenantId: tenant.id,
           email: profile.email,
           name: profile.name,
-        });
-        const subscription = await createRecurringSubscription(customer.id, plan, {
-          userId: tenant.user_id,
-          tenantId: tenant.id,
-          email: profile.email,
-          name: profile.name,
+          planId: planId || null,
         });
         await upsertSubscriptionFromStripe(subscription);
       }

@@ -4,7 +4,6 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser, getProfile } from "@/lib/auth";
 import { ensureTenantForUser } from "@/lib/onboarding";
 import { getOrCreateCustomer, createRecurringSubscription } from "@/lib/billing";
-import type { Plan } from "@/types";
 
 export const runtime = "nodejs";
 
@@ -65,11 +64,12 @@ export async function POST() {
     name: profile?.name ?? null,
   });
 
-  const newSub = await createRecurringSubscription(customer.id, plan as Plan, {
+  const newSub = await createRecurringSubscription(customer.id, {
     userId: user.id,
     tenantId: tenant.id,
     email: profile?.email || "",
     name: profile?.name ?? null,
+    planId: plan.id,
   });
 
   await admin.from("subscriptions").insert({

@@ -10,15 +10,28 @@ interface SubManagerProps {
   plans: any[];
   billingHistory: any[];
   payments: any[];
+  activation?: any;
+  activationPriceCents: number;
+  monthlyPriceCents: number;
 }
 
-export function SubscriptionManager({ subscription, plans, billingHistory, payments }: SubManagerProps) {
+export function SubscriptionManager({
+  subscription,
+  plans,
+  billingHistory,
+  payments,
+  activation,
+  activationPriceCents,
+  monthlyPriceCents,
+}: SubManagerProps) {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
 
   const paymentOk = searchParams.get("sucesso") === "1";
+
+  const activationPaid = activation?.status === "succeeded";
 
   async function checkout(planId: string) {
     setLoading(true);
@@ -83,13 +96,20 @@ export function SubscriptionManager({ subscription, plans, billingHistory, payme
       )}
 
       {/* Estado atual */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="card">
+          <p className="text-xs uppercase tracking-wider text-gray-400 font-semibold">Ativação do site</p>
+          <p className="mt-2 text-xl font-semibold" style={{ fontFamily: "var(--font-display)" }}>
+            {activationPaid ? "Pago" : "Pendente"}
+          </p>
+          <p className="text-sm text-gray-400 mt-1">{formatBRL(activationPriceCents)} — pagamento único</p>
+        </div>
         <div className="card">
           <p className="text-xs uppercase tracking-wider text-gray-400 font-semibold">Plano</p>
           <p className="mt-2 text-xl font-semibold" style={{ fontFamily: "var(--font-display)" }}>
             {subscription?.plan?.name || "Nenhum plano ativo"}
           </p>
-          {subscription?.plan && <p className="text-sm text-gray-400 mt-1">{formatBRL(subscription.plan.monthly_price_cents)}/mês</p>}
+          {monthlyPriceCents > 0 && <p className="text-sm text-gray-400 mt-1">{formatBRL(monthlyPriceCents)}/mês</p>}
         </div>
         <div className="card">
           <p className="text-xs uppercase tracking-wider text-gray-400 font-semibold">Status</p>
@@ -101,7 +121,7 @@ export function SubscriptionManager({ subscription, plans, billingHistory, payme
           <p className="mt-2 text-xl font-semibold" style={{ fontFamily: "var(--font-display)" }}>
             {nextBilling ? formatDate(nextBilling) : "—"}
           </p>
-          {subscription?.plan && <p className="text-sm text-gray-400 mt-1">{formatBRL(subscription.plan.monthly_price_cents)}</p>}
+          {monthlyPriceCents > 0 && <p className="text-sm text-gray-400 mt-1">{formatBRL(monthlyPriceCents)}</p>}
         </div>
       </div>
 
@@ -142,8 +162,7 @@ export function SubscriptionManager({ subscription, plans, billingHistory, payme
 
           {!subscription && plans.map((p) => (
             <button key={p.id} className="btn btn-gold" onClick={() => checkout(p.id)} disabled={loading}>
-              Assinar {p.name} — {formatBRL(p.monthly_price_cents)}
-              {p.activation_price_cents > 0 && ` + ativação ${formatBRL(p.activation_price_cents)}`}
+              Ativar site ({p.name}) — {formatBRL(monthlyPriceCents)}/mês + ativação {formatBRL(activationPriceCents)}
             </button>
           ))}
         </div>

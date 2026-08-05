@@ -1,7 +1,7 @@
 import Stripe from "stripe";
 import { getStripe } from "@/lib/stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { Plan, Subscription } from "@/types";
+import type { Subscription } from "@/types";
 
 export interface BillingUser {
   userId: string;
@@ -10,7 +10,31 @@ export interface BillingUser {
   name: string | null;
 }
 
-/** Busca ou cria um Customer no Stripe para o usuário. */
+/** Price ID da ativação (R$ 297,00 — one-time). Fonte: variável de ambiente. */
+export function getActivationPriceId(): string {
+  const id = process.env.STRIPE_ACTIVATION_PRICE_ID;
+  if (!id) throw new Error("STRIPE_ACTIVATION_PRICE_ID não configurada no ambiente");
+  return id;
+}
+
+/** Price ID da mensalidade (R$ 47,00 — recorrente). Fonte: variável de ambiente. */
+export function getMonthlyPriceId(): string {
+  const id = process.env.STRIPE_MONTHLY_PRICE_ID;
+  if (!id) throw new Error("STRIPE_MONTHLY_PRICE_ID não configurada no ambiente");
+  return id;
+}
+
+/** Retorna o objeto Price da ativação a partir do Stripe (fonte dos valores exibidos). */
+export async function getActivationPrice(): Promise<Stripe.Price> {
+  return getStripe().prices.retrieve(getActivationPriceId());
+}
+
+/** Retorna o objeto Price da mensalidade a partir do Stripe (fonte dos valores exibidos). */
+export async function getMonthlyPrice(): Promise<Stripe.Price> {
+  return getStripe().prices.retrieve(getMonthlyPriceId());
+}
+
+/** Busca ou cria um Customer no Stripe para o usuário (reutiliza se já existir). */
 export async function getOrCreateCustomer(metadata: BillingUser): Promise<Stripe.Customer> {
   const admin = createAdminClient();
   const stripe = getStripe();
@@ -37,80 +61,30 @@ export async function getOrCreateCustomer(metadata: BillingUser): Promise<Stripe
 }
 
 /**
- * Preço único de ativação (one-time) por plano. Usa idempotency key para
- * não criar preços duplicados no Stripe.
- */
-export async function getOrCreateActivationPrice(plan: Plan): Promise<Stripe.Price> {
-  const stripe = getStripe();
-  const amount = plan.activation_price_cents;
-
-  const existing = await stripe.prices.list({
-    lookup_keys: [`activation-${plan.code}`],
-    limit: 1,
-  });
-  if (existing.data.length > 0) return existing.data[0];
-
-  const product = plan.stripe_product_id
-    ? plan.stripe_product_id
-    : (
-        await stripe.products.create({ name: `Ativação — ${plan.name}`, metadata: { plan_code: plan.code } })
-      ).id;
-
-  return stripe.prices.create(
-    {
-      product,
-      unit_amount: amount,
-      currency: "brl",
-      lookup_key: `activation-${plan.code}`,
-      metadata: { plan_code: plan.code, type: "activation" },
-    },
-    { idempotencyKey: `price-activation-${plan.code}` }
-  );
-}
-
-/**
- * Cria a assinatura recorrente com billing_cycle_anchor em +30 dias
- * (primeira mensalidade cobrada 1 mês após a ativação).
+ * Cria a assinatura recorrente de R$ 47,00/mês com billing_cycle_anchor em +30 dias:
+ * a primeira mensalidade é cobrada somente 1 mês após a ativação.
  */
 export async function createRecurringSubscription(
   customerId: string,
-  plan: Plan,
-  metadata: BillingUser
+  metadata: BillingUser & { planId?: string | null }
 ): Promise<Stripe.Subscription> {
   const stripe = getStripe();
 
-  // Garante preço recorrente no Stripe para o plano
-  const priceId =
-    plan.stripe_price_id ||
-    (
-      await stripe.prices.list({ lookup_keys: [`${plan.code}-recurring`], limit: 1 })
-    ).data[0]?.id;
-
-  const resolvedPriceId =
-    priceId ||
-    (
-      await stripe.prices.create(
-        {
-          product: plan.stripe_product_id || (await stripe.products.create({ name: plan.name })).id,
-          unit_amount: plan.monthly_price_cents,
-          currency: "brl",
-          recurring: { interval: plan.billing_interval === "year" ? "year" : "month", interval_count: 1 },
-          lookup_key: `${plan.code}-recurring`,
-          metadata: { plan_code: plan.code },
-        },
-        { idempotencyKey: `price-recurring-${plan.code}` }
-      )
-    ).id;
-
   const anchor = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
+
+  const subMetadata: Record<string, string> = {
+    tenant_id: metadata.tenantId,
+    user_id: metadata.userId,
+  };
+  if (metadata.planId) subMetadata.plan_id = metadata.planId;
 
   return stripe.subscriptions.create({
     customer: customerId,
-    items: [{ price: resolvedPriceId }],
+    items: [{ price: getMonthlyPriceId() }],
     billing_cycle_anchor: anchor,
     proration_behavior: "none",
     payment_behavior: "allow_incomplete",
-    metadata: { tenant_id: metadata.tenantId, user_id: metadata.userId, plan_id: plan.id },
+    metadata: subMetadata,
   });
 }
 

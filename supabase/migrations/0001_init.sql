@@ -457,8 +457,10 @@ create policy plans_select_all on public.plans
   for select using (true);
 
 -- ============================ SEED ============================
+-- Modelo comercial: R$ 297,00 de ativação (único) + R$ 47,00/mês (recorrente).
+-- Os Price IDs cobrados vêm do Stripe via variáveis de ambiente.
 insert into public.plans (name, code, description, activation_price_cents, monthly_price_cents, billing_interval, features, is_active)
 values
-  ('Plano Mensal', 'monthly', 'Site profissional, IA, agendamento, CRM e domínio próprio.', 0, 9700, 'month', '["Site profissional personalizado","Chat IA especialista doTERRA","Agendamento integrado","CRM de clientes","Domínio próprio incluso","Suporte por WhatsApp"]', true),
-  ('Plano Anual', 'yearly', 'Todos os benefícios do plano mensal com desconto.', 0, 29900, 'year', '["Tudo do plano mensal","Domínio próprio incluso","Base de conhecimento IA","Relatórios avançados","Prioridade no suporte","Novidades em primeira mão"]', true)
+  ('Plano Mensal', 'monthly', 'Site profissional, IA, agendamento, CRM e domínio próprio.', 29700, 4700, 'month', '["Site profissional personalizado","Chat IA especialista doTERRA","Agendamento integrado","CRM de clientes","Domínio próprio incluso","Suporte por WhatsApp"]', true),
+  ('Plano Anual', 'yearly', 'Todos os benefícios do plano mensal com desconto.', 29700, 4700, 'year', '["Tudo do plano mensal","Domínio próprio incluso","Base de conhecimento IA","Relatórios avançados","Prioridade no suporte","Novidades em primeira mão"]', false)
 on conflict (code) do nothing;
