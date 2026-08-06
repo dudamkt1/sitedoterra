@@ -1,23 +1,77 @@
--- ============================================================================
--- Plataforma Multi-Tenant doTERRA — Schema inicial
+﻿-- ============================================================================
+-- Plataforma Multi-Tenant doTERRA â€” Schema inicial
+-- IDEMPOTENTE: pode ser re-executado sem erros (todas as criaÃ§Ãµes sÃ£o guardadas).
 -- ============================================================================
 
 -- ============================ EXTENSIONS ============================
 create extension if not exists "uuid-ossp";
 
 -- ============================ ENUMS ============================
-create type public.user_role as enum ('user', 'superadmin');
-create type public.account_status as enum ('pending_activation', 'active', 'suspended', 'blocked', 'cancelled');
-create type public.site_status as enum ('pending', 'active', 'suspended');
-create type public.subscription_status as enum ('awaiting_activation', 'incomplete', 'trialing', 'active', 'past_due', 'unpaid', 'canceled', 'paused');
-create type public.domain_status as enum ('pending', 'verifying', 'verified', 'ssl_pending', 'active', 'error', 'removed', 'blocked');
-create type public.payment_status as enum ('pending', 'succeeded', 'failed', 'refunded', 'cancelled');
-create type public.payment_type as enum ('activation', 'subscription', 'manual', 'refund');
-create type public.plan_interval as enum ('month', 'year');
-create type public.plan_status as enum ('active', 'inactive');
+do $$
+begin
+  if not exists (select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace where n.nspname = 'public' and t.typname = 'user_role' and typtype = 'e') then
+    create type public.user_role as enum ('user', 'superadmin');
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace where n.nspname = 'public' and t.typname = 'account_status' and typtype = 'e') then
+    create type public.account_status as enum ('pending_activation', 'active', 'suspended', 'blocked', 'cancelled');
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace where n.nspname = 'public' and t.typname = 'site_status' and typtype = 'e') then
+    create type public.site_status as enum ('pending', 'active', 'suspended');
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace where n.nspname = 'public' and t.typname = 'subscription_status' and typtype = 'e') then
+    create type public.subscription_status as enum ('awaiting_activation', 'incomplete', 'trialing', 'active', 'past_due', 'unpaid', 'canceled', 'paused');
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace where n.nspname = 'public' and t.typname = 'domain_status' and typtype = 'e') then
+    create type public.domain_status as enum ('pending', 'verifying', 'verified', 'ssl_pending', 'active', 'error', 'removed', 'blocked');
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace where n.nspname = 'public' and t.typname = 'payment_status' and typtype = 'e') then
+    create type public.payment_status as enum ('pending', 'succeeded', 'failed', 'refunded', 'cancelled');
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace where n.nspname = 'public' and t.typname = 'payment_type' and typtype = 'e') then
+    create type public.payment_type as enum ('activation', 'subscription', 'manual', 'refund');
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace where n.nspname = 'public' and t.typname = 'plan_interval' and typtype = 'e') then
+    create type public.plan_interval as enum ('month', 'year');
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace where n.nspname = 'public' and t.typname = 'plan_status' and typtype = 'e') then
+    create type public.plan_status as enum ('active', 'inactive');
+  end if;
+end $$;
 
 -- ============================ PROFILES ============================
-create table public.profiles (
+create table if not exists public.profiles (
   user_id uuid primary key references auth.users(id) on delete cascade,
   email text not null,
   name text,
@@ -33,10 +87,10 @@ create table public.profiles (
   blocked_at timestamptz,
   unblocked_at timestamptz
 );
-create index profiles_email_idx on public.profiles (email);
+create index if not exists profiles_email_idx on public.profiles (email);
 
 -- ============================ TENANTS ============================
-create table public.tenants (
+create table if not exists public.tenants (
   id uuid primary key default uuid_generate_v4(),
   user_id uuid not null references public.profiles(user_id) on delete cascade unique,
   slug text unique not null,
@@ -49,17 +103,17 @@ create table public.tenants (
   reactivated_at timestamptz,
   settings jsonb not null default '{}'::jsonb
 );
-create index tenants_slug_idx on public.tenants (slug);
+create index if not exists tenants_slug_idx on public.tenants (slug);
 
 -- ============================ SITE SETTINGS ============================
-create table public.site_settings (
+create table if not exists public.site_settings (
   tenant_id uuid primary key references public.tenants(id) on delete cascade,
   data jsonb not null default '{}'::jsonb,
   updated_at timestamptz not null default now()
 );
 
 -- ============================ PLANS ============================
-create table public.plans (
+create table if not exists public.plans (
   id uuid primary key default uuid_generate_v4(),
   name text not null,
   code text not null unique,
@@ -77,7 +131,7 @@ create table public.plans (
 );
 
 -- ============================ SUBSCRIPTIONS ============================
-create table public.subscriptions (
+create table if not exists public.subscriptions (
   id uuid primary key default uuid_generate_v4(),
   tenant_id uuid not null references public.tenants(id) on delete cascade,
   plan_id uuid references public.plans(id),
@@ -96,11 +150,11 @@ create table public.subscriptions (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-create index subscriptions_tenant_idx on public.subscriptions (tenant_id);
-create index subscriptions_customer_idx on public.subscriptions (stripe_customer_id);
+create index if not exists subscriptions_tenant_idx on public.subscriptions (tenant_id);
+create index if not exists subscriptions_customer_idx on public.subscriptions (stripe_customer_id);
 
 -- ============================ PAYMENTS ============================
-create table public.payments (
+create table if not exists public.payments (
   id uuid primary key default uuid_generate_v4(),
   tenant_id uuid not null references public.tenants(id) on delete cascade,
   subscription_id uuid references public.subscriptions(id) on delete set null,
@@ -114,10 +168,10 @@ create table public.payments (
   metadata jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
-create index payments_tenant_idx on public.payments (tenant_id);
+create index if not exists payments_tenant_idx on public.payments (tenant_id);
 
 -- ============================ BILLING HISTORY ============================
-create table public.billing_history (
+create table if not exists public.billing_history (
   id uuid primary key default uuid_generate_v4(),
   tenant_id uuid not null references public.tenants(id) on delete cascade,
   subscription_id uuid references public.subscriptions(id) on delete set null,
@@ -132,10 +186,10 @@ create table public.billing_history (
   period_end timestamptz,
   created_at timestamptz not null default now()
 );
-create index billing_tenant_idx on public.billing_history (tenant_id);
+create index if not exists billing_tenant_idx on public.billing_history (tenant_id);
 
 -- ============================ DOMAINS ============================
-create table public.domains (
+create table if not exists public.domains (
   id uuid primary key default uuid_generate_v4(),
   tenant_id uuid not null references public.tenants(id) on delete cascade,
   domain text not null unique,
@@ -151,11 +205,11 @@ create table public.domains (
   removed_at timestamptz,
   created_at timestamptz not null default now()
 );
-create index domains_tenant_idx on public.domains (tenant_id);
-create index domains_domain_idx on public.domains (domain);
+create index if not exists domains_tenant_idx on public.domains (tenant_id);
+create index if not exists domains_domain_idx on public.domains (domain);
 
 -- ============================ PAYMENT EVENTS (webhooks / auditoria) ============================
-create table public.payment_events (
+create table if not exists public.payment_events (
   id uuid primary key default uuid_generate_v4(),
   stripe_event_id text not null unique,
   stripe_event_type text not null,
@@ -165,7 +219,7 @@ create table public.payment_events (
 );
 
 -- ============================ AUDIT LOGS ============================
-create table public.audit_logs (
+create table if not exists public.audit_logs (
   id uuid primary key default uuid_generate_v4(),
   actor_id uuid references auth.users(id) on delete set null,
   actor_role public.user_role,
@@ -175,7 +229,7 @@ create table public.audit_logs (
   metadata jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
-create index audit_logs_entity_idx on public.audit_logs (entity_type, entity_id);
+create index if not exists audit_logs_entity_idx on public.audit_logs (entity_type, entity_id);
 
 -- ============================ TRIGGERS ============================
 create or replace function public.handle_new_user()
@@ -191,6 +245,7 @@ begin
 end;
 $$;
 
+drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
@@ -206,19 +261,24 @@ begin
 end;
 $$;
 
+drop trigger if exists profiles_touch on public.profiles;
 create trigger profiles_touch before update on public.profiles
   for each row execute procedure public.touch_updated_at();
+drop trigger if exists tenants_touch on public.tenants;
 create trigger tenants_touch before update on public.tenants
   for each row execute procedure public.touch_updated_at();
+drop trigger if exists subscriptions_touch on public.subscriptions;
 create trigger subscriptions_touch before update on public.subscriptions
   for each row execute procedure public.touch_updated_at();
+drop trigger if exists site_settings_touch on public.site_settings;
 create trigger site_settings_touch before update on public.site_settings
   for each row execute procedure public.touch_updated_at();
+drop trigger if exists plans_touch on public.plans;
 create trigger plans_touch before update on public.plans
   for each row execute procedure public.touch_updated_at();
 
--- ============================ FUNÇÕES PÚBLICAS (multi-tenant) ============================
--- Retorna o tenant público por slug, apenas se o site for PUBLICO.
+-- ============================ FUNÃ‡Ã•ES PÃšBLICAS (multi-tenant) ============================
+-- Retorna o tenant pÃºblico por slug, apenas se o site for PUBLICO.
 create or replace function public.get_public_tenant_by_slug(p_slug text)
 returns table (
   tenant_id uuid,
@@ -258,7 +318,7 @@ as $$
     );
 $$;
 
--- Retorna o tenant por domínio personalizado (apenas se PUBLICO).
+-- Retorna o tenant por domÃ­nio personalizado (apenas se PUBLICO).
 create or replace function public.get_public_tenant_by_domain(p_domain text)
 returns table (
   tenant_id uuid,
@@ -333,7 +393,7 @@ begin
 end;
 $$;
 
--- Cria o tenant do usuário (chamado após ativação). Retorna o tenant.
+-- Cria o tenant do usuÃ¡rio (chamado apÃ³s ativaÃ§Ã£o). Retorna o tenant.
 create or replace function public.create_tenant(p_user_id uuid, p_slug text)
 returns public.tenants
 language plpgsql
@@ -365,7 +425,7 @@ begin
 end;
 $$;
 
--- Helper de acesso do Super Admin (usado pelas políticas de RLS).
+-- Helper de acesso do Super Admin (usado pelas polÃ­ticas de RLS).
 create or replace function public.is_superadmin()
 returns boolean
 language sql
@@ -388,79 +448,107 @@ alter table public.plans enable row level security;
 alter table public.audit_logs enable row level security;
 alter table public.payment_events enable row level security;
 
+drop policy if exists audit_select_admin on public.audit_logs;
 create policy audit_select_admin on public.audit_logs
   for select using (public.is_superadmin());
+drop policy if exists payment_events_select_admin on public.payment_events;
 create policy payment_events_select_admin on public.payment_events
   for select using (public.is_superadmin());
 
--- Isolamento multi-tenant: cada usuário só acessa os próprios dados.
+-- Isolamento multi-tenant: cada usuÃ¡rio sÃ³ acessa os prÃ³prios dados.
 -- O papel 'superadmin' acessa tudo. Admin da app usa service_role (bypass RLS).
 
+drop policy if exists profiles_select_own on public.profiles;
 create policy profiles_select_own on public.profiles
   for select using (user_id = auth.uid() or public.is_superadmin());
+drop policy if exists profiles_update_own on public.profiles;
 create policy profiles_update_own on public.profiles
   for update using (user_id = auth.uid());
+drop policy if exists profiles_update_admin on public.profiles;
 create policy profiles_update_admin on public.profiles
   for update using (public.is_superadmin());
+drop policy if exists profiles_insert_own on public.profiles;
 create policy profiles_insert_own on public.profiles
   for insert with check (user_id = auth.uid());
 
+drop policy if exists tenants_select_own on public.tenants;
 create policy tenants_select_own on public.tenants
   for select using (user_id = auth.uid() or public.is_superadmin());
+drop policy if exists tenants_update_own on public.tenants;
 create policy tenants_update_own on public.tenants
   for update using (user_id = auth.uid());
+drop policy if exists tenants_update_admin on public.tenants;
 create policy tenants_update_admin on public.tenants
   for update using (public.is_superadmin());
+drop policy if exists tenants_insert_own on public.tenants;
 create policy tenants_insert_own on public.tenants
   for insert with check (user_id = auth.uid());
+drop policy if exists tenants_delete_admin on public.tenants;
 create policy tenants_delete_admin on public.tenants
   for delete using (public.is_superadmin());
 
+drop policy if exists site_settings_select_own on public.site_settings;
 create policy site_settings_select_own on public.site_settings
   for select using (tenant_id in (select id from public.tenants where user_id = auth.uid()) or public.is_superadmin());
+drop policy if exists site_settings_update_own on public.site_settings;
 create policy site_settings_update_own on public.site_settings
   for update using (tenant_id in (select id from public.tenants where user_id = auth.uid()));
+drop policy if exists site_settings_update_admin on public.site_settings;
 create policy site_settings_update_admin on public.site_settings
   for update using (public.is_superadmin());
+drop policy if exists site_settings_insert_own on public.site_settings;
 create policy site_settings_insert_own on public.site_settings
   for insert with check (tenant_id in (select id from public.tenants where user_id = auth.uid()));
 
+drop policy if exists subs_select_own on public.subscriptions;
 create policy subs_select_own on public.subscriptions
   for select using (tenant_id in (select id from public.tenants where user_id = auth.uid()) or public.is_superadmin());
+drop policy if exists subs_update_own on public.subscriptions;
 create policy subs_update_own on public.subscriptions
   for update using (tenant_id in (select id from public.tenants where user_id = auth.uid()));
+drop policy if exists subs_update_admin on public.subscriptions;
 create policy subs_update_admin on public.subscriptions
   for update using (public.is_superadmin());
+drop policy if exists subs_insert_own on public.subscriptions;
 create policy subs_insert_own on public.subscriptions
   for insert with check (tenant_id in (select id from public.tenants where user_id = auth.uid()));
 
+drop policy if exists payments_select_own on public.payments;
 create policy payments_select_own on public.payments
   for select using (tenant_id in (select id from public.tenants where user_id = auth.uid()) or public.is_superadmin());
+drop policy if exists payments_select_admin on public.payments;
 create policy payments_select_admin on public.payments
   for select using (public.is_superadmin());
 
+drop policy if exists billing_select_own on public.billing_history;
 create policy billing_select_own on public.billing_history
   for select using (tenant_id in (select id from public.tenants where user_id = auth.uid()) or public.is_superadmin());
 
+drop policy if exists domains_select_own on public.domains;
 create policy domains_select_own on public.domains
   for select using (tenant_id in (select id from public.tenants where user_id = auth.uid()) or public.is_superadmin());
+drop policy if exists domains_update_own on public.domains;
 create policy domains_update_own on public.domains
   for update using (tenant_id in (select id from public.tenants where user_id = auth.uid()));
+drop policy if exists domains_update_admin on public.domains;
 create policy domains_update_admin on public.domains
   for update using (public.is_superadmin());
+drop policy if exists domains_insert_own on public.domains;
 create policy domains_insert_own on public.domains
   for insert with check (tenant_id in (select id from public.tenants where user_id = auth.uid()));
+drop policy if exists domains_delete_admin on public.domains;
 create policy domains_delete_admin on public.domains
   for delete using (public.is_superadmin());
 
+drop policy if exists plans_select_all on public.plans;
 create policy plans_select_all on public.plans
   for select using (true);
 
 -- ============================ SEED ============================
--- Modelo comercial: R$ 297,00 de ativação (único) + R$ 47,00/mês (recorrente).
--- Os Price IDs cobrados vêm do Stripe via variáveis de ambiente.
+-- Modelo comercial: R$ 297,00 de ativaÃ§Ã£o (Ãºnico) + R$ 47,00/mÃªs (recorrente).
+-- Os Price IDs cobrados vÃªm do Stripe via variÃ¡veis de ambiente.
 insert into public.plans (name, code, description, activation_price_cents, monthly_price_cents, billing_interval, features, is_active)
 values
-  ('Plano Mensal', 'monthly', 'Site profissional, IA, agendamento, CRM e domínio próprio.', 29700, 4700, 'month', '["Site profissional personalizado","Chat IA especialista doTERRA","Agendamento integrado","CRM de clientes","Domínio próprio incluso","Suporte por WhatsApp"]', true),
-  ('Plano Anual', 'yearly', 'Todos os benefícios do plano mensal com desconto.', 29700, 4700, 'year', '["Tudo do plano mensal","Domínio próprio incluso","Base de conhecimento IA","Relatórios avançados","Prioridade no suporte","Novidades em primeira mão"]', false)
+  ('Plano Mensal', 'monthly', 'Site profissional, IA, agendamento, CRM e domÃ­nio prÃ³prio.', 29700, 4700, 'month', '["Site profissional personalizado","Chat IA especialista doTERRA","Agendamento integrado","CRM de clientes","DomÃ­nio prÃ³prio incluso","Suporte por WhatsApp"]', true),
+  ('Plano Anual', 'yearly', 'Todos os benefÃ­cios do plano mensal com desconto.', 29700, 4700, 'year', '["Tudo do plano mensal","DomÃ­nio prÃ³prio incluso","Base de conhecimento IA","RelatÃ³rios avanÃ§ados","Prioridade no suporte","Novidades em primeira mÃ£o"]', false)
 on conflict (code) do nothing;

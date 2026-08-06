@@ -2,6 +2,7 @@
 -- CONTINUAÇÃO PARA PROJETOS ONDE O 0001_init.sql FALHOU PARCIALMENTE
 -- (erro: function public.is_superadmin() does not exist na linha do policy)
 -- ----------------------------------------------------------------------------
+-- IDEMPOTENTE: pode ser re-executado sem erros (todas as políticas têm guarda).
 -- Rodar SOMENTE em um projeto onde o 0001 foi aplicado até o bloco de RLS
 -- (tabelas/enums/funções/triggers já existem). Em projeto novo, basta rodar
 -- o 0001_init.sql corrigido (a ordem da função is_superadmin foi ajustada).
@@ -18,68 +19,96 @@ as $$
   select coalesce((select role = 'superadmin' from public.profiles where user_id = auth.uid()), false);
 $$;
 
+drop policy if exists audit_select_admin on public.audit_logs;
 create policy audit_select_admin on public.audit_logs
   for select using (public.is_superadmin());
+drop policy if exists payment_events_select_admin on public.payment_events;
 create policy payment_events_select_admin on public.payment_events
   for select using (public.is_superadmin());
 
+drop policy if exists profiles_select_own on public.profiles;
 create policy profiles_select_own on public.profiles
   for select using (user_id = auth.uid() or public.is_superadmin());
+drop policy if exists profiles_update_own on public.profiles;
 create policy profiles_update_own on public.profiles
   for update using (user_id = auth.uid());
+drop policy if exists profiles_update_admin on public.profiles;
 create policy profiles_update_admin on public.profiles
   for update using (public.is_superadmin());
+drop policy if exists profiles_insert_own on public.profiles;
 create policy profiles_insert_own on public.profiles
   for insert with check (user_id = auth.uid());
 
+drop policy if exists tenants_select_own on public.tenants;
 create policy tenants_select_own on public.tenants
   for select using (user_id = auth.uid() or public.is_superadmin());
+drop policy if exists tenants_update_own on public.tenants;
 create policy tenants_update_own on public.tenants
   for update using (user_id = auth.uid());
+drop policy if exists tenants_update_admin on public.tenants;
 create policy tenants_update_admin on public.tenants
   for update using (public.is_superadmin());
+drop policy if exists tenants_insert_own on public.tenants;
 create policy tenants_insert_own on public.tenants
   for insert with check (user_id = auth.uid());
+drop policy if exists tenants_delete_admin on public.tenants;
 create policy tenants_delete_admin on public.tenants
   for delete using (public.is_superadmin());
 
+drop policy if exists site_settings_select_own on public.site_settings;
 create policy site_settings_select_own on public.site_settings
   for select using (tenant_id in (select id from public.tenants where user_id = auth.uid()) or public.is_superadmin());
+drop policy if exists site_settings_update_own on public.site_settings;
 create policy site_settings_update_own on public.site_settings
   for update using (tenant_id in (select id from public.tenants where user_id = auth.uid()));
+drop policy if exists site_settings_update_admin on public.site_settings;
 create policy site_settings_update_admin on public.site_settings
   for update using (public.is_superadmin());
+drop policy if exists site_settings_insert_own on public.site_settings;
 create policy site_settings_insert_own on public.site_settings
   for insert with check (tenant_id in (select id from public.tenants where user_id = auth.uid()));
 
+drop policy if exists subs_select_own on public.subscriptions;
 create policy subs_select_own on public.subscriptions
   for select using (tenant_id in (select id from public.tenants where user_id = auth.uid()) or public.is_superadmin());
+drop policy if exists subs_update_own on public.subscriptions;
 create policy subs_update_own on public.subscriptions
   for update using (tenant_id in (select id from public.tenants where user_id = auth.uid()));
+drop policy if exists subs_update_admin on public.subscriptions;
 create policy subs_update_admin on public.subscriptions
   for update using (public.is_superadmin());
+drop policy if exists subs_insert_own on public.subscriptions;
 create policy subs_insert_own on public.subscriptions
   for insert with check (tenant_id in (select id from public.tenants where user_id = auth.uid()));
 
+drop policy if exists payments_select_own on public.payments;
 create policy payments_select_own on public.payments
   for select using (tenant_id in (select id from public.tenants where user_id = auth.uid()) or public.is_superadmin());
+drop policy if exists payments_select_admin on public.payments;
 create policy payments_select_admin on public.payments
   for select using (public.is_superadmin());
 
+drop policy if exists billing_select_own on public.billing_history;
 create policy billing_select_own on public.billing_history
   for select using (tenant_id in (select id from public.tenants where user_id = auth.uid()) or public.is_superadmin());
 
+drop policy if exists domains_select_own on public.domains;
 create policy domains_select_own on public.domains
   for select using (tenant_id in (select id from public.tenants where user_id = auth.uid()) or public.is_superadmin());
+drop policy if exists domains_update_own on public.domains;
 create policy domains_update_own on public.domains
   for update using (tenant_id in (select id from public.tenants where user_id = auth.uid()));
+drop policy if exists domains_update_admin on public.domains;
 create policy domains_update_admin on public.domains
   for update using (public.is_superadmin());
+drop policy if exists domains_insert_own on public.domains;
 create policy domains_insert_own on public.domains
   for insert with check (tenant_id in (select id from public.tenants where user_id = auth.uid()));
+drop policy if exists domains_delete_admin on public.domains;
 create policy domains_delete_admin on public.domains
   for delete using (public.is_superadmin());
 
+drop policy if exists plans_select_all on public.plans;
 create policy plans_select_all on public.plans
   for select using (true);
 
