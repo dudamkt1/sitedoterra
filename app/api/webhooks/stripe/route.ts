@@ -38,11 +38,17 @@ export async function POST(request: Request) {
   }
 
   // ---- Idempotência ----
-  const { error: insertErr } = await admin.from("payment_events").insert({
-    stripe_event_id: event.id,
-    stripe_event_type: event.type,
-    data: body ? JSON.parse(body) : {},
-  }).select("id").maybeSingle();
+  const { data: inserted, error: insertErr } = await admin
+    .from("payment_events")
+    .insert({
+      stripe_event_id: event.id,
+      stripe_event_type: event.type,
+      data: body ? JSON.parse(body) : {},
+    })
+    .select("processed_at")
+    .maybeSingle();
+
+  const processedAt = inserted?.processed_at || null;
 
   if (insertErr) {
     const isDup = String(insertErr.message).toLowerCase().includes("duplicate") ||
@@ -58,6 +64,9 @@ export async function POST(request: Request) {
   try {
     await handleEvent(event);
   } catch (err) {
+    // Falhou ao processar: remove a claim de idempotência para que a
+    // próxima tentativa do Stripe reprocesse o evento de verdade.
+    await admin.from("payment_events").delete().eq("stripe_event_id", event.id);
     console.error("Erro ao processar webhook", event.type, err);
     return NextResponse.json({ error: "processing_error" }, { status: 500 });
   }
@@ -186,6 +195,10 @@ async function handleEvent(event: Stripe.Event) {
             : invoice.subscription;
         if (subObj) await upsertSubscriptionFromStripe(subObj);
       }
+
+      // Invoice R$ 0 gerada pela billing_cycle_anchor futura (1ª mensalidade
+      // só em +30 dias): sincroniza a assinatura, mas não registra pagamento.
+      if ((invoice.amount_paid || 0) <= 0) break;
 
       if (tenantId) {
         await admin.from("billing_history").upsert(

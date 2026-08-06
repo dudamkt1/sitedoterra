@@ -39,6 +39,18 @@ export async function getOrCreateCustomer(metadata: BillingUser): Promise<Stripe
   const admin = createAdminClient();
   const stripe = getStripe();
 
+  // 1) Já vinculado ao tenant (persistido no momento do primeiro checkout)
+  const { data: tenant } = await admin
+    .from("tenants")
+    .select("stripe_customer_id")
+    .eq("id", metadata.tenantId)
+    .maybeSingle();
+
+  if (tenant?.stripe_customer_id) {
+    return (await stripe.customers.retrieve(tenant.stripe_customer_id)) as Stripe.Customer;
+  }
+
+  // 2) Fallback: vinculado em alguma assinatura existente
   const { data: existingSub } = await admin
     .from("subscriptions")
     .select("stripe_customer_id")
@@ -48,14 +60,24 @@ export async function getOrCreateCustomer(metadata: BillingUser): Promise<Stripe
     .maybeSingle();
 
   if (existingSub?.stripe_customer_id) {
+    await admin
+      .from("tenants")
+      .update({ stripe_customer_id: existingSub.stripe_customer_id })
+      .eq("id", metadata.tenantId);
     return (await stripe.customers.retrieve(existingSub.stripe_customer_id)) as Stripe.Customer;
   }
 
+  // 3) Cria e persiste no tenant para nunca duplicar Customers
   const customer = await stripe.customers.create({
     email: metadata.email,
     name: metadata.name || undefined,
     metadata: { tenant_id: metadata.tenantId, user_id: metadata.userId },
   });
+
+  await admin
+    .from("tenants")
+    .update({ stripe_customer_id: customer.id })
+    .eq("id", metadata.tenantId);
 
   return customer;
 }
@@ -108,9 +130,13 @@ export async function upsertSubscriptionFromStripe(sub: Stripe.Subscription): Pr
     current_period_end: sub.current_period_end ? new Date(sub.current_period_end * 1000).toISOString() : null,
     next_billing_at: sub.current_period_end ? new Date(sub.current_period_end * 1000).toISOString() : null,
     cancel_at_period_end: sub.cancel_at_period_end,
-    activated_at: sub.status === "active" ? new Date().toISOString() : undefined,
-    canceled_at: sub.status === "canceled" ? new Date().toISOString() : undefined,
   };
+
+  // Sincroniza o customer no tenant (evita duplicar Customers Stripe)
+  await admin
+    .from("tenants")
+    .update({ stripe_customer_id: payload.stripe_customer_id })
+    .eq("id", tenantId);
 
   const { data: existing } = await admin
     .from("subscriptions")
@@ -121,7 +147,11 @@ export async function upsertSubscriptionFromStripe(sub: Stripe.Subscription): Pr
   if (existing) {
     const { data } = await admin
       .from("subscriptions")
-      .update(payload)
+      .update({
+        ...payload,
+        // Reativação (active) limpa a data de cancelamento; cancelamento marca.
+        canceled_at: sub.status === "canceled" ? new Date().toISOString() : null,
+      })
       .eq("id", existing.id)
       .select("*")
       .single();
@@ -130,7 +160,11 @@ export async function upsertSubscriptionFromStripe(sub: Stripe.Subscription): Pr
 
   const { data } = await admin
     .from("subscriptions")
-    .insert(payload)
+    .insert({
+      ...payload,
+      activated_at: sub.status === "active" ? new Date().toISOString() : null,
+      canceled_at: sub.status === "canceled" ? new Date().toISOString() : null,
+    })
     .select("*")
     .single();
   return (data as Subscription) || null;

@@ -59,6 +59,12 @@ export async function POST(request: Request) {
     line_items: [{ price: getActivationPriceId(), quantity: 1 }],
     customer: customer.id,
     metadata,
+    payment_intent_data: {
+      // Salva o cartão como método de pagamento padrão do Customer para
+      // cobranças off-session — usado pela mensalidade R$ 47 que será
+      // criada após a ativação (primeira cobrança apenas em +30 dias).
+      setup_future_usage: "off_session",
+    },
     success_url: `${appUrl}/painel/assinatura?sucesso=1`,
     cancel_url: `${appUrl}/painel/assinatura`,
   });

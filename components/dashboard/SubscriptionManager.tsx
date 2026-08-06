@@ -80,10 +80,14 @@ export function SubscriptionManager({
     setLoading(false);
   }
 
-  const isActive = subscription?.status === "active";
-  const isCanceled = subscription?.status === "canceled" || subscription?.cancel_at_period_end;
+  const cancelScheduled = subscription?.cancel_at_period_end === true;
+  const isActive = subscription?.status === "active" && !cancelScheduled;
+  const isCanceled =
+    subscription?.status === "canceled" ||
+    subscription?.status === "paused" ||
+    cancelScheduled;
   const nextBilling = subscription?.next_billing_at || subscription?.current_period_end;
-  const statusLabel = isCanceled && subscription?.cancel_at_period_end
+  const statusLabel = cancelScheduled
     ? "Cancelamento agendado para o fim do período"
     : undefined;
 
