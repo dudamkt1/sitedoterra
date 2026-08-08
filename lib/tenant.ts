@@ -8,7 +8,12 @@ import type { PublicTenant, Subscription } from "@/types";
  *
  * Retorna null quando o site não é público (suspenso/inexistente).
  */
+function hasSupabaseEnv(): boolean {
+  return !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+}
+
 export async function getPublicTenantBySlug(slug: string): Promise<PublicTenant | null> {
+  if (!hasSupabaseEnv()) return null;
   const admin = createAdminClient();
   const { data, error } = await admin.rpc("get_public_tenant_by_slug", { p_slug: slug });
   if (error) return null;
@@ -17,6 +22,7 @@ export async function getPublicTenantBySlug(slug: string): Promise<PublicTenant 
 }
 
 export async function getPublicTenantByDomain(hostname: string): Promise<PublicTenant | null> {
+  if (!hasSupabaseEnv()) return null;
   const domain = hostname.toLowerCase().replace(/^www\./, "");
   const admin = createAdminClient();
   const { data, error } = await admin.rpc("get_public_tenant_by_domain", { p_domain: domain });
@@ -30,8 +36,6 @@ export async function getPublicTenantByDomain(hostname: string): Promise<PublicT
  * Retorna { tenant, access } — use para renderizar o site ou a página de suspensão.
  */
 export async function resolveTenantAccess(opts: { slug?: string; hostname?: string }) {
-  const admin = createAdminClient();
-
   let tenantId: string | null = null;
   let tenant: PublicTenant | null = null;
 
@@ -45,6 +49,8 @@ export async function resolveTenantAccess(opts: { slug?: string; hostname?: stri
     return { tenant: null, access: "suspended" as const, subscription: null };
   }
   tenantId = tenant.tenant_id;
+
+  const admin = createAdminClient();
 
   // Busca assinatura ativa para checagem precisa de acesso
   const { data: sub } = await admin

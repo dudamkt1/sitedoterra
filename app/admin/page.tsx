@@ -5,6 +5,9 @@ import { formatBRL } from "@/lib/utils";
 export const dynamic = "force-dynamic";
 
 export default async function AdminHome() {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return null;
+  }
   const admin = createAdminClient();
 
   const now = new Date();
