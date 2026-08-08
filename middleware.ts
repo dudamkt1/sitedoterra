@@ -1,6 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
-import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
 const PROTECTED_PREFIXES = ["/painel", "/admin"];
 const AUTH_PREFIXES = ["/login", "/cadastro", "/signup"];
@@ -22,17 +21,38 @@ async function resolveSlugByHostname(host: string): Promise<string | null> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !anon) return null;
-  const supabase = createSupabaseClient(url, anon, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
+
   const domain = host.toLowerCase().replace(/^www\./, "").split(":")[0];
-  const { data } = await supabase.rpc("get_public_tenant_by_domain", { p_domain: domain });
-  if (!data) return null;
-  const row = Array.isArray(data) ? data[0] : data;
-  return (row?.slug as string) || null;
+  try {
+    const res = await fetch(`${url}/rest/v1/rpc/get_public_tenant_by_domain`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: anon,
+        Authorization: `Bearer ${anon}`,
+      },
+      body: JSON.stringify({ p_domain: domain }),
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const data: unknown = await res.json();
+    if (!data) return null;
+    const row = Array.isArray(data) ? data[0] : data;
+    return (row as { slug?: string } | null)?.slug || null;
+  } catch {
+    return null;
+  }
 }
 
 export async function middleware(request: NextRequest) {
+  try {
+    return await handleMiddleware(request);
+  } catch {
+    return NextResponse.next({ request });
+  }
+}
+
+async function handleMiddleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const host = request.headers.get("host") || request.headers.get("x-forwarded-host") || "";
 
