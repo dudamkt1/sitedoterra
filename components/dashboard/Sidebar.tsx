@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 const USER_LINKS = [
   { href: "/painel", label: "Visão geral", icon: "📊" },
   { href: "/painel/meu-site", label: "Meu Site", icon: "🌐" },
+  { href: "/painel/ia", label: "IA para seu site", icon: "🤖" },
   { href: "/painel/assinatura", label: "Minha Assinatura", icon: "💳" },
   { href: "/painel/dominio", label: "Domínio", icon: "🔗" },
   { href: "/painel/pagamentos", label: "Pagamentos", icon: "🧾" },

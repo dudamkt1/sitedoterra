@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
-import { TenantSite } from "@/components/site/TenantSite";
+import { SiteHome } from "@/components/site/SiteHome";
 import { SuspendedSitePage } from "@/components/site/SuspendedSitePage";
 import { resolveTenantAccess } from "@/lib/tenant";
+import { resolveHomeSections } from "@/lib/home";
 
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
   const { tenant } = await resolveTenantAccess({ slug: params.slug });
@@ -31,10 +32,21 @@ export default async function TenantSitePage({ params }: { params: { slug: strin
       : `https://${host}`;
 
   if (access === "available") {
+    const sections = await resolveHomeSections({ tenant });
+    const siteData = (tenant.site_data || {}) as Record<string, unknown>;
     return (
       <>
         <link rel="canonical" href={canonicalUrl} />
-        <TenantSite tenant={tenant} />
+        <SiteHome
+          slug={tenant.slug}
+          sections={sections}
+          contact={{
+            whatsapp: (siteData.whatsapp as string) || undefined,
+            email: (siteData.email as string) || tenant.email || undefined,
+            instagram: siteData.instagram ? `https://instagram.com/${String(siteData.instagram).replace(/^@/, "")}` : undefined,
+            profileName: tenant.profile_name || undefined,
+          }}
+        />
       </>
     );
   }

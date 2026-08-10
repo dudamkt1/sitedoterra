@@ -121,3 +121,103 @@ export interface PublicTenant {
   profile_name: string | null;
   email: string;
 }
+
+// ============================ HOME MODULAR ============================
+
+export type SectionType =
+  | "header"
+  | "hero"
+  | "trustbar"
+  | "about"
+  | "testimonials"
+  | "story"
+  | "video"
+  | "booking"
+  | "tips"
+  | "products"
+  | "faq"
+  | "pricing"
+  | "footer";
+
+export interface SectionPermissions {
+  can_edit?: boolean;
+  can_toggle?: boolean;
+  can_edit_image?: boolean;
+  can_edit_video?: boolean;
+  can_edit_button?: boolean;
+  can_edit_colors?: boolean;
+  can_edit_layout?: boolean;
+  available_to_all?: boolean;
+}
+
+export interface SiteSection {
+  id: string;
+  type: SectionType;
+  key: string;
+  label: string;
+  title: string | null;
+  subtitle: string | null;
+  enabled: boolean;
+  is_required: boolean;
+  sort_order: number;
+  settings: Record<string, unknown>;
+  content: Record<string, unknown>;
+  permissions: SectionPermissions;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface TenantSection {
+  id?: string;
+  tenant_id: string;
+  section_id: string;
+  enabled: boolean;
+  content: Record<string, unknown>;
+  settings: Record<string, unknown>;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ResolvedHomeSection extends SiteSection {
+  tenant_id?: string;
+  tenant_enabled: boolean;
+  tenant_override?: boolean;
+  anchor: string;
+  navLabel?: string;
+}
+
+// ============================ IA ============================
+
+export interface AiProvider {
+  id: string;
+  code: string;
+  name: string;
+  enabled: boolean;
+  requires_api_key: boolean;
+  free_tier: string | null;
+  limits: string | null;
+  docs_url: string | null;
+  base_url: string | null;
+  model: string | null;
+  instructions: string | null;
+  sort_order: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface AiSettings {
+  id?: string;
+  user_id: string;
+  provider_id: string | null;
+  api_key_enc: string | null;
+  updated_at?: string;
+}
+
+export interface AiConfigView {
+  settings: {
+    provider_id: string | null;
+    has_key: boolean;
+    key_hint: string | null;
+  };
+  providers: AiProvider[];
+}

@@ -150,6 +150,38 @@
 }
 
 
+#tenant-site .nav-extra-link {
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--branco);
+  border: 1px solid rgba(254, 252, 248, 0.45);
+  padding: 0.45rem 1.1rem;
+  border-radius: 2px;
+  text-decoration: none;
+  transition: all 0.3s;
+  background: rgba(196, 150, 58, 0.05);
+}
+
+#tenant-site .nav-extra-link:hover {
+  background: var(--ouro);
+  color: var(--branco);
+  border-color: var(--ouro);
+}
+
+#tenant-site nav.scrolled .nav-extra-link {
+  color: var(--ouro);
+  border-color: rgba(196, 150, 58, 0.4);
+}
+
+#tenant-site nav.scrolled .nav-extra-link:hover {
+  color: var(--branco);
+  background: var(--ouro);
+}
+
+
 #tenant-site .hamburger { display: none; flex-direction: column; gap: 5px; cursor: pointer; background: none; border: none; padding: 4px; }
 
 #tenant-site .hamburger span { width: 22px; height: 1.5px; background: white; display: block; transition: all 0.3s; }
@@ -2171,3 +2203,31 @@
 
 }
 
+/* ============================================================================
+   HOME MODULAR — suporte a imagens reais, vídeo embed e seleção de horário
+   ============================================================================ */
+
+#tenant-site .hero-img-real,
+#tenant-site .historia-img-real {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+#tenant-site .video-embed {
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
+}
+
+#tenant-site .slot.selected {
+  background: var(--verde);
+  color: #fff;
+  border-color: var(--verde);
+}
+
+@media (max-width: 768px) {
+  #tenant-site .video-embed { min-height: 320px; }
+}
