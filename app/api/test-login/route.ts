@@ -10,8 +10,9 @@ export const runtime = "nodejs";
  * Login server-side das contas de teste. As credenciais NUNCA chegam ao
  * frontend (ficam apenas em variáveis de ambiente no servidor).
  *
- * Só funciona quando ENABLE_TEST_ACCOUNTS=true (gate de autorização) e
- * NEXT_PUBLIC_ENABLE_TEST_ACCOUNTS=true (gate de visibilidade dos botões).
+ * Os botões ficam sempre visíveis na tela /login; o login só é efetivado
+ * quando as credenciais (TEST_SUPERADMIN_EMAIL/SENHA e TEST_USER_EMAIL/SENHA)
+ * estão configuradas no servidor.
  *
  * POST /api/test-login   body: { account: "superadmin" | "client" }
  */
@@ -30,23 +31,10 @@ const ACCOUNTS = {
 } as const;
 
 export async function GET() {
-  const enabled =
-    process.env.ENABLE_TEST_ACCOUNTS === "true" &&
-    process.env.NEXT_PUBLIC_ENABLE_TEST_ACCOUNTS === "true";
-  return NextResponse.json({ enabled });
+  return NextResponse.json({ enabled: true });
 }
 
 export async function POST(request: Request) {
-  const enabledServer = process.env.ENABLE_TEST_ACCOUNTS === "true";
-  const enabledPublic = process.env.NEXT_PUBLIC_ENABLE_TEST_ACCOUNTS === "true";
-
-  if (!enabledServer || !enabledPublic) {
-    return NextResponse.json(
-      { error: "Acesso rápido de teste desativado no servidor." },
-      { status: 403 }
-    );
-  }
-
   const body = await request.json().catch(() => ({}));
   const account = ACCOUNTS[String(body.account || "") as keyof typeof ACCOUNTS];
   if (!account) {

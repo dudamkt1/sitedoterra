@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -63,27 +63,6 @@ function LoginForm() {
     }
   }
 
-  // O fallback usa a flag compilada no build; a configuração é confirmada no
-  // servidor em tempo de execução (ambas as flags precisam estar ativas).
-  const [quickLoginEnabled, setQuickLoginEnabled] = useState(
-    process.env.NEXT_PUBLIC_ENABLE_TEST_ACCOUNTS === "true"
-  );
-
-  useEffect(() => {
-    let active = true;
-    fetch("/api/test-login")
-      .then((r) => r.json())
-      .then((json) => {
-        if (active && json && typeof json.enabled === "boolean") {
-          setQuickLoginEnabled(json.enabled);
-        }
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, []);
-
   return (
     <div>
       <h1 className="text-2xl font-semibold mb-1" style={{ fontFamily: "var(--font-display)" }}>
@@ -131,36 +110,35 @@ function LoginForm() {
         </Link>
       </p>
 
-      {quickLoginEnabled && (
-        <div className="mt-8 rounded-xl border border-dashed border-amber-400 bg-amber-50 p-4">
-          <p className="text-[0.7rem] font-bold uppercase tracking-wider text-amber-700 mb-3">
-            Acesso rápido — Testes
-          </p>
-          <div className="space-y-2">
-            <button
-              type="button"
-              onClick={() => quickLogin("superadmin")}
-              disabled={loading}
-              className="w-full btn border border-amber-300 bg-amber-100 text-amber-800 hover:bg-amber-200 !shadow-none"
-            >
-              🛡️ Entrar como Super Admin
-            </button>
-            <button
-              type="button"
-              onClick={() => quickLogin("client")}
-              disabled={loading}
-              className="w-full btn border border-amber-300 bg-white text-amber-700 hover:bg-amber-100 !shadow-none"
-            >
-              🧪 Entrar como Cliente Teste
-            </button>
-          </div>
-          <p className="mt-3 text-[0.65rem] text-amber-600">
-            Contas de TESTE. Disponível somente quando a flag de ambiente
-            <code className="mx-1 font-mono text-amber-700">ENABLE_TEST_ACCOUNTS=true</code>
-            está ativa.
-          </p>
+      <div className="mt-8 rounded-xl border border-dashed border-amber-400 bg-amber-50 p-4">
+        <p className="text-[0.7rem] font-bold uppercase tracking-wider text-amber-700 mb-3">
+          Acesso rápido — Testes
+        </p>
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={() => quickLogin("superadmin")}
+            disabled={loading}
+            className="w-full btn border border-amber-300 bg-amber-100 text-amber-800 hover:bg-amber-200 !shadow-none"
+          >
+            🛡️ Entrar como Super Admin
+          </button>
+          <button
+            type="button"
+            onClick={() => quickLogin("client")}
+            disabled={loading}
+            className="w-full btn border border-amber-300 bg-white text-amber-700 hover:bg-amber-100 !shadow-none"
+          >
+            🧪 Entrar como Conta de Usuário
+          </button>
         </div>
-      )}
+        <p className="mt-3 text-[0.65rem] text-amber-600">
+          Contas de TESTE configuradas em variáveis de ambiente no servidor
+          (<code className="mx-1 font-mono text-amber-700">TEST_SUPERADMIN_EMAIL</code> e{" "}
+          <code className="mx-1 font-mono text-amber-700">TEST_USER_EMAIL</code>). O login só é
+          efetivado se as credenciais estiverem configuradas.
+        </p>
+      </div>
     </div>
   );
 }
