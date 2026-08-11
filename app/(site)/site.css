@@ -1478,6 +1478,15 @@
 }
 
 
+/* HOME modular: a seção "Acompanhe no Instagram" renderiza com id="dicas"
+   (mesmo layout do demo #instagram) — garante o mesmo recuo das demais. */
+#tenant-site #dicas {
+  padding: 100px 8%;
+  background: var(--creme);
+}
+
+
+
 #tenant-site .insta-header {
   display: flex;
   align-items: flex-end;
@@ -2417,6 +2426,10 @@
   #tenant-site #about {
     padding: 70px 6%;
     gap: 3rem;
+  }
+
+  #tenant-site #dicas {
+    padding: 70px 6%;
   }
 
   #tenant-site #about .ia-chat-window {
