@@ -83,10 +83,14 @@ export default function DashboardSidebar({
         )}
       </nav>
 
-      <div className="px-4 py-4 border-t border-gray-100">
-        <p className="text-sm font-medium text-gray-700 mb-1 truncate">{name}</p>
-        <button onClick={signOut} className="text-xs text-red-600 hover:underline">
-          Sair da conta
+      <div className="px-4 py-4 border-t border-gray-100 space-y-2">
+        <p className="text-sm font-medium text-gray-700 truncate">{name}</p>
+        <button
+          onClick={signOut}
+          className="flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
+        >
+          <span>🚪</span>
+          Sair
         </button>
       </div>
     </aside>
