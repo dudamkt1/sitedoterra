@@ -174,21 +174,6 @@ export const SECTION_CONTENT_FIELDS: Record<SectionType, ContentFieldDef[]> = {
   ],
   pricing: [
     { key: "eyebrow", label: "Selo superior", type: "text" },
-    { key: "title", label: "Título", type: "text", ai: true, aiKind: "title" },
-    { key: "subtitle", label: "Subtítulo", type: "text" },
-    {
-      key: "plans", label: "Planos", type: "list", itemLabel: "Plano", fields: [
-        { key: "name", label: "Nome", type: "text" },
-        { key: "price", label: "Preço (ex.: 97)", type: "text" },
-        { key: "period", label: "Período", type: "text" },
-        { key: "popular", label: "Destaque", type: "boolean" },
-        { key: "badge", label: "Selo (ex.: Mais popular)", type: "text" },
-        { key: "economy", label: "Economia", type: "text" },
-        { key: "features", label: "Recursos", type: "list", itemLabel: "Recurso", fields: [{ key: "f", label: "Recurso", type: "text" }] },
-        { key: "buttonText", label: "Texto do botão", type: "text" },
-        { key: "buttonUrl", label: "Link do botão", type: "url" },
-      ],
-    },
   ],
   footer: [
     { key: "aboutText", label: "Texto sobre", type: "textarea", ai: true, aiKind: "description" },

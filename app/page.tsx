@@ -25,9 +25,16 @@ const DEMO_TENANT: PublicTenant = {
  * partir da configuração GLOBAL (Super Admin) com o conteúdo padrão, e o
  * Super Admin edita tudo em /admin/editor-home.
  */
-export default async function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams?: { [key: string]: string | string[] | undefined };
+}) {
+  // ?preview=1 permite ao Super Admin visualizar a HOME pública mesmo logado
+  // (ex.: "Visualizar HOME" em /admin/planos e no Editor da Home).
+  const preview = searchParams?.preview === "1";
   const user = await getCurrentUser();
-  if (user) {
+  if (user && !preview) {
     redirect("/painel");
   }
 

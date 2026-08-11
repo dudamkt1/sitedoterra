@@ -120,7 +120,7 @@ export function HomeEditor({ initialSections, appUrl }: HomeEditorProps) {
           {sections.length} seções · arraste para reordenar
         </p>
         <div className="flex items-center gap-3">
-          <a href="/" target="_blank" className="btn btn-outline !py-2 !px-4 text-xs">
+          <a href="/?preview=1" target="_blank" className="btn btn-outline !py-2 !px-4 text-xs">
             Ver HOME pública ↗
           </a>
           <button className="btn btn-primary !py-2 !px-4 text-xs" onClick={() => setCreating(true)}>

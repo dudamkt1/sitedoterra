@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { DEFAULT_SECTIONS, DEFAULT_SECTION_CONTENT, anchorFor, normalizeSectionPermissions } from "@/lib/site-sections";
+import { getActiveOffer, buildPricingContent } from "@/lib/commercial";
 import type { PublicTenant, ResolvedHomeSection, SiteSection, TenantSection } from "@/types";
 
 /**
@@ -151,6 +152,12 @@ export async function resolveHomeSections(opts: ResolveOptions): Promise<Resolve
   }
   tenantMap = tenantMap || new Map<string, TenantSection>();
 
+  // Fonte de verdade comercial: a seção "Planos / Oferta" exibe os dados
+  // cadastrados pelo Super Admin (tabela plans), nunca valores em código.
+  const hasPricing = global.some((s) => s.type === "pricing");
+  const activeOffer = hasPricing ? await getActiveOffer() : null;
+  const pricingOverlay = activeOffer ? buildPricingContent(activeOffer) : {};
+
   const resolved: ResolvedHomeSection[] = [];
 
   for (const section of global) {
@@ -168,7 +175,8 @@ export async function resolveHomeSections(opts: ResolveOptions): Promise<Resolve
       DEFAULT_SECTION_CONTENT[section.type] || {},
       legacyContentFor(section.type, siteData),
       section.content || {},
-      override?.content || {}
+      override?.content || {},
+      section.type === "pricing" ? pricingOverlay : {}
     );
 
     const navLabel = (override?.settings?.navLabel as string) || (section.settings?.navLabel as string) || section.label;

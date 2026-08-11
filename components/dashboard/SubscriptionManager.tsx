@@ -12,7 +12,9 @@ interface SubManagerProps {
   payments: any[];
   activation?: any;
   activationPriceCents: number;
+  activationRegularPriceCents?: number;
   monthlyPriceCents: number;
+  allowCancel?: boolean;
 }
 
 export function SubscriptionManager({
@@ -22,7 +24,9 @@ export function SubscriptionManager({
   payments,
   activation,
   activationPriceCents,
+  activationRegularPriceCents,
   monthlyPriceCents,
+  allowCancel = true,
 }: SubManagerProps) {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
@@ -106,7 +110,13 @@ export function SubscriptionManager({
           <p className="mt-2 text-xl font-semibold" style={{ fontFamily: "var(--font-display)" }}>
             {activationPaid ? "Pago" : "Pendente"}
           </p>
-          <p className="text-sm text-gray-400 mt-1">{formatBRL(activationPriceCents)} — pagamento único</p>
+          <p className="text-sm text-gray-400 mt-1">
+            {activationRegularPriceCents ? (
+              <><span className="line-through mr-1">{formatBRL(activationRegularPriceCents)}</span> {formatBRL(activationPriceCents)} — pagamento único</>
+            ) : (
+              `${formatBRL(activationPriceCents)} — pagamento único`
+            )}
+          </p>
         </div>
         <div className="card">
           <p className="text-xs uppercase tracking-wider text-gray-400 font-semibold">Plano</p>
@@ -144,11 +154,12 @@ export function SubscriptionManager({
               <button className="btn btn-outline" onClick={openBillingPortal} disabled={loading}>
                 💳 Atualizar forma de pagamento
               </button>
-              {!confirmCancel ? (
+              {allowCancel && !confirmCancel && (
                 <button className="btn btn-danger" onClick={() => setConfirmCancel(true)} disabled={loading}>
                   Cancelar assinatura
                 </button>
-              ) : (
+              )}
+              {allowCancel && confirmCancel && (
                 <div className="flex items-center gap-3 bg-red-50 rounded-lg px-4 py-2">
                   <span className="text-sm text-red-700">Cancelar mesmo? Seu site ficará suspenso no fim do período, mas seus dados são preservados.</span>
                   <button className="btn btn-danger !py-1.5" onClick={cancel} disabled={loading}>Sim, cancelar</button>

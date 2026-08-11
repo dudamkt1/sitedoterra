@@ -1,6 +1,7 @@
 import Stripe from "stripe";
 import { getStripe } from "@/lib/stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getActiveOffer, getPlanById } from "@/lib/commercial";
 import type { Subscription } from "@/types";
 
 export interface BillingUser {
@@ -10,18 +11,36 @@ export interface BillingUser {
   name: string | null;
 }
 
-/** Price ID da ativação (R$ 297,00 — one-time). Fonte: variável de ambiente. */
+/** Price ID da ativação (R$ 297,00 — one-time). Fallback: variável de ambiente. */
 export function getActivationPriceId(): string {
   const id = process.env.STRIPE_ACTIVATION_PRICE_ID;
   if (!id) throw new Error("STRIPE_ACTIVATION_PRICE_ID não configurada no ambiente");
   return id;
 }
 
-/** Price ID da mensalidade (R$ 47,00 — recorrente). Fonte: variável de ambiente. */
+/** Price ID da mensalidade (R$ 47,00 — recorrente). Fallback: variável de ambiente. */
 export function getMonthlyPriceId(): string {
   const id = process.env.STRIPE_MONTHLY_PRICE_ID;
   if (!id) throw new Error("STRIPE_MONTHLY_PRICE_ID não configurada no ambiente");
   return id;
+}
+
+/**
+ * Resolve o Price ID da ATIVAÇÃO a partir da configuração comercial (tabela
+ * plans — gerenciada pelo Super Admin). Se não houver Price ID cadastrado,
+ * usa a variável de ambiente como fallback. O frontend nunca conhece esses IDs.
+ */
+export async function resolveActivationPriceId(planId?: string | null): Promise<string> {
+  const plan = planId ? await getPlanById(planId) : await getActiveOffer();
+  if (plan?.activation_price_id) return plan.activation_price_id;
+  return getActivationPriceId();
+}
+
+/** Resolve o Price ID da MENSALIDADE a partir da configuração comercial. */
+export async function resolveMonthlyPriceId(planId?: string | null): Promise<string> {
+  const plan = planId ? await getPlanById(planId) : await getActiveOffer();
+  if (plan?.monthly_price_id) return plan.monthly_price_id;
+  return getMonthlyPriceId();
 }
 
 /** Retorna o objeto Price da ativação a partir do Stripe (fonte dos valores exibidos). */
@@ -83,8 +102,9 @@ export async function getOrCreateCustomer(metadata: BillingUser): Promise<Stripe
 }
 
 /**
- * Cria a assinatura recorrente de R$ 47,00/mês com billing_cycle_anchor em +30 dias:
- * a primeira mensalidade é cobrada somente 1 mês após a ativação.
+ * Cria a assinatura recorrente (ex.: R$ 47,00/mês) com primeira cobrança
+ * apenas após o período definido na configuração comercial (trial_days).
+ * O Price ID vem da tabela `plans` (Super Admin) com fallback para env.
  */
 export async function createRecurringSubscription(
   customerId: string,
@@ -92,7 +112,11 @@ export async function createRecurringSubscription(
 ): Promise<Stripe.Subscription> {
   const stripe = getStripe();
 
-  const anchor = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
+  const plan = metadata.planId ? await getPlanById(metadata.planId) : await getActiveOffer();
+  const priceId = plan?.monthly_price_id || getMonthlyPriceId();
+  const trialDays = Math.max(1, plan?.trial_days || 30);
+
+  const anchor = Math.floor(Date.now() / 1000) + trialDays * 24 * 60 * 60;
 
   const subMetadata: Record<string, string> = {
     tenant_id: metadata.tenantId,
@@ -102,7 +126,7 @@ export async function createRecurringSubscription(
 
   return stripe.subscriptions.create({
     customer: customerId,
-    items: [{ price: getMonthlyPriceId() }],
+    items: [{ price: priceId }],
     billing_cycle_anchor: anchor,
     proration_behavior: "none",
     payment_behavior: "allow_incomplete",

@@ -2,6 +2,7 @@ import { getDashboardContext } from "@/lib/auth";
 import { SectionTitle } from "@/components/dashboard/ui";
 import { SubscriptionManager } from "@/components/dashboard/SubscriptionManager";
 import { getActivationPrice, getMonthlyPrice } from "@/lib/billing";
+import { getActiveOffer } from "@/lib/commercial";
 
 export const dynamic = "force-dynamic";
 
@@ -23,14 +24,21 @@ export default async function AssinaturaPage() {
       : Promise.resolve({ data: null }),
   ]);
 
-  let activationPriceCents = 0;
-  let monthlyPriceCents = 0;
-  try {
-    const [actPrice, monPrice] = await Promise.all([getActivationPrice(), getMonthlyPrice()]);
-    activationPriceCents = actPrice.unit_amount || 0;
-    monthlyPriceCents = monPrice.unit_amount || 0;
-  } catch (e) {
-    console.warn("Preços do Stripe não configurados/indisponíveis:", e);
+  // Valores exibidos: FONTE = configuração comercial do Super Admin (tabela plans).
+  // Fallback = preços do Stripe quando a oferta não estiver configurada.
+  const offer = await getActiveOffer();
+  let activationPriceCents = offer?.activation_price_cents || 0;
+  let activationRegularPriceCents = offer?.activation_regular_price_cents || 0;
+  let monthlyPriceCents = offer?.monthly_price_cents || 0;
+  let allowCancel = offer ? offer.allow_cancel !== false : true;
+  if (!activationPriceCents || !monthlyPriceCents) {
+    try {
+      const [actPrice, monPrice] = await Promise.all([getActivationPrice(), getMonthlyPrice()]);
+      if (!activationPriceCents) activationPriceCents = actPrice.unit_amount || 0;
+      if (!monthlyPriceCents) monthlyPriceCents = monPrice.unit_amount || 0;
+    } catch (e) {
+      console.warn("Preços do Stripe não configurados/indisponíveis:", e);
+    }
   }
 
   return (
@@ -45,7 +53,9 @@ export default async function AssinaturaPage() {
         payments={payments as any[]}
         activation={activation as any}
         activationPriceCents={activationPriceCents}
+        activationRegularPriceCents={activationRegularPriceCents}
         monthlyPriceCents={monthlyPriceCents}
+        allowCancel={allowCancel}
       />
     </div>
   );

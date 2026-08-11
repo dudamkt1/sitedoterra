@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getDashboardContext } from "@/lib/auth";
 import { getSiteAccess } from "@/lib/access";
 import { formatBRL, formatDate } from "@/lib/utils";
+import { getActiveOffer } from "@/lib/commercial";
 import { StatCard, StatusBadge } from "@/components/dashboard/ui";
 
 export default async function PainelHome() {
@@ -9,6 +10,7 @@ export default async function PainelHome() {
   if (!ctx?.profile) return null;
 
   const { profile, tenant, subscription, domains } = ctx;
+  const offer = await getActiveOffer();
   const siteAccess = getSiteAccess({
     accountStatus: profile.status,
     siteStatus: tenant?.site_status || "pending",
@@ -17,7 +19,7 @@ export default async function PainelHome() {
   });
 
   const publicUrl = tenant ? `/${tenant.slug}` : null;
-  const planName = subscription?.plan?.name || "Sem plano";
+  const planName = subscription?.plan?.name || offer?.name || "Sem plano";
   const nextBilling = subscription?.next_billing_at || subscription?.current_period_end;
 
   return (
@@ -40,7 +42,7 @@ export default async function PainelHome() {
           label="Plano"
           value={planName}
           icon="📦"
-          sub={subscription ? formatBRL(subscription.plan?.monthly_price_cents || 0) + "/mês" : "Escolha um plano"}
+          sub={offer ? `${formatBRL(offer.activation_price_cents)} ativação + ${formatBRL(offer.monthly_price_cents)}/mês` : "Escolha um plano"}
         />
         <StatCard
           label="Assinatura"

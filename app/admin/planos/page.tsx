@@ -1,20 +1,26 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { AdminPlans } from "@/components/admin/AdminPlans";
-import { formatBRL } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminPlanosPage() {
   const admin = createAdminClient();
-  const { data: plans } = await admin.from("plans").select("*").order("created_at");
+  const [{ data: plans }, { data: history }] = await Promise.all([
+    admin.from("plans").select("*").order("sort_order", { ascending: true }).order("created_at"),
+    admin.from("price_history").select("*").order("created_at", { ascending: false }).limit(200),
+  ]);
 
   return (
     <div>
-      <h1 className="text-3xl font-semibold mb-1" style={{ fontFamily: "var(--font-display)" }}>Planos</h1>
+      <h1 className="text-3xl font-semibold mb-1" style={{ fontFamily: "var(--font-display)" }}>Planos e Preços</h1>
       <p className="text-sm text-gray-500 mb-8">
-        Configure valores de ativação e mensalidade, planos e disponibilidade.
+        Configuração comercial centralizada. Preços, mensalidade, benefícios, textos e Price IDs do Stripe definidos aqui
+        são a fonte de verdade para a HOME, o painel e o checkout.
       </p>
-      <AdminPlans plans={(plans || []).map((p: any) => ({ ...p, priceLabel: formatBRL(p.monthly_price_cents), activationLabel: formatBRL(p.activation_price_cents) }))} />
+      <AdminPlans
+        plans={(plans || []) as any[]}
+        history={(history || []) as any[]}
+      />
     </div>
   );
 }

@@ -2002,6 +2002,209 @@
 #tenant-site .plano-card.destaque .btn-plano:hover { background: var(--verde-medio); }
 
 
+/* ============================================================================
+   PLANOS / OFERTA — layout premium (configuração comercial do Super Admin)
+   ============================================================================ */
+
+#tenant-site .oferta-card {
+  position: relative;
+  z-index: 2;
+  background: var(--branco);
+  color: var(--preto);
+  border-radius: 20px;
+  padding: 3rem 2.5rem;
+  max-width: 480px;
+  margin: 0 auto;
+  text-align: center;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
+  border-top: 4px solid var(--ouro);
+}
+
+#tenant-site .oferta-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--verde);
+  color: var(--branco);
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 6px 16px;
+  border-radius: 30px;
+  margin-bottom: 1.25rem;
+  white-space: nowrap;
+}
+
+#tenant-site .oferta-badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ouro-claro);
+  flex-shrink: 0;
+}
+
+#tenant-site .oferta-tipo {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--cinza);
+  margin-bottom: 1.25rem;
+}
+
+#tenant-site .oferta-precos { margin-bottom: 0.5rem; }
+
+#tenant-site .oferta-preco-antigo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+#tenant-site .oferta-preco-antigo > span:first-child {
+  color: var(--cinza-claro);
+  font-size: 0.95rem;
+  text-decoration: line-through;
+}
+
+#tenant-site .oferta-setinha {
+  color: var(--ouro);
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+#tenant-site .oferta-preco-principal {
+  font-family: var(--font-display);
+  font-size: clamp(3rem, 6vw, 4.2rem);
+  font-weight: 600;
+  color: var(--verde);
+  line-height: 1;
+}
+
+#tenant-site .oferta-economia {
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ouro);
+  margin-top: 0.4rem;
+}
+
+#tenant-site .oferta-ativa {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--verde);
+  margin: 1rem 0 1.5rem;
+}
+
+#tenant-site .oferta-beneficios {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  text-align: left;
+  margin-bottom: 1.75rem;
+}
+
+#tenant-site .oferta-beneficios li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.86rem;
+  color: var(--preto);
+}
+
+#tenant-site .oferta-beneficios li::before {
+  content: '✓';
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--verde);
+  color: var(--branco);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.62rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+#tenant-site .oferta-divider {
+  border: none;
+  border-top: 1px solid rgba(26, 26, 20, 0.12);
+  margin: 1.75rem 0;
+}
+
+#tenant-site .oferta-mensal { margin-bottom: 1.75rem; }
+
+#tenant-site .oferta-mensal-label {
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--cinza);
+  margin-bottom: 0.35rem;
+}
+
+#tenant-site .oferta-mensal-preco {
+  font-family: var(--font-display);
+  font-size: 2.2rem;
+  font-weight: 600;
+  color: var(--preto);
+  line-height: 1.1;
+}
+
+#tenant-site .oferta-mensal-preco span {
+  font-family: var(--font-body);
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--cinza);
+}
+
+#tenant-site .oferta-mensal-cancel {
+  font-size: 0.8rem;
+  color: var(--cinza);
+  margin-top: 0.4rem;
+}
+
+#tenant-site .oferta-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: var(--verde);
+  color: var(--branco);
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 1rem 1.5rem;
+  border-radius: 10px;
+  text-decoration: none;
+  transition: all 0.3s;
+  box-shadow: 0 10px 24px rgba(29, 92, 58, 0.3);
+}
+
+#tenant-site .oferta-cta:hover {
+  background: var(--verde-medio);
+  transform: translateY(-2px);
+}
+
+#tenant-site .oferta-cta-arrow { transition: transform 0.3s; }
+
+#tenant-site .oferta-cta:hover .oferta-cta-arrow { transform: translateX(4px); }
+
+#tenant-site .oferta-transparencia {
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--cinza-claro);
+  margin-top: 1.25rem;
+}
+
+
+
 
 #tenant-site footer {
   background: var(--preto);
@@ -2194,6 +2397,12 @@
   #tenant-site .planos-cards { flex-direction: column; align-items: center; }
 
   #tenant-site .plano-card { width: 100%; max-width: 340px; }
+
+  #tenant-site .oferta-card { padding: 2.25rem 1.5rem; }
+
+  #tenant-site .oferta-preco-principal { font-size: clamp(2.6rem, 12vw, 3.6rem); }
+
+  #tenant-site .oferta-badge { white-space: normal; }
 
   #tenant-site .insta-grid { grid-template-columns: repeat(2, 1fr); }
 

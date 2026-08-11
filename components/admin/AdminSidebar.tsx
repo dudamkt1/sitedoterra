@@ -10,7 +10,7 @@ const LINKS = [
   { href: "/admin/usuarios", label: "Usuários", icon: "👥" },
   { href: "/admin/financeiro", label: "Financeiro", icon: "💰" },
   { href: "/admin/dominios", label: "Domínios", icon: "🔗" },
-  { href: "/admin/planos", label: "Planos", icon: "📦" },
+  { href: "/admin/planos", label: "Planos e Preços", icon: "💰" },
 ];
 
 export default function AdminSidebar({ email }: { email: string }) {

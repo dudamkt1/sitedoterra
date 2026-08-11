@@ -99,16 +99,48 @@ export interface Plan {
   name: string;
   code: string;
   description: string | null;
+  /** Valor normal da ativação (ex.: R$ 1.500,00) — exibido riscado. */
+  activation_regular_price_cents: number;
+  /** Valor promocional/cobrado da ativação (ex.: R$ 297,00) — pagamento único. */
   activation_price_cents: number;
+  /** Mensalidade recorrente (ex.: R$ 47,00/mês). */
   monthly_price_cents: number;
   billing_interval: "month" | "year";
   status: "active" | "inactive";
-  features: unknown[];
+  /** Benefícios da oferta (exibidos com ✓ na HOME). */
+  features: string[];
+  offer_title: string | null;
+  offer_subtitle: string | null;
+  promo_text: string | null;
+  /** Texto do botão CTA. Aceita o placeholder {price} (ex.: "Quero meu site por {price}"). */
+  cta_text: string | null;
+  /** Texto de transparência. Aceita {activation} e {monthly}. */
+  transparency_text: string | null;
+  cancel_text: string | null;
+  allow_cancel: boolean;
+  /** Primeira cobrança da mensalidade em N dias após a ativação. */
+  trial_days: number;
+  sort_order: number;
   stripe_product_id: string | null;
+  /** Price ID da mensalidade no Stripe (legado). */
   stripe_price_id: string | null;
+  /** Price ID da ativação no Stripe (pagamento único). */
+  activation_price_id: string | null;
+  /** Price ID da mensalidade no Stripe (recorrente). */
+  monthly_price_id: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface PriceHistory {
+  id: string;
+  plan_id: string;
+  field: string;
+  previous_value_cents: number | null;
+  new_value_cents: number | null;
+  changed_by: string | null;
+  created_at: string;
 }
 
 export interface PublicTenant {
