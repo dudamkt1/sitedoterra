@@ -45,8 +45,7 @@ export default async function HomePage({
       slug="index"
       sections={sections}
       extraNav={[
-        { label: "Entrar", href: "/login" },
-        { label: "Começar agora", href: "/cadastro", className: "nav-extra-link" },
+        { label: "Painel", href: "/login" },
       ]}
     />
   );
