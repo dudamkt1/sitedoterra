@@ -135,6 +135,13 @@ export interface ResolveOptions {
   tenant: PublicTenant | null;
   globalSections?: SiteSection[];
   tenantSectionMap?: Map<string, TenantSection>;
+  /**
+   * Quando true (sites de tenants em /slug), os dados PRÓPRIOS do tenant
+   * (site_settings.data — editados em /painel/meu-site) têm precedência sobre
+   * o conteúdo GLOBAL (site_sections, o template padrão da plataforma).
+   * Quando false (HOME "/", que é o template global), o conteúdo global vence.
+   */
+  tenantDataOverridesGlobal?: boolean;
 }
 
 /**
@@ -171,13 +178,24 @@ export async function resolveHomeSections(opts: ResolveOptions): Promise<Resolve
       enabled = override.enabled !== false;
     }
 
-    const content = deepMerge(
-      DEFAULT_SECTION_CONTENT[section.type] || {},
-      legacyContentFor(section.type, siteData),
-      section.content || {},
-      override?.content || {},
-      section.type === "pricing" ? pricingOverlay : {}
-    );
+    const legacy = legacyContentFor(section.type, siteData);
+    const globalContent = section.content || {};
+    const merged = opts.tenantDataOverridesGlobal
+      ? deepMerge(
+          DEFAULT_SECTION_CONTENT[section.type] || {},
+          globalContent,
+          legacy,
+          override?.content || {},
+          section.type === "pricing" ? pricingOverlay : {}
+        )
+      : deepMerge(
+          DEFAULT_SECTION_CONTENT[section.type] || {},
+          legacy,
+          globalContent,
+          override?.content || {},
+          section.type === "pricing" ? pricingOverlay : {}
+        );
+    const content = merged;
 
     const navLabel = (override?.settings?.navLabel as string) || (section.settings?.navLabel as string) || section.label;
 

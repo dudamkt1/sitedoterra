@@ -6,6 +6,9 @@ import { SuspendedSitePage } from "@/components/site/SuspendedSitePage";
 import { resolveTenantAccess } from "@/lib/tenant";
 import { resolveHomeSections } from "@/lib/home";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
   const { tenant } = await resolveTenantAccess({ slug: params.slug });
   if (!tenant) return { title: "Site não encontrado" };
@@ -32,7 +35,9 @@ export default async function TenantSitePage({ params }: { params: { slug: strin
       : `https://${host}`;
 
   if (access === "available") {
-    const sections = await resolveHomeSections({ tenant });
+    // tenantDataOverridesGlobal=true: os dados do próprio tenant (site_settings,
+    // editados em /painel/meu-site) têm prioridade sobre o template global.
+    const sections = await resolveHomeSections({ tenant, tenantDataOverridesGlobal: true });
     const siteData = (tenant.site_data || {}) as Record<string, unknown>;
     return (
       <>

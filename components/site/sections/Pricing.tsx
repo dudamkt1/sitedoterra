@@ -37,7 +37,7 @@ export interface PricingContent {
 }
 
 function brl(cents: number | undefined): string {
-  return (cents || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  return ((cents || 0) / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
 /** Destaca a última palavra do título em itálico (padrão visual da HOME). */
