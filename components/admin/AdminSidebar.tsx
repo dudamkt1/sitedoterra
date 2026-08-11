@@ -9,6 +9,7 @@ const LINKS = [
   { href: "/admin/editor-ia", label: "Provedores de IA", icon: "🤖" },
   { href: "/admin/usuarios", label: "Usuários", icon: "👥" },
   { href: "/admin/financeiro", label: "Financeiro", icon: "💰" },
+  { href: "/admin/midias", label: "Mídias (R2)", icon: "🖼️" },
   { href: "/admin/dominios", label: "Domínios", icon: "🔗" },
   { href: "/admin/planos", label: "Planos e Preços", icon: "💰" },
 ];

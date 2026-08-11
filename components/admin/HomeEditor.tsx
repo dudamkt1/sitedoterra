@@ -238,6 +238,7 @@ export function HomeEditor({ initialSections, appUrl }: HomeEditorProps) {
                   sectionType={editing.type as SectionType}
                   value={editing.content}
                   onChange={(content) => setDraft({ ...editing, content })}
+                  mediaScope="system"
                 />
               </div>
             )}

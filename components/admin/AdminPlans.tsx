@@ -21,6 +21,7 @@ interface PlanRow {
   allow_cancel: boolean;
   trial_days: number;
   trial_months: number;
+  media_quota_bytes: number;
   sort_order: number;
   features: string[];
   stripe_product_id: string | null;
@@ -110,6 +111,7 @@ export function AdminPlans({ plans, history }: { plans: PlanRow[]; history: Hist
       allow_cancel: true,
       trial_days: 30,
       trial_months: 3,
+      media_quota_bytes: 500 * 1024 * 1024,
       sort_order: 10,
       features: ["Site profissional", "Seu endereço personalizado", "Painel exclusivo", "Personalização do conteúdo", "Site responsivo", "Ferramentas de IA", "Suporte por WhatsApp"],
       stripe_product_id: "",
@@ -278,6 +280,7 @@ export function AdminPlans({ plans, history }: { plans: PlanRow[]; history: Hist
               <dd className="text-xs text-gray-400 mt-0.5">
                 primeira cobrança após {activeOffer.trial_months || 3} {activeOffer.trial_months === 1 ? "mês" : "meses"}
               </dd>
+              <dd className="text-xs text-gray-400 mt-0.5">armazenamento: {(activeOffer.media_quota_bytes || 0) / 1024 / 1024} MB</dd>
             </div>
             <div className="rounded-lg bg-gray-50 p-3">
               <dt className="text-gray-400 text-xs mb-1">CANCELAMENTO</dt>
@@ -318,6 +321,7 @@ export function AdminPlans({ plans, history }: { plans: PlanRow[]; history: Hist
                 </div>
                 <div className="flex justify-between"><dt className="text-gray-500">Mensalidade</dt><dd className="font-medium">{formatBRL(p.monthly_price_cents)}/mês</dd></div>
                 <div className="flex justify-between"><dt className="text-gray-500">Primeira cobrança</dt><dd className="font-medium">após {p.trial_months || 3} {p.trial_months === 1 ? "mês" : "meses"}</dd></div>
+                <div className="flex justify-between"><dt className="text-gray-500">Armazenamento</dt><dd className="font-medium">{(p.media_quota_bytes || 0) / 1024 / 1024} MB</dd></div>
                 <div className="flex justify-between"><dt className="text-gray-500">Período</dt><dd className="font-medium">{p.billing_interval === "year" ? "Anual" : "Mensal"}</dd></div>
               </dl>
               <div className="flex gap-2 mt-4">
@@ -421,6 +425,16 @@ export function AdminPlans({ plans, history }: { plans: PlanRow[]; history: Hist
                   <p className="text-xs uppercase tracking-wider text-gray-400 font-semibold mb-3">Stripe e status</p>
                 </div>
                 {input("Stripe Product ID", "stripe_product_id")}
+                <div>
+                  <label className="label">Limite de armazenamento de mídia (MB)</label>
+                  <input
+                    type="number"
+                    className="input"
+                    min={1}
+                    value={Math.round((editing.media_quota_bytes || 0) / 1024 / 1024)}
+                    onChange={(e) => set("media_quota_bytes", Math.max(0, Math.round(Number(e.target.value) || 0)) * 1024 * 1024)}
+                  />
+                </div>
                 <div className="flex items-end pb-2">
                   <label className="flex items-center gap-2 text-sm text-gray-600">
                     <input type="checkbox" className="w-4 h-4 accent-[#1d5c3a]" checked={editing.is_active} onChange={(e) => set("is_active", e.target.checked)} />

@@ -45,6 +45,11 @@ export const RESERVED_SLUGS = [
   "pricing",
   "precos",
   "preco",
+  "midia",
+  "midias",
+  "media",
+  "arquivos",
+  "uploads",
 ];
 
 export function slugify(input: string): string {
@@ -118,4 +123,16 @@ export function formatDateTime(value: string | null | undefined): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+export function formatBytes(bytes: number): string {
+  if (!bytes || bytes <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  let i = 0;
+  let n = bytes;
+  while (n >= 1024 && i < units.length - 1) {
+    n /= 1024;
+    i++;
+  }
+  return `${n.toFixed(n < 10 && i > 0 ? 1 : 0)} ${units[i]}`;
 }

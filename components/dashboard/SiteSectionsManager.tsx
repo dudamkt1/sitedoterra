@@ -160,7 +160,7 @@ export function SiteSectionsManager({ slug, appUrl }: { slug: string; appUrl: st
               {editing.can_edit ? "Salve suas alterações para refletir na página pública." : "Você não tem permissão para editar esta seção."}
             </p>
             <div className="max-h-[60vh] overflow-y-auto pr-2">
-              <SectionContentEditor sectionType={editing.type} value={draft} onChange={setDraft} />
+              <SectionContentEditor sectionType={editing.type} value={draft} onChange={setDraft} mediaScope="tenant" />
             </div>
             <div className="flex justify-end gap-2 mt-5">
               <button className="btn btn-outline" onClick={() => setEditing(null)}>Cancelar</button>

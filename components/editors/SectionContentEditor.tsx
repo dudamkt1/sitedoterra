@@ -4,11 +4,14 @@ import { useMemo, useState } from "react";
 import type { SectionType } from "@/types";
 import { SECTION_CONTENT_FIELDS, jsonToString, stringToJson, type ContentFieldDef } from "@/lib/section-fields";
 import { deepMerge } from "@/lib/home";
+import { MediaPicker } from "@/components/media/MediaPicker";
 
 interface SectionContentEditorProps {
   sectionType: SectionType;
   value: Record<string, unknown>;
   onChange: (next: Record<string, unknown>) => void;
+  /** Escopo de mídia: "system" (Super Admin/global) ou "tenant" (padrão). */
+  mediaScope?: "tenant" | "system";
 }
 
 interface Suggestion {
@@ -60,7 +63,7 @@ const AI_KIND_PROMPTS: Record<string, string> = {
   default: "Escreva um texto claro e elegante em português do Brasil.",
 };
 
-export function SectionContentEditor({ sectionType, value, onChange }: SectionContentEditorProps) {
+export function SectionContentEditor({ sectionType, value, onChange, mediaScope }: SectionContentEditorProps) {
   const fields = useMemo(() => SECTION_CONTENT_FIELDS[sectionType] || [], [sectionType]);
   const [suggestions, setSuggestions] = useState<Record<string, Suggestion>>({});
 
@@ -138,13 +141,31 @@ export function SectionContentEditor({ sectionType, value, onChange }: SectionCo
         case "image":
           return (
             <div>
-              <input
-                type="text"
-                className="input"
-                value={typeof current === "string" ? current : ""}
-                placeholder="https://..."
-                onChange={(e) => onChange(setPath(value, path, e.target.value))}
-              />
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  className="input flex-1"
+                  value={typeof current === "string" ? current : ""}
+                  placeholder="URL da imagem ou escolha na biblioteca"
+                  onChange={(e) => onChange(setPath(value, path, e.target.value))}
+                />
+                <MediaPicker
+                  scope={mediaScope || "tenant"}
+                  value={typeof current === "string" ? current : ""}
+                  onChange={(url) => onChange(setPath(value, path, url))}
+                />
+              </div>
+              {typeof current === "string" && current && (
+                <div className="mt-2 rounded-lg bg-gray-50 p-2 inline-block">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={current}
+                    alt="preview"
+                    className="h-20 w-auto max-w-full object-contain rounded"
+                    referrerPolicy="no-referrer"
+                  />
+                </div>
+              )}
             </div>
           );
         case "boolean":

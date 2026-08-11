@@ -48,6 +48,7 @@ export async function POST(request: Request) {
     allow_cancel: body.allow_cancel !== false,
     trial_days: Math.max(1, Math.round(Number(body.trial_days) || 30)),
     trial_months: Math.max(1, Math.round(Number(body.trial_months) || 3)),
+    media_quota_bytes: Math.max(1, Math.round(Number(body.media_quota_bytes) || 500 * 1024 * 1024)),
     sort_order: Math.round(Number(body.sort_order) || 0),
     features,
     stripe_product_id: text(body.stripe_product_id),

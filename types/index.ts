@@ -130,6 +130,8 @@ export interface Plan {
   activation_price_id: string | null;
   /** Price ID da mensalidade no Stripe (recorrente). */
   monthly_price_id: string | null;
+  /** Limite de armazenamento de mídia (bytes) permitido por este plano. */
+  media_quota_bytes: number;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -254,4 +256,58 @@ export interface AiConfigView {
     key_hint: string | null;
   };
   providers: AiProvider[];
+}
+
+// ============================ MÍDIA (Cloudflare R2) ============================
+
+export type MediaStatus = "uploading" | "uploaded" | "failed";
+export type MediaScope = "tenant" | "system" | "admin";
+
+/** Metadados de um arquivo armazenado no R2 (binário NUNCA vai para o banco). */
+export interface MediaFile {
+  id: string;
+  tenant_id: string | null;
+  user_id: string;
+  storage_key: string;
+  public_url: string;
+  original_name: string | null;
+  file_name: string | null;
+  mime_type: string | null;
+  file_size: number;
+  width: number | null;
+  height: number | null;
+  category: string;
+  folder: string | null;
+  is_public: boolean;
+  status: MediaStatus;
+  created_at: string;
+  updated_at: string;
+  /** Campos extras presentes somente na visão do Super Admin. */
+  tenant_name?: string | null;
+  tenant_slug?: string | null;
+  owner_name?: string | null;
+  owner_email?: string | null;
+}
+
+export interface MediaAction {
+  id: string;
+  media_id: string | null;
+  tenant_id: string | null;
+  user_id: string | null;
+  action: string;
+  details: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface MediaStorageStats {
+  totalBytes: number;
+  totalFiles: number;
+  quotaBytes: number;
+  byTenant: {
+    tenant_id: string;
+    slug: string;
+    site_name: string | null;
+    files: number;
+    bytes: number;
+  }[];
 }
