@@ -102,8 +102,21 @@ export async function getOrCreateCustomer(metadata: BillingUser): Promise<Stripe
 }
 
 /**
+ * Adiciona `months` meses a uma data, preservando o dia do mês
+ * (com clamp para meses mais curtos, ex.: 31 → último dia).
+ */
+function addMonths(date: Date, months: number): Date {
+  const d = new Date(date);
+  const day = d.getDate();
+  d.setMonth(d.getMonth() + months);
+  if (d.getDate() < day) d.setDate(0);
+  return d;
+}
+
+/**
  * Cria a assinatura recorrente (ex.: R$ 47,00/mês) com primeira cobrança
- * apenas após o período definido na configuração comercial (trial_days).
+ * apenas após o número de MESES definido na configuração comercial
+ * (trial_months — Super Admin decide em /admin/planos).
  * O Price ID vem da tabela `plans` (Super Admin) com fallback para env.
  */
 export async function createRecurringSubscription(
@@ -114,9 +127,9 @@ export async function createRecurringSubscription(
 
   const plan = metadata.planId ? await getPlanById(metadata.planId) : await getActiveOffer();
   const priceId = plan?.monthly_price_id || getMonthlyPriceId();
-  const trialDays = Math.max(1, plan?.trial_days || 30);
+  const trialMonths = Math.max(1, plan?.trial_months || 3);
 
-  const anchor = Math.floor(Date.now() / 1000) + trialDays * 24 * 60 * 60;
+  const anchor = Math.floor(addMonths(new Date(), trialMonths).getTime() / 1000);
 
   const subMetadata: Record<string, string> = {
     tenant_id: metadata.tenantId,

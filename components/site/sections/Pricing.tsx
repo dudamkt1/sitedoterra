@@ -23,6 +23,7 @@ export interface OfferView {
   cancelText?: string;
   allowCancel?: boolean;
   trialDays?: number;
+  trialMonths?: number;
   billingInterval?: string;
   benefits?: string[];
   ctaUrl?: string;
@@ -94,9 +95,11 @@ export function Pricing({ content }: { content: PricingContent }) {
   const tp = titleParts(content.title || "Tenha um site assim hoje mesmo");
   const benefits = offer.benefits || [];
   const firstChargeText =
-    offer.trialDays && offer.trialDays > 0
-      ? `Após ${offer.trialDays === 30 ? "o primeiro mês" : `${offer.trialDays} dias`}`
-      : "Mensal";
+    offer.trialMonths && offer.trialMonths > 0
+      ? `Após ${offer.trialMonths} ${offer.trialMonths === 1 ? "mês" : "meses"}`
+      : offer.trialDays && offer.trialDays > 0
+        ? `Após ${offer.trialDays === 30 ? "o primeiro mês" : `${offer.trialDays} dias`}`
+        : "Mensal";
 
   return (
     <section id="planos">

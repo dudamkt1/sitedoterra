@@ -15,6 +15,7 @@ interface SubManagerProps {
   activationRegularPriceCents?: number;
   monthlyPriceCents: number;
   allowCancel?: boolean;
+  trialMonths?: number;
 }
 
 export function SubscriptionManager({
@@ -27,6 +28,7 @@ export function SubscriptionManager({
   activationRegularPriceCents,
   monthlyPriceCents,
   allowCancel = true,
+  trialMonths = 3,
 }: SubManagerProps) {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
@@ -136,6 +138,13 @@ export function SubscriptionManager({
             {nextBilling ? formatDate(nextBilling) : "—"}
           </p>
           {monthlyPriceCents > 0 && <p className="text-sm text-gray-400 mt-1">{formatBRL(monthlyPriceCents)}</p>}
+          {!nextBilling && (
+            <p className="text-xs text-gray-400 mt-1">
+              {trialMonths > 0
+                ? `primeira cobrança após ${trialMonths} ${trialMonths === 1 ? "mês" : "meses"} da ativação`
+                : "primeira cobrança após a ativação"}
+            </p>
+          )}
         </div>
       </div>
 

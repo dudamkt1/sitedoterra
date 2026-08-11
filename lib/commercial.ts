@@ -24,6 +24,7 @@ export interface OfferView {
   cancelText: string;
   allowCancel: boolean;
   trialDays: number;
+  trialMonths: number;
   billingInterval: string;
   benefits: string[];
   ctaUrl: string;
@@ -102,7 +103,8 @@ export function buildOfferView(plan: Plan): OfferView {
     transparencyText: resolveTemplate(plan.transparency_text, plan),
     cancelText: plan.cancel_text || "Sem fidelidade. Cancele quando quiser.",
     allowCancel: plan.allow_cancel !== false,
-    trialDays: plan.trial_days || 30,
+    trialDays: (plan.trial_months || 3) * 30,
+    trialMonths: plan.trial_months || 3,
     billingInterval: plan.billing_interval,
     benefits: offerBenefits(plan),
     ctaUrl: "/cadastro",

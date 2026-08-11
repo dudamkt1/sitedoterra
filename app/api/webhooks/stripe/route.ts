@@ -122,7 +122,8 @@ async function handleEvent(event: Stripe.Event) {
         { onConflict: "stripe_checkout_session_id", ignoreDuplicates: true }
       );
 
-      // Cria assinatura mensal recorrente (R$ 47,00 — 1ª cobrança em +30 dias)
+      // Cria assinatura mensal recorrente (R$ 47,00 — 1ª cobrança após os meses
+      // definidos pelo Super Admin em /admin/planos, padrão 3 meses)
       const customerId =
         (typeof session.customer === "string" ? session.customer : session.customer?.id) || null;
       const customer = customerId
@@ -197,7 +198,7 @@ async function handleEvent(event: Stripe.Event) {
       }
 
       // Invoice R$ 0 gerada pela billing_cycle_anchor futura (1ª mensalidade
-      // só em +30 dias): sincroniza a assinatura, mas não registra pagamento.
+      // só após os meses configurados): sincroniza a assinatura, mas não registra pagamento.
       if ((invoice.amount_paid || 0) <= 0) break;
 
       if (tenantId) {

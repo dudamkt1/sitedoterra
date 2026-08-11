@@ -118,8 +118,10 @@ export interface Plan {
   transparency_text: string | null;
   cancel_text: string | null;
   allow_cancel: boolean;
-  /** Primeira cobrança da mensalidade em N dias após a ativação. */
+  /** Primeira cobrança da mensalidade em N dias após a ativação (legado). */
   trial_days: number;
+  /** Primeira cobrança da mensalidade em N meses após a ativação (padrão 3). */
+  trial_months: number;
   sort_order: number;
   stripe_product_id: string | null;
   /** Price ID da mensalidade no Stripe (legado). */

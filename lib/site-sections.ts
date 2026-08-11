@@ -284,10 +284,11 @@ export const DEFAULT_SECTION_CONTENT: Record<SectionType, Record<string, unknown
       promoText: "Oferta especial de lançamento",
       ctaText: "Quero meu site por R$ 297",
       transparencyText:
-        "R$ 297 corresponde à ativação inicial do site. Após o primeiro mês, inicia-se a mensalidade de R$ 47. Sem fidelidade e com cancelamento quando quiser.",
+        "R$ 297 corresponde à ativação inicial do site. Após 3 meses, inicia-se a mensalidade de R$ 47. Sem fidelidade e com cancelamento quando quiser.",
       cancelText: "Sem fidelidade. Cancele quando quiser.",
       allowCancel: true,
-      trialDays: 30,
+      trialDays: 90,
+      trialMonths: 3,
       billingInterval: "month",
       benefits: [
         "Site profissional",

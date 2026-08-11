@@ -31,6 +31,7 @@ export default async function AssinaturaPage() {
   let activationRegularPriceCents = offer?.activation_regular_price_cents || 0;
   let monthlyPriceCents = offer?.monthly_price_cents || 0;
   let allowCancel = offer ? offer.allow_cancel !== false : true;
+  const trialMonths = offer?.trial_months || 3;
   if (!activationPriceCents || !monthlyPriceCents) {
     try {
       const [actPrice, monPrice] = await Promise.all([getActivationPrice(), getMonthlyPrice()]);
@@ -56,6 +57,7 @@ export default async function AssinaturaPage() {
         activationRegularPriceCents={activationRegularPriceCents}
         monthlyPriceCents={monthlyPriceCents}
         allowCancel={allowCancel}
+        trialMonths={trialMonths}
       />
     </div>
   );
