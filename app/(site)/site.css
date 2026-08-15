@@ -76,6 +76,14 @@
   transition: color 0.3s;
 }
 
+#tenant-site .nav-logo-img {
+  display: block;
+  height: 44px;
+  width: auto;
+  max-width: 220px;
+  object-fit: contain;
+}
+
 
 #tenant-site nav.scrolled .nav-logo { color: var(--verde); }
 

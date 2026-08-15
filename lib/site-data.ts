@@ -1,4 +1,9 @@
 export interface SiteData {
+  site_title?: string;
+  /** Logo do site (menu superior). mode: "image" usa url; "text" usa logoText. */
+  logoMode?: "image" | "text";
+  logoUrl?: string;
+  logoText?: string;
   name?: string;
   surname?: string;
   fullName?: string;
@@ -42,7 +47,6 @@ export interface SiteData {
   };
   video?: { label: string };
   social?: { whatsapp: boolean; instagram: boolean; youtube: boolean };
-  site_title?: string;
 }
 
 export const DEFAULT_SITE_DATA: SiteData = {

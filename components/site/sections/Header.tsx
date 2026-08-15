@@ -4,11 +4,12 @@ import { useEffect, useRef } from "react";
 
 export interface HeaderProps {
   logoText?: string;
+  logoUrl?: string;
   navItems: { label: string; href: string }[];
   extraNav?: { label: string; href: string; className?: string }[];
 }
 
-export function Header({ logoText = "Logo", navItems, extraNav = [] }: HeaderProps) {
+export function Header({ logoText = "Logo", logoUrl, navItems, extraNav = [] }: HeaderProps) {
   const navRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -25,7 +26,12 @@ export function Header({ logoText = "Logo", navItems, extraNav = [] }: HeaderPro
   return (
     <nav ref={navRef}>
       <a href="#hero" className="nav-logo">
-        {logoText}
+        {logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={logoUrl} alt={logoText} className="nav-logo-img" referrerPolicy="no-referrer" />
+        ) : (
+          logoText
+        )}
       </a>
       <ul className="nav-links">
         {navItems.map((item) => (

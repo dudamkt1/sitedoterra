@@ -50,12 +50,17 @@ export default async function TenantSitePage({ params }: { params: { slug: strin
         <SiteHome
           slug={tenant.slug}
           sections={sections}
-          contact={{
-            whatsapp: (siteData.whatsapp as string) || undefined,
-            email: (siteData.email as string) || tenant.email || undefined,
-            instagram: siteData.instagram ? `https://instagram.com/${String(siteData.instagram).replace(/^@/, "")}` : undefined,
-            profileName: tenant.profile_name || undefined,
-          }}
+contact={{
+              whatsapp: (siteData.whatsapp as string) || undefined,
+              email: (siteData.email as string) || tenant.email || undefined,
+              instagram: siteData.instagram ? `https://instagram.com/${String(siteData.instagram).replace(/^@/, "")}` : undefined,
+              profileName: tenant.profile_name || undefined,
+            }}
+            logo={{
+              mode: (siteData.logoMode as "image" | "text") || undefined,
+              url: (siteData.logoUrl as string) || undefined,
+              text: (siteData.logoText as string) || undefined,
+            }}
         />
       </>
     );

@@ -16,6 +16,7 @@ export async function POST(request: Request) {
   const allowed = [
     "name", "surname", "fullName", "role", "eyebrow", "description",
     "whatsapp", "email", "instagram", "instagramHandle",
+    "logoMode", "logoUrl", "logoText",
     "stats", "testimonials", "history", "products", "faq", "schedule",
     "video", "social", "site_title",
   ];

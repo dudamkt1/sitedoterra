@@ -21,10 +21,17 @@ export interface SiteContact {
   profileName?: string;
 }
 
+export interface SiteLogo {
+  mode?: "image" | "text";
+  url?: string;
+  text?: string;
+}
+
 interface SiteHomeProps {
   slug: string;
   sections: ResolvedHomeSection[];
   contact?: SiteContact;
+  logo?: SiteLogo;
   extraNav?: { label: string; href: string; className?: string }[];
 }
 
@@ -34,11 +41,16 @@ interface SiteHomeProps {
  * renderiza cada uma como componente independente, na ordem correta.
  * Seções desativadas são simplesmente ignoradas.
  */
-export function SiteHome({ slug, sections, contact, extraNav = [] }: SiteHomeProps) {
+export function SiteHome({ slug, sections, contact, logo, extraNav = [] }: SiteHomeProps) {
   const visible = sections.filter((s) => s.enabled);
 
   const headerSection = visible.find((s) => s.type === "header");
-  const logoText = (headerSection?.content.logoText as string) || (headerSection?.label as string) || "Logo";
+  const headerContent = (headerSection?.content || {}) as Record<string, unknown>;
+  const logoText = logo?.text || (headerContent.logoText as string) || (headerSection?.label as string) || "Logo";
+  const logoUrl =
+    logo?.mode === "text"
+      ? undefined
+      : logo?.url || (headerContent.logoUrl as string) || undefined;
 
   const navItems = visible
     .filter((s) => s.settings?.showInNav !== false && s.type !== "header" && s.type !== "footer")
@@ -55,7 +67,7 @@ export function SiteHome({ slug, sections, contact, extraNav = [] }: SiteHomePro
   return (
     <div id="tenant-site" data-slug={slug}>
       <SiteEffects />
-      <Header logoText={logoText} navItems={navItems} extraNav={extraNav} />
+      <Header logoText={logoText} logoUrl={logoUrl} navItems={navItems} extraNav={extraNav} />
 
       {visible.map((s) => {
         switch (s.type) {

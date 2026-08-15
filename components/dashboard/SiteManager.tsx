@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { MediaPicker } from "@/components/media/MediaPicker";
 
 interface SiteManagerProps {
   slug: string;
@@ -28,10 +29,14 @@ export function SiteManager({ slug, pendingSlug, siteData, appUrl, hasSubscripti
     email: siteData?.email || "",
     instagram: siteData?.instagram || "",
     instagramHandle: siteData?.instagramHandle || "",
+    logoMode: siteData?.logoMode || (siteData?.logoUrl ? "image" : ""),
+    logoUrl: siteData?.logoUrl || "",
+    logoText: siteData?.logoText || "",
     statYears: siteData?.stats?.years || "",
     statClients: siteData?.stats?.clients || "",
     statSatisfaction: siteData?.stats?.satisfaction || "",
   });
+  const [logoTouched, setLogoTouched] = useState(false);
   const [savingSite, setSavingSite] = useState(false);
   const [siteMsg, setSiteMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -69,32 +74,45 @@ export function SiteManager({ slug, pendingSlug, siteData, appUrl, hasSubscripti
     setSavingSlug(false);
   }
 
+  function updateLogo(patch: Partial<typeof form>) {
+    setLogoTouched(true);
+    setForm({ ...form, ...patch });
+  }
+
   async function saveSite() {
     setSavingSite(true);
     setSiteMsg(null);
+    const payload: Record<string, unknown> = {
+      name: form.name,
+      surname: form.surname,
+      fullName: `${form.name} ${form.surname}`.trim() || undefined,
+      role: form.role,
+      eyebrow: form.eyebrow,
+      description: form.description,
+      whatsapp: form.whatsapp.replace(/[^\d]/g, ""),
+      email: form.email,
+      instagram: form.instagram,
+      instagramHandle: form.instagramHandle,
+      stats: {
+        years: form.statYears,
+        labelYears: "Anos de experiência",
+        clients: form.statClients,
+        labelClients: "Clientes atendidas",
+        satisfaction: form.statSatisfaction,
+        labelSatisfaction: "Satisfação",
+      },
+    };
+    // Só envia a logo se o usuário mexeu no card — assim quem não configura
+    // continua herdando a logo padrão definida no template global (Super Admin).
+    if (logoTouched) {
+      payload.logoMode = form.logoMode;
+      payload.logoUrl = form.logoUrl || undefined;
+      payload.logoText = form.logoText || undefined;
+    }
     const res = await fetch("/api/site", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: form.name,
-        surname: form.surname,
-        fullName: `${form.name} ${form.surname}`.trim() || undefined,
-        role: form.role,
-        eyebrow: form.eyebrow,
-        description: form.description,
-        whatsapp: form.whatsapp.replace(/[^\d]/g, ""),
-        email: form.email,
-        instagram: form.instagram,
-        instagramHandle: form.instagramHandle,
-        stats: {
-          years: form.statYears,
-          labelYears: "Anos de experiência",
-          clients: form.statClients,
-          labelClients: "Clientes atendidas",
-          satisfaction: form.statSatisfaction,
-          labelSatisfaction: "Satisfação",
-        },
-      }),
+      body: JSON.stringify(payload),
     });
     const data = await res.json();
     setSiteMsg(data.success ? { ok: true, text: "Conteúdo do site salvo com sucesso!" } : { ok: false, text: "Erro ao salvar." });
@@ -161,6 +179,87 @@ export function SiteManager({ slug, pendingSlug, siteData, appUrl, hasSubscripti
           </a>
           {!hasSubscription && (
             <p className="mt-2 text-xs text-gray-400">O site entra no ar após a ativação da assinatura.</p>
+          )}
+        </div>
+      </div>
+
+      {/* ---------- Logo do site ---------- */}
+      <div className="card">
+        <h2 className="card-title mb-1">Logo do site</h2>
+        <p className="text-sm text-gray-500 mb-4">
+          A logo aparece no menu superior do seu site. Escolha uma <strong>imagem</strong> ou use o <strong>texto</strong>.
+        </p>
+
+        <div className="flex items-center gap-3 mb-2">
+          <span className="text-xs font-semibold text-gray-500">Exibir como:</span>
+          {(["text", "image"] as const).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              className={`btn !py-1.5 !px-4 !text-sm ${form.logoMode === mode ? "btn-primary" : "btn-outline"}`}
+              onClick={() => updateLogo({ logoMode: mode })}
+            >
+              {mode === "image" ? "🖼️ Imagem" : "🔤 Texto"}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-gray-400 mb-4">
+          {form.logoMode
+            ? "Sua escolha substitui a logo da plataforma no seu site."
+            : "Sem logo própria: seu site usa a logo padrão da plataforma."}
+        </p>
+
+        {form.logoMode === "image" && (
+          <div className="mb-4">
+            <label className="label">Imagem da logo</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                className="input flex-1"
+                value={form.logoUrl}
+                placeholder="URL da imagem ou escolha na biblioteca"
+                onChange={(e) => updateLogo({ logoUrl: e.target.value })}
+              />
+              <MediaPicker
+                scope="tenant"
+                value={form.logoUrl || undefined}
+                onChange={(url) => updateLogo({ logoUrl: url })}
+              />
+            </div>
+            {form.logoUrl && (
+              <div className="mt-2 rounded-lg bg-gray-50 p-3 inline-block">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={form.logoUrl} alt="Logo" className="h-10 w-auto max-w-56 object-contain" referrerPolicy="no-referrer" />
+              </div>
+            )}
+            <div className="mt-2 rounded-lg bg-gray-50 border border-gray-100 p-3 text-xs text-gray-500">
+              <strong className="text-gray-700">Dica:</strong> envie um arquivo <strong>PNG ou SVG</strong> com fundo
+              transparente, em formato horizontal (ex.: <strong>200×48px</strong>). O logo será exibido com até{" "}
+              <strong>220px de largura e 44px de altura</strong>.
+            </div>
+          </div>
+        )}
+
+        <div>
+          <label className="label">Nome / Texto do logo</label>
+          <input
+            type="text"
+            className="input"
+            value={form.logoText}
+            placeholder="ex.: Ana Beatriz"
+            onChange={(e) => updateLogo({ logoText: e.target.value })}
+          />
+          <p className="text-xs text-gray-400 mt-1">
+            Usado quando a exibição é por texto (e como texto alternativo da imagem).
+          </p>
+        </div>
+
+        <div className="mt-5 flex items-center gap-3">
+          <button className="btn btn-primary" onClick={saveSite} disabled={savingSite}>
+            {savingSite ? "Salvando..." : "Salvar logo"}
+          </button>
+          {siteMsg && (
+            <span className={`text-sm ${siteMsg.ok ? "text-green-600" : "text-red-600"}`}>{siteMsg.text}</span>
           )}
         </div>
       </div>

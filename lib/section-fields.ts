@@ -30,6 +30,7 @@ export interface ContentFieldDef {
 export const SECTION_CONTENT_FIELDS: Record<SectionType, ContentFieldDef[]> = {
   header: [
     { key: "logoText", label: "Texto da logo", type: "text" },
+    { key: "logoUrl", label: "Logo (imagem)", type: "image" },
   ],
   hero: [
     { key: "eyebrow", label: "Selo / subtítulo do topo", type: "text", ai: true, aiKind: "title" },
