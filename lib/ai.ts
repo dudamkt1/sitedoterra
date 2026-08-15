@@ -20,7 +20,6 @@ const GEMINI_KNOWN_MODELS = [
   "gemini-2.5-flash",
   "gemini-2.0-flash",
   "gemini-2.5-pro",
-  "gemini-1.5-flash",
 ];
 
 // Modelos atuais (30/jul-ago/2026) na ordem de preferência. Groq descontinuou
@@ -68,6 +67,33 @@ const OPENROUTER_FREE_PRIORITY = [
   "nvidia/nemotron-3-super-120b-a12b:free",
   "nvidia/nemotron-3-nano-30b-a3b:free",
 ];
+
+// Modelos que estão descontinuados e seus substitutos atuais. Aplicado a TODO
+// provedor lido do banco, para NUNCA tentar um modelo morto — mesmo que o banco
+// (ou o deploy anterior) ainda tenha o valor antigo. Corrige sozinho.
+const MODEL_MIGRATIONS: Record<string, Record<string, string>> = {
+  "google-gemini": { "gemini-1.5-flash": "gemini-2.5-flash", "gemini-1.5-pro": "gemini-2.5-flash" },
+  groq: {
+    "llama-3.3-70b-versatile": "openai/gpt-oss-20b",
+    "llama-3.1-8b-instant": "openai/gpt-oss-20b",
+    "llama3-70b-8192": "openai/gpt-oss-20b",
+    "llama3-8b-8192": "openai/gpt-oss-20b",
+  },
+  openrouter: {
+    "meta-llama/llama-3.1-8b-instruct:free": "openrouter/free",
+    "meta-llama/llama-3.3-70b-instruct:free": "openrouter/free",
+    "meta-llama/llama-3.1-70b-instruct:free": "openrouter/free",
+  },
+};
+
+/** Troca o modelo do provedor pelo substituto atual se ele estiver descontinuado. */
+function normalizeProviderModel(p: AiProvider): AiProvider {
+  const map = MODEL_MIGRATIONS[p.code];
+  if (!map) return p;
+  const replacement = map[p.model || ""];
+  if (!replacement || replacement === p.model) return p;
+  return { ...p, model: replacement };
+}
 
 /** Candidatos de modelo para Gemini: configurado primeiro, depois estáveis. */
 function geminiCandidates(p: AiProvider): string[] {
@@ -209,7 +235,16 @@ export async function getEnabledProviders(): Promise<AiProvider[]> {
     .eq("enabled", true)
     .order("sort_order", { ascending: true });
   if (error || !data) return [];
-  return data as unknown as AiProvider[];
+  const rows = data as unknown as AiProvider[];
+  const providers = rows.map((p) => normalizeProviderModel(p));
+  // best-effort: se detectamos modelo descontinuado, corrige no banco (self-heal)
+  for (const p of providers) {
+    const original = rows.find((r) => r.id === p.id);
+    if (original && p.model && original.model !== p.model) {
+      await persistWorkingModel(p.id, p.model, original.model).catch(() => {});
+    }
+  }
+  return providers;
 }
 
 export async function getProvidersForAdmin(): Promise<AiProvider[]> {
@@ -220,7 +255,15 @@ export async function getProvidersForAdmin(): Promise<AiProvider[]> {
     .select("*")
     .order("sort_order", { ascending: true });
   if (error || !data) return [];
-  return data as unknown as AiProvider[];
+  const rows = data as unknown as AiProvider[];
+  const providers = rows.map((p) => normalizeProviderModel(p));
+  for (const p of providers) {
+    const original = rows.find((r) => r.id === p.id);
+    if (original && p.model && original.model !== p.model) {
+      await persistWorkingModel(p.id, p.model, original.model).catch(() => {});
+    }
+  }
+  return providers;
 }
 
 export async function getAiSettings(userId: string): Promise<AiSettings | null> {
@@ -258,7 +301,11 @@ export async function testProviderConnection(userId: string, providerId: string)
   const admin = createAdminClient();
   const { data: provider } = await admin.from("ai_providers").select("*").eq("id", providerId).maybeSingle();
   if (!provider) return { ok: false, message: "Provedor não encontrado." };
-  const p = provider as unknown as AiProvider;
+  const original = provider as unknown as AiProvider;
+  const p = normalizeProviderModel(original);
+  if (p.model && p.model !== original.model) {
+    await persistWorkingModel(p.id, p.model, original.model).catch(() => {});
+  }
 
   try {
     if (p.code === "google-gemini") {
@@ -322,7 +369,11 @@ export async function generateWithAi(
   const admin = createAdminClient();
   const { data: provider } = await admin.from("ai_providers").select("*").eq("id", settings.provider_id).maybeSingle();
   if (!provider) return { ok: false, error: "Provedor não encontrado." };
-  const p = provider as unknown as AiProvider;
+  const original = provider as unknown as AiProvider;
+  const p = normalizeProviderModel(original);
+  if (p.model && p.model !== original.model) {
+    await persistWorkingModel(p.id, p.model, original.model).catch(() => {});
+  }
 
   const system = p.instructions || "Você é um assistente de conteúdo. Responda em português do Brasil.";
   const kind = input.kind || "default";
