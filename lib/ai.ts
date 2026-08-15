@@ -6,6 +6,61 @@ import type { AiProvider, AiSettings } from "@/types";
  * Camada de serviço da IA. Todo acesso a chaves acontece no servidor.
  */
 
+// ---------------------------------------------------------------------------
+// ROBUSTEZ CONTRA MODELOS DESCONTINUADOS
+// ---------------------------------------------------------------------------
+// Modelos de IA mudam/são descontinuados pelos provedores (ex.: gemini-1.5-flash
+// saiu do ar). Para o CLIENTE nunca ver "modelo não encontrado", usamos uma
+// lista de modelos estáveis: se o modelo configurado falhar com "modelo não
+// disponível", tentamos automaticamente o próximo da lista e atualizamos a
+// configuração global (ai_providers) para o modelo que funcionou.
+// ---------------------------------------------------------------------------
+
+const GEMINI_KNOWN_MODELS = [
+  "gemini-2.5-flash",
+  "gemini-2.0-flash",
+  "gemini-2.5-pro",
+  "gemini-1.5-flash",
+];
+
+const OPENAI_COMPAT_MODEL_FALLBACKS: Record<string, string[]> = {
+  groq: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "llama3-70b-8192"],
+  openrouter: [
+    "meta-llama/llama-3.1-8b-instruct:free",
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "meta-llama/llama-3.1-70b-instruct:free",
+  ],
+};
+
+/** Candidatos de modelo para Gemini: configurado primeiro, depois estáveis. */
+function geminiCandidates(p: AiProvider): string[] {
+  return Array.from(
+    new Set([p.model, ...GEMINI_KNOWN_MODELS].filter((m): m is string => Boolean(m)))
+  );
+}
+
+/** Candidatos para provedores OpenAI-compatible (Groq, OpenRouter, etc.). */
+function openAiCompatCandidates(p: AiProvider): string[] {
+  const base = OPENAI_COMPAT_MODEL_FALLBACKS[p.code] || [];
+  return Array.from(new Set([p.model, ...base].filter((m): m is string => Boolean(m))));
+}
+
+/** true quando o erro significa "modelo descontinuado/indisponível" (recoverável). */
+function isModelUnavailable(status: number, body: string): boolean {
+  return status === 404 && /(no longer available|not found|not supported|does not exist)/i.test(body);
+}
+
+/** Persiste o modelo que funcionou na configuração global (auto-healing). */
+async function persistWorkingModel(providerId: string, model: string, configured: string | null) {
+  if (!model || !providerId || model === configured) return;
+  try {
+    const admin = createAdminClient();
+    await admin.from("ai_providers").update({ model, updated_at: new Date().toISOString() }).eq("id", providerId);
+  } catch {
+    // best-effort: não bloqueia a resposta do usuário
+  }
+}
+
 export async function getEnabledProviders(): Promise<AiProvider[]> {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) return [];
   const admin = createAdminClient();
@@ -68,33 +123,54 @@ export async function testProviderConnection(userId: string, providerId: string)
 
   try {
     if (p.code === "google-gemini") {
-      const url = `${p.base_url || "https://generativelanguage.googleapis.com"}/v1beta/models/${p.model || "gemini-2.5-flash"}:generateContent?key=${apiKey}`;
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contents: [{ parts: [{ text: "Responda apenas: ok" }] }] }),
-      });
-      if (!res.ok) {
+      const base = p.base_url || "https://generativelanguage.googleapis.com";
+      let lastErr = "";
+      let lastStatus = 0;
+      for (const model of geminiCandidates(p)) {
+        const url = `${base}/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ contents: [{ parts: [{ text: "Responda apenas: ok" }] }] }),
+        });
+        if (res.ok) {
+          await persistWorkingModel(p.id, model, p.model);
+          return { ok: true, message: "Conexão OK! Sua chave está funcionando." };
+        }
         const err = await res.text();
-        return { ok: false, message: `Falha na conexão (HTTP ${res.status}): ${err.slice(0, 200)}` };
+        if (!isModelUnavailable(res.status, err)) {
+          return { ok: false, message: `Falha na conexão (HTTP ${res.status}): ${err.slice(0, 200)}` };
+        }
+        lastErr = err;
+        lastStatus = res.status;
       }
-      return { ok: true, message: "Conexão OK! Sua chave está funcionando." };
+      return { ok: false, message: `Falha na conexão (HTTP ${lastStatus}): ${lastErr.slice(0, 200)}` };
     }
 
     // OpenAI-compatible (Groq, OpenRouter, etc.)
-    const res = await fetch(`${p.base_url || ""}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({ model: p.model || "llama-3.3-70b-versatile", messages: [{ role: "user", content: "Responda apenas: ok" }], max_tokens: 16 }),
-    });
-    if (!res.ok) {
+    let lastErr = "";
+    let lastStatus = 0;
+    for (const model of openAiCompatCandidates(p)) {
+      const res = await fetch(`${p.base_url || ""}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({ model, messages: [{ role: "user", content: "Responda apenas: ok" }], max_tokens: 16 }),
+      });
+      if (res.ok) {
+        await persistWorkingModel(p.id, model, p.model);
+        return { ok: true, message: "Conexão OK! Sua chave está funcionando." };
+      }
       const err = await res.text();
-      return { ok: false, message: `Falha na conexão (HTTP ${res.status}): ${err.slice(0, 200)}` };
+      if (!isModelUnavailable(res.status, err)) {
+        return { ok: false, message: `Falha na conexão (HTTP ${res.status}): ${err.slice(0, 200)}` };
+      }
+      lastErr = err;
+      lastStatus = res.status;
     }
-    return { ok: true, message: "Conexão OK! Sua chave está funcionando." };
+    return { ok: false, message: `Falha na conexão (HTTP ${lastStatus}): ${lastErr.slice(0, 200)}` };
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : "Erro desconhecido na conexão." };
   }
@@ -127,51 +203,72 @@ export async function generateWithAi(
 
   try {
     if (p.code === "google-gemini") {
-      const url = `${p.base_url || "https://generativelanguage.googleapis.com"}/v1beta/models/${p.model || "gemini-2.5-flash"}:generateContent?key=${apiKey}`;
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: system }] },
-          contents: [{ parts: [{ text: fullPrompt }] }],
-          generationConfig: { temperature: 0.7, maxOutputTokens: 600 },
-        }),
-      });
-      if (!res.ok) {
+      const base = p.base_url || "https://generativelanguage.googleapis.com";
+      let lastErr = "";
+      let lastStatus = 0;
+      for (const model of geminiCandidates(p)) {
+        const url = `${base}/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: system }] },
+            contents: [{ parts: [{ text: fullPrompt }] }],
+            generationConfig: { temperature: 0.7, maxOutputTokens: 600 },
+          }),
+        });
+        if (res.ok) {
+          await persistWorkingModel(p.id, model, p.model);
+          const json = await res.json();
+          const text = json?.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text || "").join("") || "";
+          if (!text) return { ok: false, error: "O provedor retornou resposta vazia. Verifique os limites do plano gratuito." };
+          return { ok: true, text: text.trim() };
+        }
         const err = await res.text();
-        return { ok: false, error: `Erro do provedor (HTTP ${res.status}): ${err.slice(0, 200)}` };
+        if (!isModelUnavailable(res.status, err)) {
+          return { ok: false, error: `Erro do provedor (HTTP ${res.status}): ${err.slice(0, 200)}` };
+        }
+        lastErr = err;
+        lastStatus = res.status;
       }
-      const json = await res.json();
-      const text = json?.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text || "").join("") || "";
-      if (!text) return { ok: false, error: "O provedor retornou resposta vazia. Verifique os limites do plano gratuito." };
-      return { ok: true, text: text.trim() };
+      return { ok: false, error: `Erro do provedor (HTTP ${lastStatus}): ${lastErr.slice(0, 200)}` };
     }
 
     // OpenAI-compatible
-    const res = await fetch(`${p.base_url || ""}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: p.model || "llama-3.3-70b-versatile",
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: fullPrompt },
-        ],
-        max_tokens: 700,
-        temperature: 0.7,
-      }),
-    });
-    if (!res.ok) {
+    let lastErr = "";
+    let lastStatus = 0;
+    for (const model of openAiCompatCandidates(p)) {
+      const res = await fetch(`${p.base_url || ""}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: system },
+            { role: "user", content: fullPrompt },
+          ],
+          max_tokens: 700,
+          temperature: 0.7,
+        }),
+      });
+      if (res.ok) {
+        await persistWorkingModel(p.id, model, p.model);
+        const json = await res.json();
+        const text = json?.choices?.[0]?.message?.content || "";
+        if (!text) return { ok: false, error: "O provedor retornou resposta vazia. Verifique os limites do plano gratuito." };
+        return { ok: true, text: text.trim() };
+      }
       const err = await res.text();
-      return { ok: false, error: `Erro do provedor (HTTP ${res.status}): ${err.slice(0, 200)}` };
+      if (!isModelUnavailable(res.status, err)) {
+        return { ok: false, error: `Erro do provedor (HTTP ${res.status}): ${err.slice(0, 200)}` };
+      }
+      lastErr = err;
+      lastStatus = res.status;
     }
-    const json = await res.json();
-    const text = json?.choices?.[0]?.message?.content || "";
-    if (!text) return { ok: false, error: "O provedor retornou resposta vazia. Verifique os limites do plano gratuito." };
-    return { ok: true, text: text.trim() };
+    return { ok: false, error: `Erro do provedor (HTTP ${lastStatus}): ${lastErr.slice(0, 200)}` };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Erro desconhecido ao gerar conteúdo." };
   }
