@@ -210,6 +210,104 @@ async function chatWithFallback(
   return { ok: false, error: `Erro do provedor (HTTP ${lastStatus}): ${lastErr.slice(0, 200)}` };
 }
 
+// Prioridade de modelos usada na descoberta dinâmica do Gemini.
+const GEMINI_MODEL_PRIORITY = [
+  "gemini-2.5-flash",
+  "gemini-2.0-flash",
+  "gemini-2.5-pro",
+  "gemini-1.5-flash",
+];
+
+/**
+ * DESCOBERTA DINÂMICA GEMINI: consulta a lista oficial de modelos da API e
+ * devolve os que AQUELA chave consegue usar para generateContent (priorizando
+ * flash). Cobre casos como "model no longer available to new users".
+ */
+async function discoverGeminiModels(p: AiProvider, apiKey: string, base?: string): Promise<string[]> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    try {
+      const res = await fetch(`${base || p.base_url || "https://generativelanguage.googleapis.com"}/v1beta/models?key=${apiKey}`, {
+        signal: controller.signal,
+      });
+      if (!res.ok) return [];
+      const data = (await res.json()) as { models?: { name?: string; supportedGenerationMethods?: string[] }[] };
+      const usable = (data.models || [])
+        .filter((m) => (m.supportedGenerationMethods || []).includes("generateContent"))
+        .map((m) => (m.name || "").replace(/^models\//, ""))
+        .filter((id) => Boolean(id) && !/@/.test(id) && !/embedding/i.test(id) && !/imagen/i.test(id) && !/audio|speech|tts|asr/i.test(id));
+      if (!usable.length) return [];
+      const preferred = GEMINI_MODEL_PRIORITY.filter((id) => usable.includes(id));
+      if (preferred.length) return preferred;
+      return usable.sort((a, b) => a.length - b.length);
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch {
+    return [];
+  }
+}
+
+type GeminiRunResult = { ok: true; text: string } | { ok: false; error: string };
+
+/**
+ * Gera no Gemini com FALLBACK + DESCOBERTA DINÂMICA: tenta o modelo configurado
+ * e os estáveis; se todos falharem como "modelo indisponível", consulta a lista
+ * oficial de modelos da chave e tenta um disponível (preferindo flash).
+ */
+async function geminiChat(
+  p: AiProvider,
+  apiKey: string,
+  payload: { system?: string; prompt?: string }
+): Promise<GeminiRunResult> {
+  const base = p.base_url || "https://generativelanguage.googleapis.com";
+  const tried = new Set<string>();
+  let lastErr = "";
+  let lastStatus = 0;
+
+  const attempt = async (model: string): Promise<GeminiRunResult | string | null> => {
+    if (tried.has(model)) return null;
+    tried.add(model);
+    const url = `${base}/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    const body: Record<string, unknown> = {
+      contents: [{ parts: [{ text: payload.prompt || "Responda apenas: ok" }] }],
+      generationConfig: { temperature: 0.7, maxOutputTokens: 600 },
+    };
+    if (payload.system) body.systemInstruction = { parts: [{ text: payload.system }] };
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (res.ok) {
+      await persistWorkingModel(p.id, model, p.model);
+      const json = (await res.json()) as any;
+      const text = json?.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text || "").join("") || "";
+      return { ok: true, text };
+    }
+    const err = await res.text();
+    if (!isModelUnavailable(res.status, err)) {
+      return `Erro do provedor (HTTP ${res.status}): ${err.slice(0, 200)}`;
+    }
+    lastErr = err;
+    lastStatus = res.status;
+    return null;
+  };
+
+  for (const model of geminiCandidates(p)) {
+    const r = await attempt(model);
+    if (typeof r === "string") return { ok: false, error: r };
+    if (r) return r;
+  }
+  for (const model of await discoverGeminiModels(p, apiKey, base)) {
+    const r = await attempt(model);
+    if (typeof r === "string") return { ok: false, error: r };
+    if (r) return r;
+  }
+  return { ok: false, error: `Erro do provedor (HTTP ${lastStatus}): ${lastErr.slice(0, 200)}` };
+}
+
 /** true quando o erro significa "modelo descontinuado/indisponível" (recoverável). */
 function isModelUnavailable(status: number, body: string): boolean {
   return status === 404 && /(no longer available|not found|not supported|does not exist)/i.test(body);
@@ -309,28 +407,10 @@ export async function testProviderConnection(userId: string, providerId: string)
 
   try {
     if (p.code === "google-gemini") {
-      const base = p.base_url || "https://generativelanguage.googleapis.com";
-      let lastErr = "";
-      let lastStatus = 0;
-      for (const model of geminiCandidates(p)) {
-        const url = `${base}/v1beta/models/${model}:generateContent?key=${apiKey}`;
-        const res = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ contents: [{ parts: [{ text: "Responda apenas: ok" }] }] }),
-        });
-        if (res.ok) {
-          await persistWorkingModel(p.id, model, p.model);
-          return { ok: true, message: "Conexão OK! Sua chave está funcionando." };
-        }
-        const err = await res.text();
-        if (!isModelUnavailable(res.status, err)) {
-          return { ok: false, message: `Falha na conexão (HTTP ${res.status}): ${err.slice(0, 200)}` };
-        }
-        lastErr = err;
-        lastStatus = res.status;
-      }
-      return { ok: false, message: `Falha na conexão (HTTP ${lastStatus}): ${lastErr.slice(0, 200)}` };
+      const r = await geminiChat(p, apiKey, { prompt: "Responda apenas: ok" });
+      return r.ok
+        ? { ok: true, message: "Conexão OK! Sua chave está funcionando." }
+        : { ok: false, message: r.error };
     }
 
     const run = await chatWithFallback(
@@ -383,35 +463,10 @@ export async function generateWithAi(
 
   try {
     if (p.code === "google-gemini") {
-      const base = p.base_url || "https://generativelanguage.googleapis.com";
-      let lastErr = "";
-      let lastStatus = 0;
-      for (const model of geminiCandidates(p)) {
-        const url = `${base}/v1beta/models/${model}:generateContent?key=${apiKey}`;
-        const res = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: system }] },
-            contents: [{ parts: [{ text: fullPrompt }] }],
-            generationConfig: { temperature: 0.7, maxOutputTokens: 600 },
-          }),
-        });
-        if (res.ok) {
-          await persistWorkingModel(p.id, model, p.model);
-          const json = await res.json();
-          const text = json?.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text || "").join("") || "";
-          if (!text) return { ok: false, error: "O provedor retornou resposta vazia. Verifique os limites do plano gratuito." };
-          return { ok: true, text: text.trim() };
-        }
-        const err = await res.text();
-        if (!isModelUnavailable(res.status, err)) {
-          return { ok: false, error: `Erro do provedor (HTTP ${res.status}): ${err.slice(0, 200)}` };
-        }
-        lastErr = err;
-        lastStatus = res.status;
-      }
-      return { ok: false, error: `Erro do provedor (HTTP ${lastStatus}): ${lastErr.slice(0, 200)}` };
+      const r = await geminiChat(p, apiKey, { system, prompt: fullPrompt });
+      if (!r.ok) return { ok: false, error: r.error };
+      if (!r.text) return { ok: false, error: "O provedor retornou resposta vazia. Verifique os limites do plano gratuito." };
+      return { ok: true, text: r.text.trim() };
     }
 
     // OpenAI-compatible (Groq, OpenRouter, etc.) com fallback + descoberta dinâmica
