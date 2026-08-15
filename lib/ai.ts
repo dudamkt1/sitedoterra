@@ -23,14 +23,51 @@ const GEMINI_KNOWN_MODELS = [
   "gemini-1.5-flash",
 ];
 
+// Modelos atuais (30/jul-ago/2026) na ordem de preferência. Groq descontinuou
+// llama-3.3-70b-versatile e llama-3.1-8b-instant (shutdown 16/08/2026), com
+// recomendação oficial para openai/gpt-oss-20b / openai/gpt-oss-120b / qwen.
+// No OpenRouter, o roteador "openrouter/free" NUNCA quebra (sempre escolhe um
+// modelo gratuito disponível) — é a nossa maior garantia. As listas são só o
+// primeiro passo; além delas fazemos DESCOBERTA DINÂMICA via API (ver abaixo).
 const OPENAI_COMPAT_MODEL_FALLBACKS: Record<string, string[]> = {
-  groq: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "llama3-70b-8192"],
+  groq: [
+    "openai/gpt-oss-20b",
+    "openai/gpt-oss-120b",
+    "qwen/qwen3-32b",
+    "meta-llama/llama-4-scout-17b-16e-instruct",
+    "allam-2-7b",
+  ],
   openrouter: [
-    "meta-llama/llama-3.1-8b-instruct:free",
-    "meta-llama/llama-3.3-70b-instruct:free",
-    "meta-llama/llama-3.1-70b-instruct:free",
+    "openrouter/free",
+    "google/gemma-4-31b-it:free",
+    "google/gemma-4-26b-a4b-it:free",
+    "openai/gpt-oss-20b:free",
+    "nvidia/nemotron-3-ultra-550b-a55b:free",
+    "nvidia/nemotron-3-super-120b-a12b:free",
+    "openai/gpt-oss-120b:free",
   ],
 };
+
+// Prioridade de modelos usada na descoberta dinâmica do Groq.
+const GROQ_MODEL_PRIORITY = [
+  "openai/gpt-oss-20b",
+  "openai/gpt-oss-120b",
+  "qwen/qwen3-32b",
+  "meta-llama/llama-4-scout-17b-16e-instruct",
+  "allam-2-7b",
+];
+
+// Prioridade de modelos gratuitos usada na descoberta dinâmica do OpenRouter.
+const OPENROUTER_FREE_PRIORITY = [
+  "openrouter/free",
+  "google/gemma-4-31b-it:free",
+  "google/gemma-4-26b-a4b-it:free",
+  "openai/gpt-oss-20b:free",
+  "openai/gpt-oss-120b:free",
+  "nvidia/nemotron-3-ultra-550b-a55b:free",
+  "nvidia/nemotron-3-super-120b-a12b:free",
+  "nvidia/nemotron-3-nano-30b-a3b:free",
+];
 
 /** Candidatos de modelo para Gemini: configurado primeiro, depois estáveis. */
 function geminiCandidates(p: AiProvider): string[] {
@@ -43,6 +80,108 @@ function geminiCandidates(p: AiProvider): string[] {
 function openAiCompatCandidates(p: AiProvider): string[] {
   const base = OPENAI_COMPAT_MODEL_FALLBACKS[p.code] || [];
   return Array.from(new Set([p.model, ...base].filter((m): m is string => Boolean(m))));
+}
+
+/**
+ * DESCOBERTA DINÂMICA: consulta a API do provedor e devolve os modelos
+ * atualmente disponíveis (priorizando gratuitos/estáveis). Assim, mesmo que a
+ * lista estática acima fique velha, o sistema sempre encontra um modelo válido.
+ * Best-effort: falhou a consulta => retorna lista vazia.
+ */
+async function discoverLiveModels(p: AiProvider, apiKey: string): Promise<string[]> {
+  try {
+    if (p.code === "groq" && apiKey) {
+      const res = await fetch("https://api.groq.com/openai/v1/models", {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+      if (!res.ok) return [];
+      const data = (await res.json()) as { data?: { id?: string }[] };
+      const ids = new Set(
+        (data.data || []).map((m) => m.id).filter((id): id is string => Boolean(id))
+      );
+      return GROQ_MODEL_PRIORITY.filter((id) => ids.has(id));
+    }
+
+    if (p.code === "openrouter") {
+      const res = await fetch("https://openrouter.ai/api/v1/models/");
+      if (!res.ok) return [];
+      const data = (await res.json()) as {
+        data?: { id?: string; pricing?: { prompt?: string; completion?: string }; modality?: string; input_modalities?: string[] }[];
+      };
+      const freeIds = (data.data || [])
+        .filter(
+          (m) =>
+            m.id?.includes(":free") &&
+            m.pricing?.prompt === "0" &&
+            m.pricing?.completion === "0" &&
+            !m.id.includes("content-safety") &&
+            !m.id.includes("rerank") &&
+            !m.id.includes("embed") &&
+            (m.modality === "text" || (m.input_modalities && m.input_modalities.includes("text")))
+        )
+        .map((m) => m.id as string);
+      const chosen = OPENROUTER_FREE_PRIORITY.filter((id) => freeIds.includes(id));
+      if (chosen.length) return chosen;
+      // Nenhum preferido disponível: devolve qualquer gratuito de texto.
+      return freeIds.sort((a, b) => a.length - b.length);
+    }
+  } catch {
+    // descoberta dinâmica é best-effort
+  }
+  return [];
+}
+
+type ChatRunResult = { ok: true; text: string } | { ok: false; error: string };
+
+/**
+ * Tenta gerar em um provedor OpenAI-compatible com FALLBACK automático:
+ * 1) modelo configurado + lista estável; 2) se tudo falhar com "modelo
+ * indisponível", faz descoberta dinâmica e tenta os modelos atuais do provedor.
+ */
+async function chatWithFallback(
+  p: AiProvider,
+  apiKey: string,
+  makeBody: (model: string) => Record<string, unknown>,
+  extractText: (json: any) => string
+): Promise<ChatRunResult> {
+  const tried = new Set<string>();
+  let lastErr = "";
+  let lastStatus = 0;
+
+  const attempt = async (model: string): Promise<ChatRunResult | null> => {
+    if (tried.has(model)) return null;
+    tried.add(model);
+    const res = await fetch(`${p.base_url || ""}/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify(makeBody(model)),
+    });
+    if (res.ok) {
+      await persistWorkingModel(p.id, model, p.model);
+      return { ok: true, text: extractText(await res.json()) };
+    }
+    const err = await res.text();
+    if (!isModelUnavailable(res.status, err)) {
+      return { ok: false, error: `Erro do provedor (HTTP ${res.status}): ${err.slice(0, 200)}` };
+    }
+    lastErr = err;
+    lastStatus = res.status;
+    return null;
+  };
+
+  const statics = openAiCompatCandidates(p);
+  for (const model of statics) {
+    const r = await attempt(model);
+    if (r) return r;
+  }
+
+  const discovered = await discoverLiveModels(p, apiKey);
+  for (const model of discovered) {
+    const r = await attempt(model);
+    if (r) return r;
+  }
+
+  return { ok: false, error: `Erro do provedor (HTTP ${lastStatus}): ${lastErr.slice(0, 200)}` };
 }
 
 /** true quando o erro significa "modelo descontinuado/indisponível" (recoverável). */
@@ -147,33 +286,23 @@ export async function testProviderConnection(userId: string, providerId: string)
       return { ok: false, message: `Falha na conexão (HTTP ${lastStatus}): ${lastErr.slice(0, 200)}` };
     }
 
-    // OpenAI-compatible (Groq, OpenRouter, etc.)
-    let lastErr = "";
-    let lastStatus = 0;
-    for (const model of openAiCompatCandidates(p)) {
-      const res = await fetch(`${p.base_url || ""}/chat/completions`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({ model, messages: [{ role: "user", content: "Responda apenas: ok" }], max_tokens: 16 }),
-      });
-      if (res.ok) {
-        await persistWorkingModel(p.id, model, p.model);
-        return { ok: true, message: "Conexão OK! Sua chave está funcionando." };
-      }
-      const err = await res.text();
-      if (!isModelUnavailable(res.status, err)) {
-        return { ok: false, message: `Falha na conexão (HTTP ${res.status}): ${err.slice(0, 200)}` };
-      }
-      lastErr = err;
-      lastStatus = res.status;
+    const run = await chatWithFallback(
+      p,
+      apiKey,
+      makeBodyFor,
+      (json) => (json?.choices?.[0]?.message?.content as string | undefined) || ""
+    );
+    if (run.ok) {
+      return { ok: true, message: "Conexão OK! Sua chave está funcionando." };
     }
-    return { ok: false, message: `Falha na conexão (HTTP ${lastStatus}): ${lastErr.slice(0, 200)}` };
+    return { ok: false, message: run.error };
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : "Erro desconhecido na conexão." };
   }
+}
+
+function makeBodyFor(model: string): Record<string, unknown> {
+  return { model, messages: [{ role: "user", content: "Responda apenas: ok" }], max_tokens: 16 };
 }
 
 /**
@@ -234,41 +363,25 @@ export async function generateWithAi(
       return { ok: false, error: `Erro do provedor (HTTP ${lastStatus}): ${lastErr.slice(0, 200)}` };
     }
 
-    // OpenAI-compatible
-    let lastErr = "";
-    let lastStatus = 0;
-    for (const model of openAiCompatCandidates(p)) {
-      const res = await fetch(`${p.base_url || ""}/chat/completions`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model,
-          messages: [
-            { role: "system", content: system },
-            { role: "user", content: fullPrompt },
-          ],
-          max_tokens: 700,
-          temperature: 0.7,
-        }),
-      });
-      if (res.ok) {
-        await persistWorkingModel(p.id, model, p.model);
-        const json = await res.json();
-        const text = json?.choices?.[0]?.message?.content || "";
-        if (!text) return { ok: false, error: "O provedor retornou resposta vazia. Verifique os limites do plano gratuito." };
-        return { ok: true, text: text.trim() };
-      }
-      const err = await res.text();
-      if (!isModelUnavailable(res.status, err)) {
-        return { ok: false, error: `Erro do provedor (HTTP ${res.status}): ${err.slice(0, 200)}` };
-      }
-      lastErr = err;
-      lastStatus = res.status;
-    }
-    return { ok: false, error: `Erro do provedor (HTTP ${lastStatus}): ${lastErr.slice(0, 200)}` };
+    // OpenAI-compatible (Groq, OpenRouter, etc.) com fallback + descoberta dinâmica
+    const run = await chatWithFallback(
+      p,
+      apiKey,
+      (model) => ({
+        model,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: fullPrompt },
+        ],
+        max_tokens: 700,
+        temperature: 0.7,
+      }),
+      (json) => (json?.choices?.[0]?.message?.content as string | undefined) || ""
+    );
+    if (!run.ok) return { ok: false, error: run.error };
+    const text = run.text;
+    if (!text) return { ok: false, error: "O provedor retornou resposta vazia. Verifique os limites do plano gratuito." };
+    return { ok: true, text: text.trim() };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Erro desconhecido ao gerar conteúdo." };
   }
