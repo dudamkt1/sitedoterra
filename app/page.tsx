@@ -1,6 +1,6 @@
-import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { SiteHome } from "@/components/site/SiteHome";
+import { LoggedInNotice } from "@/components/site/LoggedInNotice";
 import { DEFAULT_SITE_DATA } from "@/lib/site-data";
 import { resolveHomeSections } from "@/lib/home";
 import type { PublicTenant } from "@/types";
@@ -25,29 +25,23 @@ const DEMO_TENANT: PublicTenant = {
  * Usa a mesma arquitetura modular multi-tenant: as seções são resolvidas a
  * partir da configuração GLOBAL (Super Admin) com o conteúdo padrão, e o
  * Super Admin edita tudo em /admin/editor-home.
+ *
+ * Usuários logados NÃO são forçados ao painel: veem a página normalmente e
+ * apenas um aviso discreto de que estão logados (LoggedInNotice).
  */
-export default async function HomePage({
-  searchParams,
-}: {
-  searchParams?: { [key: string]: string | string[] | undefined };
-}) {
-  // ?preview=1 permite ao Super Admin visualizar a HOME pública mesmo logado
-  // (ex.: "Visualizar HOME" em /admin/planos e no Editor da Home).
-  const preview = searchParams?.preview === "1";
+export default async function HomePage() {
   const user = await getCurrentUser();
-  if (user && !preview) {
-    redirect("/painel");
-  }
 
   const sections = await resolveHomeSections({ tenant: DEMO_TENANT });
 
   return (
-    <SiteHome
-      slug="index"
-      sections={sections}
-      extraNav={[
-        { label: "Painel", href: "/login" },
-      ]}
-    />
+    <>
+      {user && <LoggedInNotice email={user.email} />}
+      <SiteHome
+        slug="index"
+        sections={sections}
+        extraNav={[{ label: "Painel", href: user ? "/painel" : "/login" }]}
+      />
+    </>
   );
 }

@@ -2,9 +2,11 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import { SiteHome } from "@/components/site/SiteHome";
+import { LoggedInNotice } from "@/components/site/LoggedInNotice";
 import { SuspendedSitePage } from "@/components/site/SuspendedSitePage";
 import { resolveTenantAccess } from "@/lib/tenant";
 import { resolveHomeSections } from "@/lib/home";
+import { getCurrentUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -26,6 +28,8 @@ export default async function TenantSitePage({ params }: { params: { slug: strin
     notFound();
   }
 
+  const user = await getCurrentUser();
+
   const headerList = headers();
   const host = headerList.get("x-forwarded-host") || headerList.get("host") || "";
   const protocol = headerList.get("x-forwarded-proto") || "https";
@@ -42,6 +46,7 @@ export default async function TenantSitePage({ params }: { params: { slug: strin
     return (
       <>
         <link rel="canonical" href={canonicalUrl} />
+        {user && <LoggedInNotice email={user.email} />}
         <SiteHome
           slug={tenant.slug}
           sections={sections}
@@ -59,6 +64,7 @@ export default async function TenantSitePage({ params }: { params: { slug: strin
   return (
     <>
       <link rel="canonical" href={canonicalUrl} />
+      {user && <LoggedInNotice email={user.email} />}
       <SuspendedSitePage tenant={tenant} host={host} />
     </>
   );
