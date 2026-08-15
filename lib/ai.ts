@@ -68,7 +68,7 @@ export async function testProviderConnection(userId: string, providerId: string)
 
   try {
     if (p.code === "google-gemini") {
-      const url = `${p.base_url || "https://generativelanguage.googleapis.com"}/v1beta/models/${p.model || "gemini-1.5-flash"}:generateContent?key=${apiKey}`;
+      const url = `${p.base_url || "https://generativelanguage.googleapis.com"}/v1beta/models/${p.model || "gemini-2.5-flash"}:generateContent?key=${apiKey}`;
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -127,7 +127,7 @@ export async function generateWithAi(
 
   try {
     if (p.code === "google-gemini") {
-      const url = `${p.base_url || "https://generativelanguage.googleapis.com"}/v1beta/models/${p.model || "gemini-1.5-flash"}:generateContent?key=${apiKey}`;
+      const url = `${p.base_url || "https://generativelanguage.googleapis.com"}/v1beta/models/${p.model || "gemini-2.5-flash"}:generateContent?key=${apiKey}`;
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

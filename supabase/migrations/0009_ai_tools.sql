@@ -79,7 +79,7 @@ values
     'O plano gratuito do Gemini tem limite de requisições por dia (RPm/TPM). Para uso contínuo e intenso, verifique o plano pago (Pay-as-you-go). Não é necessário cartão para começar.',
     'https://aistudio.google.com/app/apikey',
     'https://generativelanguage.googleapis.com',
-    'gemini-1.5-flash',
+    'gemini-2.5-flash',
     'Você é um assistente de conteúdo para sites de consultoras de bem-estar. Responda em português do Brasil, com tom elegante e profissional. Sempre entregue o texto solicitado pronto para uso.',
     10
   ),
