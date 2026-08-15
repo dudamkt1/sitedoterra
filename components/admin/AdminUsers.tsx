@@ -21,12 +21,12 @@ export function AdminUsers({ rows, plans }: { rows: Row[]; plans: any[] }) {
   const [statusFilter, setStatusFilter] = useState("all");
   const [busy, setBusy] = useState<string | null>(null);
 
-  async function runAction(userId: string, action: string) {
+  async function runAction(userId: string, action: string, extra: Record<string, unknown> = {}) {
     setBusy(userId);
     await fetch(`/api/admin/users/${userId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action }),
+      body: JSON.stringify({ action, ...extra }),
     });
     setBusy(null);
     window.location.reload();
@@ -117,7 +117,16 @@ export function AdminUsers({ rows, plans }: { rows: Row[]; plans: any[] }) {
                         </span>
                       </div>
                     </td>
-                    <td><StatusBadge status={s?.status || "awaiting_activation"} /></td>
+                    <td>
+                      <div className="flex items-center gap-1">
+                        <StatusBadge status={s?.status || "awaiting_activation"} />
+                        {r.tenant?.monthly_billing_enabled === false && (
+                          <span className="badge badge-yellow" title="Ativo sem mensalidade (isenção)">
+                            s/ mensal
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td>
                       <div className="text-xs text-gray-500">{r.url}</div>
                       {r.tenant && (
@@ -150,6 +159,22 @@ export function AdminUsers({ rows, plans }: { rows: Row[]; plans: any[] }) {
                           <option value="">Alterar plano…</option>
                           {plans.map((pl) => <option key={pl.id} value={pl.id}>{pl.name}</option>)}
                         </select>
+                        <div className="flex gap-1">
+                          <button
+                            className="btn btn-primary !py-1 !px-2 text-xs"
+                            onClick={() => runAction(p.user_id, "activate_site", { billing: "monthly" })}
+                            disabled={busy === p.user_id}
+                          >
+                            Ativar (mensal)
+                          </button>
+                          <button
+                            className="btn btn-gold !py-1 !px-2 text-xs"
+                            onClick={() => runAction(p.user_id, "activate_site", { billing: "none" })}
+                            disabled={busy === p.user_id}
+                          >
+                            Ativar (sem mensal)
+                          </button>
+                        </div>
                         <div className="flex gap-1">
                           {p.status !== "blocked" ? (
                             <button className="btn btn-danger !py-1 !px-2 text-xs" onClick={() => runAction(p.user_id, "block")} disabled={busy === p.user_id}>Bloquear</button>

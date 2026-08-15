@@ -5,6 +5,8 @@ export interface AccessInput {
   siteStatus: SiteStatus;
   subscriptionStatus: SubscriptionStatus;
   blocked: boolean;
+  /** false = usuário isento de mensalidade: site fica público sem assinatura ativa. */
+  billingEnabled: boolean;
 }
 
 export type SiteAccess = "available" | "suspended";
@@ -12,33 +14,31 @@ export type SiteAccess = "available" | "suspended";
 /**
  * REGRA CENTRAL DE ACESSO PÚBLICO.
  *
- * PUBLIC_SITE = AVAILABLE somente quando TODOS os critérios forem verdadeiros:
- *   subscription.status === 'active'
- *   account.status === 'active'
- *   site.status === 'active'
- *   !blocked
+ * PUBLIC_SITE = AVAILABLE quando:
+ *   - conta ativa, site ativo e não bloqueado; E
+ *   - billing habilitado → exige subscription.status === 'active';
+ *   - billing desabilitado (isenção) → não exige assinatura.
  *
  * Esta é a ÚNICA fonte de verdade. Não espalhar esta lógica em componentes.
  */
 export function getSiteAccess(input: AccessInput): SiteAccess {
-  if (
-    input.subscriptionStatus === "active" &&
+  const baseOk =
     input.accountStatus === "active" &&
     input.siteStatus === "active" &&
-    !input.blocked
-  ) {
-    return "available";
-  }
-  return "suspended";
+    !input.blocked;
+  if (!baseOk) return "suspended";
+  if (input.billingEnabled && input.subscriptionStatus !== "active") return "suspended";
+  return "available";
 }
 
 export function isSitePublic(
   accountStatus: AccountStatus,
   siteStatus: SiteStatus,
   subscriptionStatus: SubscriptionStatus,
-  blocked: boolean
+  blocked: boolean,
+  billingEnabled = true
 ): boolean {
-  return getSiteAccess({ accountStatus, siteStatus, subscriptionStatus, blocked }) === "available";
+  return getSiteAccess({ accountStatus, siteStatus, subscriptionStatus, blocked, billingEnabled }) === "available";
 }
 
 export interface AccessDetail {
@@ -64,16 +64,16 @@ export function explainSiteAccess(input: AccessInput): AccessDetail {
   if (input.accountStatus === "suspended") {
     reasons.push("Sua conta está suspensa.");
   }
-  if (input.subscriptionStatus === "awaiting_activation") {
+  if (input.billingEnabled && input.subscriptionStatus === "awaiting_activation") {
     reasons.push("Sua assinatura ainda não foi ativada.");
   }
-  if (input.subscriptionStatus === "past_due" || input.subscriptionStatus === "unpaid") {
+  if (input.billingEnabled && (input.subscriptionStatus === "past_due" || input.subscriptionStatus === "unpaid")) {
     reasons.push("Há um pagamento pendente. Por favor, atualize seus dados de pagamento.");
   }
-  if (input.subscriptionStatus === "canceled" || input.subscriptionStatus === "paused") {
+  if (input.billingEnabled && (input.subscriptionStatus === "canceled" || input.subscriptionStatus === "paused")) {
     reasons.push("Sua assinatura está cancelada.");
   }
-  if (input.subscriptionStatus === "incomplete" || input.subscriptionStatus === "trialing") {
+  if (input.billingEnabled && (input.subscriptionStatus === "incomplete" || input.subscriptionStatus === "trialing")) {
     reasons.push("Sua assinatura está em processo de ativação.");
   }
   if (input.siteStatus === "pending") {

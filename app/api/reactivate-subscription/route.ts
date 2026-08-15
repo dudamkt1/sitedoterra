@@ -31,6 +31,41 @@ export async function POST() {
 
   if (!sub) return NextResponse.json({ error: "Nenhuma assinatura para reativar" }, { status: 400 });
 
+  const { data: tenantRow } = await admin
+    .from("tenants")
+    .select("monthly_billing_enabled")
+    .eq("id", tenant.id)
+    .maybeSingle();
+  const billingEnabled = tenantRow?.monthly_billing_enabled !== false;
+
+  // Isento de mensalidade: apenas reativa o site localmente (sem cobrança).
+  if (!billingEnabled) {
+    const { data: localRow } = await admin
+      .from("subscriptions")
+      .update({
+        status: "active",
+        cancel_at_period_end: false,
+        reactivated_at: new Date().toISOString(),
+        canceled_at: null,
+      })
+      .eq("id", sub.id)
+      .select("id")
+      .single();
+    if (localRow) {
+      await admin.from("tenants").update({ site_status: "active", suspended_at: null, reactivated_at: new Date().toISOString() }).eq("id", tenant.id);
+      await admin.from("profiles").update({ status: "active" }).eq("user_id", user.id);
+    }
+    await admin.from("audit_logs").insert({
+      actor_id: user.id,
+      actor_role: "user",
+      action: "subscription.reactivated_no_billing",
+      entity_type: "subscription",
+      entity_id: sub.id,
+      metadata: { tenant_id: tenant.id, monthly_billing_enabled: false },
+    });
+    return NextResponse.json({ success: true });
+  }
+
   const stripe = getStripe();
   const plan = sub.plan as { id: string; monthly_price_cents: number; billing_interval: string; code: string; name: string; activation_price_cents: number; stripe_product_id: string | null; stripe_price_id: string | null } | null;
 

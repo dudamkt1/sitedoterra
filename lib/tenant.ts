@@ -67,7 +67,8 @@ export async function resolveTenantAccess(opts: { slug?: string; hostname?: stri
       "active",
       tenant.site_status as "active" | "pending" | "suspended",
       (sub?.status as Subscription["status"]) || "awaiting_activation",
-      false
+      false,
+      tenant.monthly_billing_enabled !== false
     )
       ? ("available" as const)
       : ("suspended" as const),

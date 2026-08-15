@@ -58,6 +58,7 @@ export default async function AssinaturaPage() {
         monthlyPriceCents={monthlyPriceCents}
         allowCancel={allowCancel}
         trialMonths={trialMonths}
+        billingEnabled={ctx.tenant?.monthly_billing_enabled !== false}
       />
     </div>
   );

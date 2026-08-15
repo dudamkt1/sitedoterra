@@ -16,6 +16,7 @@ interface SubManagerProps {
   monthlyPriceCents: number;
   allowCancel?: boolean;
   trialMonths?: number;
+  billingEnabled?: boolean;
 }
 
 export function SubscriptionManager({
@@ -29,6 +30,7 @@ export function SubscriptionManager({
   monthlyPriceCents,
   allowCancel = true,
   trialMonths = 3,
+  billingEnabled = true,
 }: SubManagerProps) {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
@@ -131,6 +133,9 @@ export function SubscriptionManager({
           <p className="text-xs uppercase tracking-wider text-gray-400 font-semibold">Status</p>
           <div className="mt-2"><StatusBadge status={subscription?.status || "awaiting_activation"} /></div>
           {statusLabel && <p className="text-xs text-gray-400 mt-2">{statusLabel}</p>}
+          {!billingEnabled && (
+            <p className="text-xs text-emerald-600 mt-2">Ativo sem mensalidade recorrente.</p>
+          )}
         </div>
         <div className="card">
           <p className="text-xs uppercase tracking-wider text-gray-400 font-semibold">Próxima cobrança</p>
@@ -158,7 +163,7 @@ export function SubscriptionManager({
       <div className="card">
         <h2 className="card-title mb-4">Ações</h2>
         <div className="flex flex-wrap gap-3">
-          {isActive && (
+          {isActive && billingEnabled && (
             <>
               <button className="btn btn-outline" onClick={openBillingPortal} disabled={loading}>
                 💳 Atualizar forma de pagamento
@@ -178,17 +183,23 @@ export function SubscriptionManager({
             </>
           )}
 
-          {isCanceled && (
+          {isCanceled && billingEnabled && (
             <button className="btn btn-gold" onClick={reactivate} disabled={loading}>
               {loading ? "Processando..." : "♻️ Reativar assinatura"}
             </button>
           )}
 
-          {!subscription && plans.map((p) => (
+          {!subscription && billingEnabled && plans.map((p) => (
             <button key={p.id} className="btn btn-gold" onClick={() => checkout(p.id)} disabled={loading}>
               Ativar site ({p.name}) — {formatBRL(monthlyPriceCents)}/mês + ativação {formatBRL(activationPriceCents)}
             </button>
           ))}
+
+          {!billingEnabled && (
+            <p className="text-sm text-emerald-700 bg-emerald-50 rounded-lg px-4 py-3">
+              Sua conta está ativa sem mensalidade. Não há cobranças recorrentes vinculadas.
+            </p>
+          )}
         </div>
       </div>
 

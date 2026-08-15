@@ -143,7 +143,16 @@ async function handleEvent(event: Stripe.Event) {
         .eq("status", "active")
         .maybeSingle();
 
-      if (!existingActive) {
+      // Usuário isento de mensalidade (Super Admin ativou sem recorrência):
+      // não cria assinatura mensal no Stripe.
+      const { data: tenantRow } = await admin
+        .from("tenants")
+        .select("monthly_billing_enabled")
+        .eq("id", tenantId)
+        .maybeSingle();
+      const billingEnabled = tenantRow?.monthly_billing_enabled !== false;
+
+      if (!existingActive && billingEnabled) {
         const subscription = await createRecurringSubscription(customer.id, {
           userId: tenant.user_id,
           tenantId: tenant.id,
@@ -176,6 +185,14 @@ async function handleEvent(event: Stripe.Event) {
           .eq("id", local.id);
       }
       if (sub.status === "canceled" || sub.status === "paused") {
+        // Isento de mensalidade: não suspende o site por billing.
+        const { data: tenantRow } = await admin
+          .from("tenants")
+          .select("monthly_billing_enabled")
+          .eq("id", local.tenant_id)
+          .maybeSingle();
+        if (tenantRow?.monthly_billing_enabled === false) break;
+
         // Período terminou / cancelado → suspende o site (dados preservados)
         const tenantId = local.tenant_id;
         await admin.from("tenants").update({ site_status: "suspended", suspended_at: new Date().toISOString() }).eq("id", tenantId);
@@ -238,6 +255,13 @@ async function handleEvent(event: Stripe.Event) {
       const invoice = event.data.object as Stripe.Invoice;
       const tenantId = await resolveTenantFromInvoice(invoice);
       if (tenantId) {
+        const { data: tenantRow } = await admin
+          .from("tenants")
+          .select("monthly_billing_enabled")
+          .eq("id", tenantId)
+          .maybeSingle();
+        if (tenantRow?.monthly_billing_enabled === false) break;
+
         const { data: sub } = await admin
           .from("subscriptions")
           .select("id")

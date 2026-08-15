@@ -16,6 +16,7 @@ export default async function PainelHome() {
     siteStatus: tenant?.site_status || "pending",
     subscriptionStatus: subscription?.status || "awaiting_activation",
     blocked: profile.status === "blocked",
+    billingEnabled: tenant?.monthly_billing_enabled !== false,
   });
 
   const publicUrl = tenant ? `/${tenant.slug}` : null;

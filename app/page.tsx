@@ -17,6 +17,7 @@ const DEMO_TENANT: PublicTenant = {
   site_data: DEFAULT_SITE_DATA as Record<string, unknown>,
   profile_name: "Ana Beatriz",
   email: "contato@anabeatriz.com.br",
+  monthly_billing_enabled: true,
 };
 
 /**

@@ -38,7 +38,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Este nome de usuário já está em uso. Escolha outro." }, { status: 409 });
   }
 
-  // Só libera o site quando houver assinatura ativa
+  // Usuário isento de mensalidade: site liberado sem exigir assinatura ativa.
+  const { data: tenantRow } = await admin
+    .from("tenants")
+    .select("monthly_billing_enabled")
+    .eq("id", tenant.id)
+    .maybeSingle();
+  const billingEnabled = tenantRow?.monthly_billing_enabled !== false;
+
+  // Só libera o site quando houver assinatura ativa (ou estiver isento).
   const { data: sub } = await admin
     .from("subscriptions")
     .select("status")
@@ -47,11 +55,12 @@ export async function POST(request: Request) {
     .limit(1)
     .maybeSingle();
 
-  const siteStatus = sub?.status === "active" ? "active" : "pending";
+  const subActive = sub?.status === "active";
+  const siteStatus = billingEnabled && !subActive ? "pending" : "active";
 
   const { error } = await admin
     .from("tenants")
-    .update({ slug, site_status: siteStatus, activated_at: sub?.status === "active" ? new Date().toISOString() : undefined })
+    .update({ slug, site_status: siteStatus, activated_at: siteStatus === "active" ? new Date().toISOString() : undefined })
     .eq("id", tenant.id);
 
   if (error) {

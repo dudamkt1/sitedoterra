@@ -49,6 +49,8 @@ export interface Tenant {
   slug: string;
   site_name: string | null;
   site_status: SiteStatus;
+  /** false = usuário isento de mensalidade recorrente (Super Admin decidiu na ativação). */
+  monthly_billing_enabled: boolean;
   created_at: string;
   activated_at: string | null;
   suspended_at: string | null;
@@ -156,6 +158,7 @@ export interface PublicTenant {
   site_data: Record<string, unknown>;
   profile_name: string | null;
   email: string;
+  monthly_billing_enabled: boolean;
 }
 
 // ============================ HOME MODULAR ============================
