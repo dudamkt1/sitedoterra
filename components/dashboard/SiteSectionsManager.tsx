@@ -63,7 +63,9 @@ export function SiteSectionsManager({ slug, appUrl }: { slug: string; appUrl: st
 
   function openEdit(section: SectionView) {
     setEditing(section);
-    setDraft(JSON.parse(JSON.stringify(section.tenant_content && Object.keys(section.tenant_content).length ? section.tenant_content : section.content)));
+    // Sempre parte do conteúdo EFETIVO (o mesmo que aparece no site público),
+    // incluindo os dados vindos de "Informações do site" (site_settings).
+    setDraft(JSON.parse(JSON.stringify(section.content)));
   }
 
   async function saveEdit() {

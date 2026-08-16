@@ -11,6 +11,8 @@ export interface HeroContent {
   description?: string;
   image?: string | null;
   imageAlt?: string;
+  badgeTitle?: string;
+  badgeSubtitle?: string;
   primaryBtn?: { text?: string; url?: string };
   secondaryBtn?: { text?: string; url?: string };
   stats?: Stat[];
@@ -20,6 +22,8 @@ export interface HeroContent {
 export function Hero({ content }: { content: HeroContent }) {
   const firstName = content.firstName || "Ana";
   const lastName = content.lastName || "Beatriz";
+  const badgeTitle = content.badgeTitle || "Certified Wellness";
+  const badgeSubtitle = content.badgeSubtitle || "Expert em bem-estar";
   const stats = content.stats?.length ? content.stats : [];
   const primary = content.primaryBtn || {};
   const secondary = content.secondaryBtn || {};
@@ -87,8 +91,8 @@ export function Hero({ content }: { content: HeroContent }) {
         <div className="hero-badge">
           <div className="hero-badge-icon">🌿</div>
           <div className="hero-badge-text">
-            <strong>Certified Wellness</strong>
-            <span>Expert em bem-estar</span>
+            <strong>{badgeTitle}</strong>
+            <span>{badgeSubtitle}</span>
           </div>
         </div>
       </div>

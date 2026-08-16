@@ -25,6 +25,8 @@ export function SiteManager({ slug, pendingSlug, siteData, appUrl, hasSubscripti
     role: siteData?.role || "",
     eyebrow: siteData?.eyebrow || "",
     description: siteData?.description || "",
+    badgeTitle: siteData?.badgeTitle || "",
+    badgeSubtitle: siteData?.badgeSubtitle || "",
     whatsapp: siteData?.whatsapp || "",
     email: siteData?.email || "",
     instagram: siteData?.instagram || "",
@@ -89,6 +91,8 @@ export function SiteManager({ slug, pendingSlug, siteData, appUrl, hasSubscripti
       role: form.role,
       eyebrow: form.eyebrow,
       description: form.description,
+      badgeTitle: form.badgeTitle,
+      badgeSubtitle: form.badgeSubtitle,
       whatsapp: form.whatsapp.replace(/[^\d]/g, ""),
       email: form.email,
       instagram: form.instagram,
@@ -286,6 +290,12 @@ export function SiteManager({ slug, pendingSlug, siteData, appUrl, hasSubscripti
               placeholder="Fale sobre você e seu trabalho com óleos essenciais..."
             />
           </div>
+          <div className="sm:col-span-2">
+            <p className="text-xs uppercase tracking-wider text-gray-400 font-semibold">Selo sobre a foto</p>
+            <p className="text-xs text-gray-400 mb-2">Aparece flutuando sobre a foto no topo do seu site (ex.: &quot;Certified Wellness&quot;).</p>
+          </div>
+          {field("badgeTitle", "Título do selo", "ex.: Certified Wellness")}
+          {field("badgeSubtitle", "Subtítulo do selo", "ex.: Expert em bem-estar")}
           <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-4">
             {field("statYears", "Anos de experiência", "7+")}
             {field("statClients", "Clientes atendidas", "850+")}

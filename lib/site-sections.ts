@@ -104,6 +104,8 @@ export const DEFAULT_SECTION_CONTENT: Record<SectionType, Record<string, unknown
       "Transformo bem-estar em rotina com os melhores óleos essenciais do mundo. Há 7 anos ajudo famílias a descobrirem o poder da natureza para uma vida mais equilibrada e saudável.",
     image: null,
     imageAlt: "Foto da Consultora",
+    badgeTitle: "Certified Wellness",
+    badgeSubtitle: "Expert em bem-estar",
     primaryBtn: { text: "Falar com a IA", url: "#about" },
     secondaryBtn: { text: "Ver Produtos", url: "#products" },
     stats: [

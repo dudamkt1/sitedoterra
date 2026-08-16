@@ -15,6 +15,7 @@ export async function POST(request: Request) {
   const body = await request.json();
   const allowed = [
     "name", "surname", "fullName", "role", "eyebrow", "description",
+    "badgeTitle", "badgeSubtitle",
     "whatsapp", "email", "instagram", "instagramHandle",
     "logoMode", "logoUrl", "logoText",
     "stats", "testimonials", "history", "products", "faq", "schedule",

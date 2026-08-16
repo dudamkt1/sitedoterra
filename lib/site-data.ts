@@ -9,6 +9,8 @@ export interface SiteData {
   fullName?: string;
   role?: string;
   eyebrow?: string;
+  badgeTitle?: string;
+  badgeSubtitle?: string;
   description?: string;
   whatsapp?: string;
   email?: string;
@@ -55,6 +57,8 @@ export const DEFAULT_SITE_DATA: SiteData = {
   fullName: "Ana Beatriz",
   role: "Consultora Wellness Diamond · doTERRA",
   eyebrow: "Consultora Certificada doTERRA",
+  badgeTitle: "Certified Wellness",
+  badgeSubtitle: "Expert em bem-estar",
   description:
     "Transformo bem-estar em rotina com os melhores óleos essenciais do mundo. Há 7 anos ajudo famílias a descobrirem o poder da natureza para uma vida mais equilibrada e saudável.",
   whatsapp: "5511999999999",

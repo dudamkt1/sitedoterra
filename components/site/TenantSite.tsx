@@ -246,8 +246,8 @@ export function TenantSite({
           <div className="hero-badge">
             <div className="hero-badge-icon">🌿</div>
             <div className="hero-badge-text">
-              <strong>Certified Wellness</strong>
-              <span>doTERRA Diamond Rank</span>
+              <strong>{data.badgeTitle || "Certified Wellness"}</strong>
+              <span>{data.badgeSubtitle || "doTERRA Diamond Rank"}</span>
             </div>
           </div>
         </div>

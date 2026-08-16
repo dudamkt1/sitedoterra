@@ -83,6 +83,8 @@ function legacyContentFor(type: string, siteData: Record<string, unknown> | null
         lastName: d.surname,
         role: d.role,
         description: d.description,
+        badgeTitle: d.badgeTitle,
+        badgeSubtitle: d.badgeSubtitle,
         stats: stats.years || stats.clients || stats.satisfaction
           ? [
               { value: stats.years, label: stats.labelYears || "Anos de experiência" },
@@ -180,12 +182,19 @@ export async function resolveHomeSections(opts: ResolveOptions): Promise<Resolve
 
     const legacy = legacyContentFor(section.type, siteData);
     const globalContent = section.content || {};
+    // A fonte de verdade para os dados do perfil (site_settings.data, editados
+    // em /painel/meu-site → "Informações do site") é o LEGADO. Ele deve vencer
+    // qualquer conteúdo salvo em tenant_sections (editor "Minha Home"), senão
+    // valores congelados de nome/cargo/descrição/estatísticas deixam de refletir
+    // as alterações do usuário. Por isso, na HOME do tenant, o legado vem DEPOIS
+    // do override. Os demais campos (imagem, botões, textos da seção) continuam
+    // vindo do override quando o usuário personaliza a seção.
     const merged = opts.tenantDataOverridesGlobal
       ? deepMerge(
           DEFAULT_SECTION_CONTENT[section.type] || {},
           globalContent,
-          legacy,
           override?.content || {},
+          legacy,
           section.type === "pricing" ? pricingOverlay : {}
         )
       : deepMerge(

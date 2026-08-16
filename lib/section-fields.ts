@@ -40,6 +40,8 @@ export const SECTION_CONTENT_FIELDS: Record<SectionType, ContentFieldDef[]> = {
     { key: "description", label: "Descrição principal", type: "textarea", ai: true, aiKind: "description" },
     { key: "image", label: "Foto (URL)", type: "image" },
     { key: "imageAlt", label: "Texto alternativo da foto", type: "text" },
+    { key: "badgeTitle", label: "Selo da foto — título (ex.: Certified Wellness)", type: "text" },
+    { key: "badgeSubtitle", label: "Selo da foto — subtítulo (ex.: Expert em bem-estar)", type: "text" },
     {
       key: "primaryBtn", label: "Botão principal", type: "object", fields: [
         { key: "text", label: "Texto", type: "text" },

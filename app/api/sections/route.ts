@@ -43,7 +43,17 @@ export async function GET() {
   const tenant = await ensureTenantForUser(user.id);
   if (!tenant) return NextResponse.json({ error: "Tenant não encontrado" }, { status: 400 });
 
-  const sections = await resolveHomeSections({ tenant: { tenant_id: tenant.id, slug: tenant.slug } as never });
+  const { data: settingsRow } = await admin
+    .from("site_settings")
+    .select("data")
+    .eq("tenant_id", tenant.id)
+    .maybeSingle();
+  const siteData = (settingsRow?.data as Record<string, unknown>) || {};
+
+  const sections = await resolveHomeSections({
+    tenant: { tenant_id: tenant.id, slug: tenant.slug, site_data: siteData } as never,
+    tenantDataOverridesGlobal: true,
+  });
 
   const { data: tenantRows } = await admin
     .from("tenant_sections")
