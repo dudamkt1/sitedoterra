@@ -119,13 +119,30 @@ function legacyContentFor(type: string, siteData: Record<string, unknown> | null
         : { _contactWhatsapp: d.whatsapp };
     case "faq":
       return d.faq && Array.isArray(d.faq) && (d.faq as unknown[]).length > 0 ? { items: d.faq } : {};
-    case "footer":
+    case "footer": {
+      const rawSocial = (d.social as Record<string, unknown>) || {};
+      const social: Record<string, unknown> = {};
+      for (const key of ["instagram", "facebook", "youtube"] as const) {
+        const v = rawSocial[key];
+        if (v === false) {
+          social[key] = { enabled: false, url: undefined };
+        } else if (v === true) {
+          social[key] = { enabled: true, url: undefined };
+        } else if (isPlainObject(v)) {
+          social[key] = {
+            enabled: v.enabled !== false,
+            url: typeof v.url === "string" && v.url.trim() ? v.url : undefined,
+          };
+        }
+      }
       return {
         _contactWhatsapp: d.whatsapp,
         _contactEmail: d.email,
         _contactInstagram: d.instagram ? `https://instagram.com/${String(d.instagram).replace(/^@/, "")}` : undefined,
         _profileName: d.fullName || (d.name && d.surname ? `${d.name} ${d.surname}` : undefined),
+        social,
       };
+    }
     case "hero2contact":
       return { _contactWhatsapp: d.whatsapp, _contactEmail: d.email };
     default:

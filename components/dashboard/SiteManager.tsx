@@ -12,6 +12,24 @@ interface SiteManagerProps {
   hasSubscription: boolean;
 }
 
+const SOCIAL_NETWORKS = [
+  { key: "instagram", label: "Instagram", placeholder: "ex.: https://instagram.com/seuperfil" },
+  { key: "facebook", label: "Facebook", placeholder: "ex.: https://facebook.com/seuperfil" },
+  { key: "youtube", label: "YouTube", placeholder: "ex.: https://youtube.com/@seucanal" },
+] as const;
+
+type SocialState = Record<"instagram" | "facebook" | "youtube", { enabled: boolean; url: string }>;
+
+function normalizeSocial(raw: Record<string, any> | null | undefined): SocialState {
+  const s = raw || {};
+  const read = (key: "instagram" | "facebook" | "youtube") => {
+    const v = s[key];
+    if (v && typeof v === "object") return { enabled: v.enabled !== false, url: v.url || "" };
+    return { enabled: v === true, url: "" };
+  };
+  return { instagram: read("instagram"), facebook: read("facebook"), youtube: read("youtube") };
+}
+
 export function SiteManager({ slug, pendingSlug, siteData, appUrl, hasSubscription }: SiteManagerProps) {
   const [newSlug, setNewSlug] = useState(pendingSlug ? "" : slug);
   const [slugCheck, setSlugCheck] = useState<null | { slug: string; valid: boolean; available: boolean; reason?: string }>(null);
@@ -37,6 +55,7 @@ export function SiteManager({ slug, pendingSlug, siteData, appUrl, hasSubscripti
     statYears: siteData?.stats?.years || "",
     statClients: siteData?.stats?.clients || "",
     statSatisfaction: siteData?.stats?.satisfaction || "",
+    social: normalizeSocial(siteData?.social),
   });
   const [logoTouched, setLogoTouched] = useState(false);
   const [savingSite, setSavingSite] = useState(false);
@@ -104,6 +123,11 @@ export function SiteManager({ slug, pendingSlug, siteData, appUrl, hasSubscripti
         labelClients: "Clientes atendidas",
         satisfaction: form.statSatisfaction,
         labelSatisfaction: "Satisfação",
+      },
+      social: {
+        instagram: { enabled: form.social.instagram.enabled, url: form.social.instagram.url },
+        facebook: { enabled: form.social.facebook.enabled, url: form.social.facebook.url },
+        youtube: { enabled: form.social.youtube.enabled, url: form.social.youtube.url },
       },
     };
     // Só envia a logo se o usuário mexeu no card — assim quem não configura
@@ -306,6 +330,56 @@ export function SiteManager({ slug, pendingSlug, siteData, appUrl, hasSubscripti
         <div className="mt-5 flex items-center gap-3">
           <button className="btn btn-primary" onClick={saveSite} disabled={savingSite}>
             {savingSite ? "Salvando..." : "Salvar conteúdo"}
+          </button>
+          {siteMsg && (
+            <span className={`text-sm ${siteMsg.ok ? "text-green-600" : "text-red-600"}`}>{siteMsg.text}</span>
+          )}
+        </div>
+      </div>
+
+      {/* ---------- Redes sociais ---------- */}
+      <div className="card">
+        <h2 className="card-title mb-1">Redes sociais</h2>
+        <p className="text-sm text-gray-500 mb-5">
+          Ative as redes que aparecem no rodapé do seu site e informe o endereço. Os links abrem sempre em uma nova aba.
+        </p>
+
+        <div className="space-y-3">
+          {SOCIAL_NETWORKS.map((net) => {
+            const item = form.social[net.key];
+            return (
+              <div key={net.key} className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-sm">{net.label}</p>
+                    <p className="text-xs text-gray-400 break-all">{net.placeholder}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, social: { ...form.social, [net.key]: { ...item, enabled: !item.enabled } } })}
+                    className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${item.enabled ? "bg-[#1d5c3a]" : "bg-gray-300"}`}
+                    title={item.enabled ? "Desativar" : "Ativar"}
+                  >
+                    <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all ${item.enabled ? "left-[1.4rem]" : "left-0.5"}`} />
+                  </button>
+                </div>
+                {item.enabled && (
+                  <input
+                    type="url"
+                    className="input mt-3"
+                    value={item.url}
+                    placeholder={net.placeholder}
+                    onChange={(e) => setForm({ ...form, social: { ...form.social, [net.key]: { ...item, url: e.target.value } } })}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="mt-5 flex items-center gap-3">
+          <button className="btn btn-primary" onClick={saveSite} disabled={savingSite}>
+            {savingSite ? "Salvando..." : "Salvar redes sociais"}
           </button>
           {siteMsg && (
             <span className={`text-sm ${siteMsg.ok ? "text-green-600" : "text-red-600"}`}>{siteMsg.text}</span>

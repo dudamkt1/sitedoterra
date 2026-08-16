@@ -306,7 +306,12 @@ export const DEFAULT_SECTION_CONTENT: Record<SectionType, Record<string, unknown
   },
   footer: {
     aboutText: "Consultora doTERRA Diamond ajudando famílias a descobrirem o poder dos óleos essenciais puros.",
-    social: { whatsapp: true, instagram: true, youtube: true },
+    social: {
+      whatsapp: true,
+      instagram: { enabled: true, url: null },
+      facebook: { enabled: true, url: null },
+      youtube: { enabled: true, url: null },
+    },
     showPlatformCredit: true,
   },
 };

@@ -183,8 +183,24 @@ export const SECTION_CONTENT_FIELDS: Record<SectionType, ContentFieldDef[]> = {
     {
       key: "social", label: "Redes sociais", type: "object", fields: [
         { key: "whatsapp", label: "Mostrar WhatsApp", type: "boolean" },
-        { key: "instagram", label: "Mostrar Instagram", type: "boolean" },
-        { key: "youtube", label: "Mostrar YouTube", type: "boolean" },
+        {
+          key: "instagram", label: "Instagram", type: "object", fields: [
+            { key: "enabled", label: "Ativo", type: "boolean" },
+            { key: "url", label: "Endereço (URL)", type: "url" },
+          ],
+        },
+        {
+          key: "facebook", label: "Facebook", type: "object", fields: [
+            { key: "enabled", label: "Ativo", type: "boolean" },
+            { key: "url", label: "Endereço (URL)", type: "url" },
+          ],
+        },
+        {
+          key: "youtube", label: "YouTube", type: "object", fields: [
+            { key: "enabled", label: "Ativo", type: "boolean" },
+            { key: "url", label: "Endereço (URL)", type: "url" },
+          ],
+        },
       ],
     },
     { key: "showPlatformCredit", label: "Mostrar crédito da plataforma", type: "boolean" },

@@ -48,7 +48,12 @@ export interface SiteData {
     taken: Record<string, string[]>;
   };
   video?: { label: string };
-  social?: { whatsapp: boolean; instagram: boolean; youtube: boolean };
+  social?: {
+    whatsapp?: boolean;
+    instagram?: { enabled?: boolean; url?: string };
+    facebook?: { enabled?: boolean; url?: string };
+    youtube?: { enabled?: boolean; url?: string };
+  };
 }
 
 export const DEFAULT_SITE_DATA: SiteData = {
@@ -62,6 +67,7 @@ export const DEFAULT_SITE_DATA: SiteData = {
   description:
     "Transformo bem-estar em rotina com os melhores óleos essenciais do mundo. Há 7 anos ajudo famílias a descobrirem o poder da natureza para uma vida mais equilibrada e saudável.",
   whatsapp: "5511999999999",
+  instagram: "anabeatriz.doterra",
   instagramHandle: "@anabeatriz.doterra",
   stats: {
     years: "7+",
@@ -157,5 +163,10 @@ export const DEFAULT_SITE_DATA: SiteData = {
     taken: { "7": ["09:00", "14:00"], "10": ["10:00", "15:00"], "14": ["09:30", "16:00"], "17": ["14:30"] },
   },
   video: { label: "Assistir vídeo • 8 min" },
-  social: { whatsapp: true, instagram: true, youtube: true },
+  social: {
+    whatsapp: true,
+    instagram: { enabled: true, url: "https://instagram.com/anabeatriz.doterra" },
+    facebook: { enabled: false, url: "" },
+    youtube: { enabled: false, url: "" },
+  },
 };
