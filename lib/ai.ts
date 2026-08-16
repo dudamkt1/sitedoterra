@@ -17,9 +17,10 @@ import type { AiProvider, AiSettings } from "@/types";
 // ---------------------------------------------------------------------------
 
 const GEMINI_KNOWN_MODELS = [
-  "gemini-2.5-flash",
-  "gemini-2.0-flash",
-  "gemini-2.5-pro",
+  "gemini-3.5-flash",
+  "gemini-3.1-flash-lite",
+  "gemini-3-flash-preview",
+  "gemini-3.6-flash",
 ];
 
 // Modelos atuais (30/jul-ago/2026) na ordem de preferência. Groq descontinuou
@@ -71,8 +72,16 @@ const OPENROUTER_FREE_PRIORITY = [
 // Modelos que estão descontinuados e seus substitutos atuais. Aplicado a TODO
 // provedor lido do banco, para NUNCA tentar um modelo morto — mesmo que o banco
 // (ou o deploy anterior) ainda tenha o valor antigo. Corrige sozinho.
+// A linha Gemini 2.x foi retirada para novas chaves (HTTP 404 "no longer
+// available to new users") — o substituto atual estável é o gemini-3.5-flash.
 const MODEL_MIGRATIONS: Record<string, Record<string, string>> = {
-  "google-gemini": { "gemini-1.5-flash": "gemini-2.5-flash", "gemini-1.5-pro": "gemini-2.5-flash" },
+  "google-gemini": {
+    "gemini-1.5-flash": "gemini-3.5-flash",
+    "gemini-1.5-pro": "gemini-3.5-flash",
+    "gemini-2.0-flash": "gemini-3.5-flash",
+    "gemini-2.5-flash": "gemini-3.5-flash",
+    "gemini-2.5-pro": "gemini-3.5-flash",
+  },
   groq: {
     "llama-3.3-70b-versatile": "openai/gpt-oss-20b",
     "llama-3.1-8b-instant": "openai/gpt-oss-20b",
@@ -212,10 +221,10 @@ async function chatWithFallback(
 
 // Prioridade de modelos usada na descoberta dinâmica do Gemini.
 const GEMINI_MODEL_PRIORITY = [
-  "gemini-2.5-flash",
-  "gemini-2.0-flash",
-  "gemini-2.5-pro",
-  "gemini-1.5-flash",
+  "gemini-3.5-flash",
+  "gemini-3.1-flash-lite",
+  "gemini-3-flash-preview",
+  "gemini-3.6-flash",
 ];
 
 /**
