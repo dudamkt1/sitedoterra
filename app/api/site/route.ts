@@ -17,7 +17,8 @@ export async function POST(request: Request) {
     "name", "surname", "fullName", "role", "eyebrow", "description",
     "badgeTitle", "badgeSubtitle",
     "whatsapp", "email", "instagram", "instagramHandle",
-    "logoMode", "logoUrl", "logoText",
+    "logoMode", "logoUrl", "logoLightUrl", "logoText",
+    "faviconUrl",
     "stats", "testimonials", "history", "products", "faq", "schedule",
     "video", "social", "site_title",
   ];

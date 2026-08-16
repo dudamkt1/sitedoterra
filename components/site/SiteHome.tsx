@@ -24,6 +24,7 @@ export interface SiteContact {
 export interface SiteLogo {
   mode?: "image" | "text";
   url?: string;
+  lightUrl?: string;
   text?: string;
 }
 
@@ -67,7 +68,7 @@ export function SiteHome({ slug, sections, contact, logo, extraNav = [] }: SiteH
   return (
     <div id="tenant-site" data-slug={slug}>
       <SiteEffects />
-      <Header logoText={logoText} logoUrl={logoUrl} navItems={navItems} extraNav={extraNav} />
+      <Header logoText={logoText} logoUrl={logoUrl} logoLightUrl={logo?.lightUrl} navItems={navItems} extraNav={extraNav} />
 
       {visible.map((s) => {
         switch (s.type) {

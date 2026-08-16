@@ -84,6 +84,12 @@
   object-fit: contain;
 }
 
+/* Logo alternativa para o menu rolado (fundo claro).
+   Só troca quando o usuário enviou as duas versões (nav.dual-logo). */
+#tenant-site nav.dual-logo .nav-logo-img--light { display: none; }
+#tenant-site nav.dual-logo.scrolled .nav-logo-img--dark { display: none; }
+#tenant-site nav.dual-logo.scrolled .nav-logo-img--light { display: block; }
+
 
 #tenant-site nav.scrolled .nav-logo { color: var(--verde); }
 

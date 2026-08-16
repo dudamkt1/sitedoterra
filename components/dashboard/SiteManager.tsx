@@ -63,7 +63,9 @@ export function SiteManager({ slug, pendingSlug, siteData, appUrl, hasSubscripti
     instagramHandle: siteData?.instagramHandle || "",
     logoMode: siteData?.logoMode || (siteData?.logoUrl ? "image" : ""),
     logoUrl: siteData?.logoUrl || "",
+    logoLightUrl: siteData?.logoLightUrl || "",
     logoText: siteData?.logoText || "",
+    faviconUrl: siteData?.faviconUrl || "",
     statYears: siteData?.stats?.years || "",
     statClients: siteData?.stats?.clients || "",
     statSatisfaction: siteData?.stats?.satisfaction || "",
@@ -147,7 +149,9 @@ export function SiteManager({ slug, pendingSlug, siteData, appUrl, hasSubscripti
     if (logoTouched) {
       payload.logoMode = form.logoMode;
       payload.logoUrl = form.logoUrl || undefined;
+      payload.logoLightUrl = form.logoLightUrl || undefined;
       payload.logoText = form.logoText || undefined;
+      payload.faviconUrl = form.faviconUrl || undefined;
     }
     const res = await fetch("/api/site", {
       method: "POST",
@@ -280,6 +284,36 @@ export function SiteManager({ slug, pendingSlug, siteData, appUrl, hasSubscripti
           </div>
         )}
 
+        {form.logoMode === "image" && (
+          <div className="mb-4">
+            <label className="label">Logo para fundo claro</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                className="input flex-1"
+                value={form.logoLightUrl}
+                placeholder="URL da imagem ou escolha na biblioteca"
+                onChange={(e) => updateLogo({ logoLightUrl: e.target.value })}
+              />
+              <MediaPicker
+                scope="tenant"
+                value={form.logoLightUrl || undefined}
+                onChange={(url) => updateLogo({ logoLightUrl: url })}
+              />
+            </div>
+            {form.logoLightUrl && (
+              <div className="mt-2 rounded-lg bg-white border border-gray-100 p-3 inline-block">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={form.logoLightUrl} alt="Logo fundo claro" className="h-10 w-auto max-w-56 object-contain" referrerPolicy="no-referrer" />
+              </div>
+            )}
+            <p className="text-xs text-gray-400 mt-1">
+              Usada quando você desce a tela e o menu passa a ter fundo claro. Deixe em branco para manter a mesma logo em
+              todas as situações.
+            </p>
+          </div>
+        )}
+
         <div>
           <label className="label">Nome / Texto do logo</label>
           <input
@@ -297,6 +331,56 @@ export function SiteManager({ slug, pendingSlug, siteData, appUrl, hasSubscripti
         <div className="mt-5 flex items-center gap-3">
           <button className="btn btn-primary" onClick={saveSite} disabled={savingSite}>
             {savingSite ? "Salvando..." : "Salvar logo"}
+          </button>
+          {siteMsg && (
+            <span className={`text-sm ${siteMsg.ok ? "text-green-600" : "text-red-600"}`}>{siteMsg.text}</span>
+          )}
+        </div>
+      </div>
+
+      {/* ---------- Favicon ---------- */}
+      <div className="card">
+        <h2 className="card-title mb-1">Favicon (ícone do navegador)</h2>
+        <p className="text-sm text-gray-500 mb-4">
+          Pequeno ícone que aparece na <strong>aba do navegador</strong> e ao favoritar seu site. Se não enviar, será
+          usado o ícone padrão da plataforma.
+        </p>
+
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            className="input flex-1"
+            value={form.faviconUrl}
+            placeholder="URL da imagem ou escolha na biblioteca"
+            onChange={(e) => updateLogo({ faviconUrl: e.target.value })}
+          />
+          <MediaPicker
+            scope="tenant"
+            value={form.faviconUrl || undefined}
+            onChange={(url) => updateLogo({ faviconUrl: url })}
+          />
+        </div>
+
+        <div className="mt-3 flex items-center gap-4">
+          <div className="rounded border border-gray-200 bg-white p-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={form.faviconUrl || "https://www.google.com/s2/favicons?domain=localhost&sz=64"}
+              alt="Favicon"
+              className="w-8 h-8 object-contain"
+              referrerPolicy="no-referrer"
+            />
+          </div>
+          <p className="text-xs text-gray-500">
+            {form.faviconUrl
+              ? "Este é o ícone que aparecerá na aba do navegador."
+              : "Ícone padrão — envie um arquivo PNG, ICO ou SVG em formato quadrado (ex.: 512×512px)."}
+          </p>
+        </div>
+
+        <div className="mt-5 flex items-center gap-3">
+          <button className="btn btn-primary" onClick={saveSite} disabled={savingSite}>
+            {savingSite ? "Salvando..." : "Salvar favicon"}
           </button>
           {siteMsg && (
             <span className={`text-sm ${siteMsg.ok ? "text-green-600" : "text-red-600"}`}>{siteMsg.text}</span>

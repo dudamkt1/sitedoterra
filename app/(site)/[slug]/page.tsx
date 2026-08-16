@@ -15,9 +15,12 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   const { tenant } = await resolveTenantAccess({ slug: params.slug });
   if (!tenant) return { title: "Site não encontrado" };
   const name = tenant.profile_name || tenant.site_name || tenant.slug;
+  const siteData = (tenant.site_data || {}) as Record<string, unknown>;
+  const faviconUrl = (siteData.faviconUrl as string) || undefined;
   return {
     title: `${name} | Consultora doTERRA`,
     description: `Site oficial de ${name} — consultora doTERRA. Óleos essenciais puros, dicas de bem-estar e agendamento de consultas.`,
+    icons: faviconUrl ? { icon: faviconUrl } : undefined,
   };
 }
 
@@ -59,6 +62,7 @@ contact={{
             logo={{
               mode: (siteData.logoMode as "image" | "text") || undefined,
               url: (siteData.logoUrl as string) || undefined,
+              lightUrl: (siteData.logoLightUrl as string) || undefined,
               text: (siteData.logoText as string) || undefined,
             }}
         />

@@ -3,7 +3,11 @@ export interface SiteData {
   /** Logo do site (menu superior). mode: "image" usa url; "text" usa logoText. */
   logoMode?: "image" | "text";
   logoUrl?: string;
+  /** Logo alternativa para quando o menu fica com fundo claro (ao rolar a página). */
+  logoLightUrl?: string;
   logoText?: string;
+  /** Favicon exibido na aba do navegador. */
+  faviconUrl?: string;
   name?: string;
   surname?: string;
   fullName?: string;
