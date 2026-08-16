@@ -13,9 +13,9 @@ interface SiteManagerProps {
 }
 
 const SOCIAL_NETWORKS = [
-  { key: "instagram", label: "Instagram", placeholder: "ex.: https://instagram.com/seuperfil" },
-  { key: "facebook", label: "Facebook", placeholder: "ex.: https://facebook.com/seuperfil" },
-  { key: "youtube", label: "YouTube", placeholder: "ex.: https://youtube.com/@seucanal" },
+  { key: "instagram", label: "Instagram", placeholder: "ex.: seu.perfil (ou link completo)" },
+  { key: "facebook", label: "Facebook", placeholder: "ex.: seuperfil (ou link completo)" },
+  { key: "youtube", label: "YouTube", placeholder: "ex.: @seucanal (ou link completo)" },
 ] as const;
 
 type SocialState = Record<"instagram" | "facebook" | "youtube", { enabled: boolean; url: string }>;
@@ -28,6 +28,18 @@ function normalizeSocial(raw: Record<string, any> | null | undefined): SocialSta
     return { enabled: v === true, url: "" };
   };
   return { instagram: read("instagram"), facebook: read("facebook"), youtube: read("youtube") };
+}
+
+function socialUrl(key: "instagram" | "facebook" | "youtube", raw: string): string {
+  const value = raw.trim();
+  if (!value) return "";
+  if (/^https?:\/\//i.test(value)) return value;
+  const base: Record<string, string> = {
+    instagram: "https://instagram.com/",
+    facebook: "https://facebook.com/",
+    youtube: "https://youtube.com/",
+  };
+  return `${base[key]}${value.replace(/^@/, "")}`;
 }
 
 export function SiteManager({ slug, pendingSlug, siteData, appUrl, hasSubscription }: SiteManagerProps) {
@@ -125,9 +137,9 @@ export function SiteManager({ slug, pendingSlug, siteData, appUrl, hasSubscripti
         labelSatisfaction: "Satisfação",
       },
       social: {
-        instagram: { enabled: form.social.instagram.enabled, url: form.social.instagram.url },
-        facebook: { enabled: form.social.facebook.enabled, url: form.social.facebook.url },
-        youtube: { enabled: form.social.youtube.enabled, url: form.social.youtube.url },
+        instagram: { enabled: form.social.instagram.enabled, url: socialUrl("instagram", form.social.instagram.url) },
+        facebook: { enabled: form.social.facebook.enabled, url: socialUrl("facebook", form.social.facebook.url) },
+        youtube: { enabled: form.social.youtube.enabled, url: socialUrl("youtube", form.social.youtube.url) },
       },
     };
     // Só envia a logo se o usuário mexeu no card — assim quem não configura
@@ -365,7 +377,7 @@ export function SiteManager({ slug, pendingSlug, siteData, appUrl, hasSubscripti
                 </div>
                 {item.enabled && (
                   <input
-                    type="url"
+                    type="text"
                     className="input mt-3"
                     value={item.url}
                     placeholder={net.placeholder}
