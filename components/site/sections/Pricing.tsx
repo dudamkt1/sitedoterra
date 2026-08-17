@@ -1,3 +1,5 @@
+import { INCLUDED_CATALOG } from "@/lib/platform-includes";
+
 interface PricingPlan {
   name?: string;
   price?: string;
@@ -160,6 +162,31 @@ export function Pricing({ content }: { content: PricingContent }) {
           {offer.transparencyText && (
             <p className="oferta-transparencia">{offer.transparencyText}</p>
           )}
+        </div>
+
+        <div className="oferta-incluidos">
+          <h3 className="oferta-incluidos-title">✨ Tudo o que você recebe ao ativar</h3>
+          <p className="oferta-incluidos-sub">
+            Site completo, Central de IA e CRM — o pacote inteiro que este site usa, sem taxas escondidas.
+          </p>
+          <div className="oferta-incluidos-grid">
+            {INCLUDED_CATALOG.map((g) => (
+              <div key={g.title} className="oferta-grupo">
+                <div className="oferta-grupo-head">
+                  <span className="oferta-grupo-icon">{g.icon}</span>
+                  <span className="oferta-grupo-titulo">{g.title}</span>
+                </div>
+                <ul className="oferta-grupo-lista">
+                  {g.items.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+          <p className="oferta-incluidos-nota">
+            Tudo o que está nesta página e mais — pronto para você usar no seu painel.
+          </p>
         </div>
       </div>
     </section>

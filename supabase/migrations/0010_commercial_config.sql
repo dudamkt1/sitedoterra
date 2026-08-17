@@ -83,7 +83,7 @@ set name = 'Site Profissional',
     allow_cancel = true,
     trial_days = 30,
     sort_order = 10,
-    features = '["Site profissional","Seu endereço personalizado","Painel exclusivo","Personalização do conteúdo","Site responsivo","Ferramentas de IA","Suporte por WhatsApp"]'::jsonb,
+    features = '["Site profissional completo","Seu endereço personalizado","Painel exclusivo","Personalização do conteúdo","Site 100% responsivo","Central de IA (conteúdo e redes sociais)","CRM de clientes completo","Agendamento de consultas","Relatórios com exportação PDF/CSV","Suporte por WhatsApp"]'::jsonb,
     is_active = true
 where code = 'monthly';
 

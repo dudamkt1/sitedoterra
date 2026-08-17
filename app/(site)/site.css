@@ -2250,6 +2250,109 @@
   margin-top: 1.25rem;
 }
 
+/* ----------------------------------------------------------------------------
+   OFERTA — "TUDO O QUE VOCÊ RECEBE" (Central de IA + CRM + site completo)
+   ---------------------------------------------------------------------------- */
+
+#tenant-site .oferta-incluidos {
+  margin: 3rem auto 0;
+  max-width: 860px;
+  text-align: left;
+}
+
+#tenant-site .oferta-incluidos-title {
+  font-family: var(--font-display);
+  font-size: clamp(1.3rem, 2.5vw, 1.7rem);
+  font-weight: 300;
+  color: var(--branco);
+  text-align: center;
+  margin-bottom: 0.4rem;
+}
+
+#tenant-site .oferta-incluidos-sub {
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  color: rgba(255,255,255,0.6);
+  text-align: center;
+  max-width: 480px;
+  margin: 0 auto 2.5rem;
+}
+
+#tenant-site .oferta-incluidos-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.1rem;
+}
+
+#tenant-site .oferta-grupo {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 14px;
+  padding: 1.4rem 1.4rem 1.3rem;
+  backdrop-filter: blur(10px);
+  transition: all 0.35s;
+}
+
+#tenant-site .oferta-grupo:hover {
+  background: rgba(255,255,255,0.09);
+  transform: translateY(-4px);
+}
+
+#tenant-site .oferta-grupo-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 0.9rem;
+}
+
+#tenant-site .oferta-grupo-icon {
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+#tenant-site .oferta-grupo-titulo {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--ouro-claro);
+}
+
+#tenant-site .oferta-grupo-lista {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+#tenant-site .oferta-grupo-lista li {
+  position: relative;
+  padding-left: 1.3rem;
+  font-size: 0.84rem;
+  color: rgba(255,255,255,0.85);
+  line-height: 1.4;
+}
+
+#tenant-site .oferta-grupo-lista li::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: var(--verde-menta);
+  font-weight: 700;
+}
+
+#tenant-site .oferta-incluidos-nota {
+  font-size: 0.78rem;
+  color: rgba(255,255,255,0.45);
+  text-align: center;
+  margin-top: 2rem;
+}
+
+@media (max-width: 720px) {
+  #tenant-site .oferta-incluidos-grid { grid-template-columns: 1fr; }
+}
+
+
 
 
 

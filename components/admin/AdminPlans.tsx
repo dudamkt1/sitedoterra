@@ -113,7 +113,7 @@ export function AdminPlans({ plans, history }: { plans: PlanRow[]; history: Hist
       trial_months: 3,
       media_quota_bytes: 500 * 1024 * 1024,
       sort_order: 10,
-      features: ["Site profissional", "Seu endereço personalizado", "Painel exclusivo", "Personalização do conteúdo", "Site responsivo", "Ferramentas de IA", "Suporte por WhatsApp"],
+      features: ["Site profissional completo", "Seu endereço personalizado", "Painel exclusivo", "Personalização do conteúdo", "Site 100% responsivo", "Central de IA (conteúdo e redes sociais)", "CRM de clientes completo", "Agendamento de consultas", "Relatórios com exportação PDF/CSV", "Suporte por WhatsApp"],
       stripe_product_id: "",
       activation_price_id: "",
       monthly_price_id: "",
