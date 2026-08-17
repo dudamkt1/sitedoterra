@@ -7,6 +7,7 @@ const USER_LINKS = [
   { href: "/painel", label: "Visão geral", icon: "📊" },
   { href: "/painel/meu-site", label: "Meu Site", icon: "🌐" },
   { href: "/painel/midias", label: "Biblioteca de Mídia", icon: "📁" },
+  { href: "/painel/crm", label: "CRM", icon: "📇" },
   { href: "/painel/ia", label: "IA para seu site", icon: "🤖" },
   { href: "/painel/assinatura", label: "Minha Assinatura", icon: "💳" },
   { href: "/painel/dominio", label: "Domínio", icon: "🔗" },
@@ -45,7 +46,9 @@ export default function DashboardSidebar({
 
       <nav className="flex-1 py-4 px-3 space-y-1">
         {USER_LINKS.map((l) => {
-          const active = pathname === l.href;
+          const active = l.href === "/painel/crm"
+            ? pathname === "/painel/crm" || pathname.startsWith("/painel/crm/")
+            : pathname === l.href;
           return (
             <Link
               key={l.href}

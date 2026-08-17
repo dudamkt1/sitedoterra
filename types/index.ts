@@ -399,3 +399,276 @@ export interface MediaStorageStats {
     bytes: number;
   }[];
 }
+
+// ============================ CRM CONSULTORES ============================
+
+export type CrmModuleCode =
+  | "fidelidade"
+  | "financeiro"
+  | "cobrancas"
+  | "whatsapp"
+  | "automacoes"
+  | "relatorios";
+
+export interface CrmSettings {
+  tenant_id: string;
+  currency: string;
+  modules: Partial<Record<CrmModuleCode, boolean>>;
+  vip_rules: {
+    minSpentCents?: number;
+    minPurchases?: number;
+    minPoints?: number;
+    reorderMonths?: number;
+  };
+  categories: string[];
+  financial_categories: {
+    income?: string[];
+    expense?: string[];
+  };
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CrmClient {
+  id: string;
+  tenant_id: string;
+  user_id: string;
+  name: string;
+  cpf: string | null;
+  birth_date: string | null;
+  email: string | null;
+  phone: string | null;
+  whatsapp: string | null;
+  city: string | null;
+  state: string | null;
+  notes: string | null;
+  category: string;
+  is_vip: boolean;
+  first_contact_at: string | null;
+  first_purchase_at: string | null;
+  last_purchase_at: string | null;
+  last_contact_at: string | null;
+  created_at: string;
+  updated_at: string;
+  /** Aggregados computados (somente leitura). */
+  total_spent_cents?: number;
+  purchase_count?: number;
+  ticket_avg_cents?: number;
+  points_balance?: number;
+}
+
+export interface CrmClientNote {
+  id: string;
+  tenant_id: string;
+  client_id: string;
+  user_id: string;
+  note: string;
+  created_at: string;
+}
+
+export interface CrmTimelineEvent {
+  id: string;
+  tenant_id: string;
+  client_id: string;
+  event_type: string;
+  title: string;
+  description: string | null;
+  event_at: string;
+  created_at: string;
+}
+
+export interface CrmProduct {
+  id: string;
+  tenant_id: string;
+  user_id: string;
+  name: string;
+  description: string | null;
+  price_cents: number;
+  category: string | null;
+  image_url: string | null;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+  /** Computado: quantidade vendida / total vendido. */
+  units_sold?: number;
+  sold_cents?: number;
+}
+
+export interface CrmSale {
+  id: string;
+  tenant_id: string;
+  user_id: string;
+  client_id: string | null;
+  sale_date: string;
+  discount_cents: number;
+  total_cents: number;
+  payment_method: string | null;
+  status: string;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  /** Relacionamentos (somente leitura). */
+  client_name?: string | null;
+  items?: CrmSaleItem[];
+}
+
+export interface CrmSaleItem {
+  id: string;
+  tenant_id: string;
+  sale_id: string;
+  product_id: string | null;
+  product_name: string;
+  quantity: number;
+  unit_price_cents: number;
+  total_cents: number;
+}
+
+export interface CrmFinancialEntry {
+  id: string;
+  tenant_id: string;
+  user_id: string;
+  client_id: string | null;
+  type: "income" | "expense";
+  category: string | null;
+  description: string | null;
+  amount_cents: number;
+  entry_date: string;
+  payment_method: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  client_name?: string | null;
+}
+
+export interface CrmCharge {
+  id: string;
+  tenant_id: string;
+  user_id: string;
+  client_id: string | null;
+  sale_id: string | null;
+  amount_cents: number;
+  due_date: string;
+  payment_method: string | null;
+  status: string;
+  paid_at: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  client_name?: string | null;
+}
+
+export interface CrmLoyaltySettings {
+  tenant_id: string;
+  enabled: boolean;
+  program_name: string;
+  points_per_purchase_cents: number;
+  points_per_referral: number;
+  points_per_birthday: number;
+  points_per_special: number;
+  rules: string[];
+  benefits: string[];
+  rewards: string[];
+  levels: { name: string; min_points: number }[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CrmLoyaltyPoint {
+  id: string;
+  tenant_id: string;
+  client_id: string;
+  amount: number;
+  type: string;
+  description: string | null;
+  created_at: string;
+  client_name?: string | null;
+}
+
+export interface CrmTask {
+  id: string;
+  tenant_id: string;
+  user_id: string;
+  client_id: string | null;
+  title: string;
+  due_date: string | null;
+  due_time: string | null;
+  priority: string;
+  category: string | null;
+  notes: string | null;
+  status: string;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  client_name?: string | null;
+}
+
+export interface CrmAutomation {
+  id: string;
+  tenant_id: string;
+  user_id: string;
+  type: string;
+  enabled: boolean;
+  days: number;
+  schedule_time: string | null;
+  message: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CrmMessageTemplate {
+  id: string;
+  tenant_id: string;
+  user_id: string;
+  code: string | null;
+  label: string;
+  message: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CrmWhatsAppConfig {
+  tenant_id: string;
+  enabled: boolean;
+  provider: string | null;
+  api_url: string | null;
+  phone_id: string | null;
+  webhook_url: string | null;
+  connection_status: string;
+  created_at: string;
+  updated_at: string;
+  /** Exibido apenas com máscara, nunca o token real. */
+  has_token: boolean;
+  key_hint: string | null;
+}
+
+export interface CrmDashboardStats {
+  activeClients: number;
+  vipClients: number;
+  monthSales: number;
+  monthRevenueCents: number;
+  receivableCents: number;
+  pendingCharges: number;
+  overdueCharges: number;
+  clientsWithoutRecentContact: number;
+  upcomingBirthdays: { id: string; name: string; birth_date: string }[];
+  upcomingTasks: CrmTask[];
+  vipClientsList: CrmClient[];
+  needsAttention: CrmClient[];
+  revenueByMonth: { month: string; total_cents: number; sales: number }[];
+  consultantName: string | null;
+  currency: string;
+}
+
+export interface CrmExportBundle {
+  exported_at: string;
+  consultant_name: string | null;
+  site_name: string | null;
+  currency: string;
+  clients: CrmClient[];
+  products: CrmProduct[];
+  sales: CrmSale[];
+  financial: CrmFinancialEntry[];
+  charges: CrmCharge[];
+  tasks: CrmTask[];
+  loyaltyPoints: CrmLoyaltyPoint[];
+}
