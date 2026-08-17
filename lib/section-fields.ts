@@ -86,6 +86,17 @@ export const SECTION_CONTENT_FIELDS: Record<SectionType, ContentFieldDef[]> = {
         { key: "placeholder", label: "Placeholder do campo", type: "text" },
       ],
     },
+    {
+      key: "knowledge",
+      label: "Treinamento da assistente (respostas personalizadas)",
+      type: "list",
+      itemLabel: "Resposta",
+      fields: [
+        { key: "keywords", label: "Palavras-chave (separadas por vírgula)", type: "text" },
+        { key: "text", label: "Resposta do assistente", type: "textarea" },
+        { key: "oils", label: "Óleos sugeridos (um por linha)", type: "list" },
+      ],
+    },
   ],
   testimonials: [
     { key: "eyebrow", label: "Selo superior", type: "text" },

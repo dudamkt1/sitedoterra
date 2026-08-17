@@ -130,6 +130,9 @@ export const DEFAULT_SECTION_CONTENT: Record<SectionType, Record<string, unknown
       { emoji: "😴", label: "Ansiedade e sono" },
       { emoji: "🤕", label: "Dor de cabeça" },
       { emoji: "🛡️", label: "Imunidade" },
+      { emoji: "⚡", label: "Energia e foco" },
+      { emoji: "🤢", label: "Digestão" },
+      { emoji: "💪", label: "Dores musculares" },
     ],
     chat: {
       name: "Especialista IA doTERRA",

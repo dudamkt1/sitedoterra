@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { findIaResponse, type IaTrainingEntry } from "@/lib/ia-knowledge";
 
 interface Chip {
   emoji?: string;
@@ -20,6 +21,7 @@ export interface AboutContent {
   subtitle?: string;
   chips?: Chip[];
   chat?: ChatConfig;
+  knowledge?: IaTrainingEntry[];
   _contactWhatsapp?: string;
 }
 
@@ -28,15 +30,6 @@ interface ChatMsg {
   kind: "bot" | "user";
   html: string;
 }
-
-const OIL_RESPONSES: { match: string[]; text: string; oils: string[] }[] = [
-  { match: ["ansiedad", "sono", "dormir"], text: "Para ansiedade e sono, os óleos mais indicados são:", oils: ["Lavender", "Serenity", "Balance", "Vetiver"] },
-  { match: ["dor", "cabe"], text: "Para alívio de dores de cabeça, recomendo:", oils: ["Peppermint", "Deep Blue", "PastTense"] },
-  { match: ["imunid", "grippe", "resfriado"], text: "Para fortalecer a imunidade naturalmente:", oils: ["On Guard", "Oregano", "Frankincense"] },
-  { match: ["energia", "cansad", "disposiç"], text: "Para mais energia e clareza mental:", oils: ["Peppermint", "Wild Orange", "Motivate", "InTune"] },
-];
-
-const DEFAULT_RESPONSE = { text: "Entendi! Baseado no que você descreveu, recomendo:", oils: ["Lavender", "Balance", "Serenity"] };
 
 function escapeHtml(s: string) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -89,9 +82,7 @@ export function About({ content, contactWhatsapp, profileName }: { content: Abou
 
     setTyping(true);
     scrollToBottom();
-    const m = value.toLowerCase();
-    const hit = OIL_RESPONSES.find((r) => r.match.some((k) => m.includes(k)));
-    const resp = hit || DEFAULT_RESPONSE;
+    const resp = findIaResponse(value, content.knowledge);
     setTimeout(() => {
       setTyping(false);
       pushMessage({
