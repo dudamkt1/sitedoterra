@@ -446,7 +446,7 @@ function makeBodyFor(model: string): Record<string, unknown> {
  */
 export async function generateWithAi(
   userId: string,
-  input: { kind?: string; prompt?: string; context?: string }
+  input: { kind?: string; prompt?: string; context?: string; system?: string }
 ): Promise<{ ok: boolean; text?: string; error?: string }> {
   const settings = await getAiSettings(userId);
   if (!settings?.provider_id || !settings.api_key_enc) {
@@ -464,7 +464,7 @@ export async function generateWithAi(
     await persistWorkingModel(p.id, p.model, original.model).catch(() => {});
   }
 
-  const system = p.instructions || "Você é um assistente de conteúdo. Responda em português do Brasil.";
+  const system = input.system || p.instructions || "Você é um assistente de conteúdo. Responda em português do Brasil.";
   const kind = input.kind || "default";
   const basePrompt = input.prompt || "Escreva um texto curto e elegante.";
   const context = input.context ? `\n\nContexto: ${input.context}` : "";

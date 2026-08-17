@@ -261,6 +261,91 @@ export interface AiConfigView {
   providers: AiProvider[];
 }
 
+// ============================ CENTRAL DE IA (conteúdo doTERRA) ============================
+
+export interface AiToolField {
+  key: string;
+  label: string;
+  type: "text" | "textarea" | "select" | "number";
+  placeholder?: string;
+  options?: string[];
+  required?: boolean;
+  min?: number;
+  max?: number;
+  hint?: string;
+}
+
+export interface AiTool {
+  id: string;
+  code: string;
+  name: string;
+  emoji: string;
+  category: string;
+  description: string | null;
+  examples: string[];
+  enabled: boolean;
+  requires_api_key: boolean;
+  sort_order: number;
+  base_prompt: string | null;
+  created_at?: string;
+  updated_at?: string;
+  /** Mesclado do esquema em lib/ai-tools.ts */
+  fields: AiToolField[];
+  generates_content: boolean;
+}
+
+export interface AiTemplateField {
+  key: string;
+  label: string;
+  type: "text" | "textarea" | "color" | "image" | "select";
+  default?: string;
+  options?: string[];
+}
+
+export interface AiTemplateStructure {
+  layout: "story" | "carrossel";
+  fields: AiTemplateField[];
+}
+
+export interface AiTemplate {
+  id: string;
+  code: string;
+  name: string;
+  emoji: string;
+  category: string;
+  description: string | null;
+  structure: AiTemplateStructure;
+  enabled: boolean;
+  sort_order: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface AiHistoryItem {
+  id: string;
+  user_id: string;
+  tenant_id: string | null;
+  tool_code: string | null;
+  tool_name: string | null;
+  prompt: string | null;
+  content: string;
+  metadata: Record<string, unknown>;
+  favorite: boolean;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface AiUserTemplate {
+  id: string;
+  user_id: string;
+  tenant_id: string | null;
+  template_code: string;
+  name: string;
+  data: Record<string, unknown>;
+  created_at: string;
+  updated_at?: string;
+}
+
 // ============================ MÍDIA (Cloudflare R2) ============================
 
 export type MediaStatus = "uploading" | "uploaded" | "failed";

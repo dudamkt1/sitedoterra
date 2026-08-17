@@ -1,6 +1,6 @@
 import { getDashboardContext } from "@/lib/auth";
 import { SectionTitle } from "@/components/dashboard/ui";
-import { AiPanel } from "@/components/dashboard/AiPanel";
+import { AiCenter } from "@/components/dashboard/AiCenter";
 
 export default async function IaPage() {
   const ctx = await getDashboardContext();
@@ -8,10 +8,10 @@ export default async function IaPage() {
 
   return (
     <div>
-      <SectionTitle sub="Configure sua IA gratuita e gere conteúdos para o seu site. A chave fica armazenada com segurança e nunca é exposta no frontend.">
-        IA para seu site
+      <SectionTitle sub="Crie conteúdos para divulgar seus produtos, negócio, redes sociais e site. IA gratuita configurável, com foco no universo doTERRA e óleos essenciais.">
+        Central de IA para Conteúdo doTERRA
       </SectionTitle>
-      <AiPanel isSuperAdmin={ctx.isSuperAdmin} />
+      <AiCenter isSuperAdmin={ctx.isSuperAdmin} />
     </div>
   );
 }
