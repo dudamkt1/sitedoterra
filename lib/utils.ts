@@ -89,11 +89,36 @@ export function normalizeDomain(input: string): string {
     .replace(/\/.*$/, "");
 }
 
+// Sufixos públicos de duas partes (ex.: .com.br) — usados para detectar o apex real.
+// O apex é o "domínio registrado": sufixo + 1 rótulo.
+const TWO_PART_PUBLIC_SUFFIXES = new Set([
+  // Brasil
+  "com.br", "net.br", "org.br", "gov.br", "edu.br", "mil.br", "adv.br", "art.br",
+  "blog.br", "eco.br", "emp.br", "eng.br", "esp.br", "etc.br", "far.br", "fm.br",
+  "fot.br", "fst.br", "g12.br", "ind.br", "inf.br", "jor.br", "lel.br", "med.br",
+  "mus.br", "not.br", "ntr.br", "odo.br", "ppg.br", "pro.br", "psc.br", "psi.br",
+  "rec.br", "radio.br", "srv.br", "teo.br", "tmp.br", "tur.br", "tv.br", "vet.br",
+  "vlog.br", "wiki.br", "web.br",
+  // Internacional (casos comuns)
+  "co.uk", "org.uk", "net.uk", "me.uk", "com.au", "net.au", "org.au", "com.co",
+  "net.co", "org.co", "com.mx", "com.ar", "com.ve", "com.pe", "com.cl", "com.ec",
+  "com.uy", "com.py", "co.jp", "ne.jp", "or.jp", "co.in", "com.cn", "com.sg",
+  "com.tw", "com.hk", "com.my", "co.za", "com.ng", "com.gh", "co.ke", "com.eg",
+  "com.ma",
+]);
+
 export function isApexDomain(domain: string): boolean {
-  const parts = domain.split(".");
-  // Ex.: com.br, com, org → apex. www.example.com → não-apex
-  const withoutWww = domain.replace(/^www\./, "");
-  return withoutWww === domain;
+  const value = domain.toLowerCase();
+  const parts = value.split(".");
+  if (parts.length < 2) return false;
+  // Ex.: .com.br é um sufixo de duas partes → apex tem 3 rótulos (topconsultores.com.br).
+  // Já oleos.topconsultores.com.br tem 4 rótulos → é subdomínio.
+  const lastTwo = parts.slice(-2).join(".");
+  if (TWO_PART_PUBLIC_SUFFIXES.has(lastTwo)) {
+    return parts.length === 3;
+  }
+  // Sufixos de uma parte (ex.: .com, .net, .org) → apex tem 2 rótulos.
+  return parts.length === 2;
 }
 
 export function domainBase(domain: string): string {

@@ -111,41 +111,45 @@ export function buildDnsInstructions(
   isApex: boolean,
   vercelInfo?: VercelDomainResponse
 ): DnsInstruction {
-  const wwwValue =
-    vercelInfo?.verification?.find((v) => v.type === "CNAME" && v.domain.includes("www"))?.value ||
+  // Alvo real apontado pela Vercel (pode ser um CNAME por projeto,
+  // ex.: 1b9c57f1a54e7591.vercel-dns-017.com). Sempre preferimos o valor
+  // retornado pela API da Vercel para o próprio domínio.
+  const cnameValue =
+    vercelInfo?.verification?.find(
+      (v) => v.type === "CNAME" && v.domain.toLowerCase() === domain.toLowerCase()
+    )?.value ||
+    vercelInfo?.verification?.find((v) => v.type === "CNAME")?.value ||
     VERCEL_CNAME_TARGET;
 
+  const apexValue =
+    vercelInfo?.verification?.find((v) => v.type === "A")?.value || VERCEL_APEX_A_RECORD;
+
+  // Domínio raiz (ex.: topconsultores.com.br): A em "@" + CNAME em "www".
   if (isApex) {
     return {
       records: [
-        {
-          type: "A",
-          host: "@",
-          value: vercelInfo?.verification?.find((v) => v.type === "A")?.value || VERCEL_APEX_A_RECORD,
-          ttl: "automático",
-        },
-        {
-          type: "CNAME",
-          host: "www",
-          value: wwwValue,
-          ttl: "automático",
-        },
+        { type: "A", host: "@", value: apexValue, ttl: "automático" },
+        { type: "CNAME", host: "www", value: cnameValue, ttl: "automático" },
       ],
       explanation:
         "Aponte o registro A do domínio raiz para o IP fornecido e crie um CNAME de 'www' para o destino da Vercel. Assim, tanto meudominio.com.br quanto www.meudominio.com.br funcionarão no mesmo site.",
     };
   }
 
+  // Subdomínio (ex.: www.meudominio.com.br ou oleos.topconsultores.com.br):
+  // CNAME no próprio rótulo do subdomínio apontando para o destino da Vercel.
+  const host = domain.split(".")[0];
+
   return {
     records: [
       {
         type: "CNAME",
-        host: "www",
-        value: wwwValue,
+        host,
+        value: cnameValue,
         ttl: "automático",
       },
     ],
     explanation:
-      "Crie (ou edite) um registro CNAME de 'www' apontando para o destino da Vercel. O domínio raiz deve ter um registro A apontando para o IP fornecido pela Vercel, se você também quiser usar o domínio sem 'www'.",
+      `Crie (ou edite) um registro CNAME de '${host}' apontando para o destino da Vercel (${cnameValue}). Aguarde a propagação (pode levar de alguns minutos até 24h) e volte para verificar o domínio.`,
   };
 }
