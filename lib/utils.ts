@@ -75,7 +75,6 @@ export function isValidSlug(slug: string): boolean {
 export function isValidDomain(domain: string): boolean {
   const value = domain.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
   if (!value || value.length > 253) return false;
-  if (!/^(?!-)[a-z0-9-]{1,63}(?<!-)$/.test(value)) return false;
   const parts = value.split(".");
   if (parts.length < 2) return false;
   return parts.every((p) => /^(?!-)[a-z0-9-]{1,63}(?<!-)$/.test(p));
