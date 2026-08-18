@@ -18,7 +18,7 @@ export function Trustbar({ content }: { content: TrustbarContent }) {
         </div>
       </div>
       {content.buttonText && (
-        <a href={content.buttonUrl || "#pricing"} className="btn-vitrine">
+        <a href={content.buttonUrl || "#planos"} className="btn-vitrine">
           {content.buttonText} →
         </a>
       )}

@@ -46,26 +46,27 @@ export default async function TenantSitePage({ params }: { params: { slug: strin
     // editados em /painel/meu-site) têm prioridade sobre o template global.
     const sections = await resolveHomeSections({ tenant, tenantDataOverridesGlobal: true });
     const siteData = (tenant.site_data || {}) as Record<string, unknown>;
-    return (
+return (
       <>
         <link rel="canonical" href={canonicalUrl} />
         {user && <LoggedInNotice email={user.email} />}
         <SiteHome
           slug={tenant.slug}
           sections={sections}
-contact={{
-              whatsapp: (siteData.whatsapp as string) || undefined,
-              email: (siteData.email as string) || tenant.email || undefined,
-              instagram: siteData.instagram ? `https://instagram.com/${String(siteData.instagram).replace(/^@/, "")}` : undefined,
-              profileName: tenant.profile_name || undefined,
-            }}
-            logo={{
-              mode: (siteData.logoMode as "image" | "text") || undefined,
-              url: (siteData.logoUrl as string) || undefined,
-              lightUrl: (siteData.logoLightUrl as string) || undefined,
-              text: (siteData.logoText as string) || undefined,
-            }}
-        />
+          contact={{
+            whatsapp: (siteData.whatsapp as string) || undefined,
+            email: (siteData.email as string) || tenant.email || undefined,
+            instagram: siteData.instagram ? `https://instagram.com/${String(siteData.instagram).replace(/^@/, "")}` : undefined,
+            profileName: tenant.profile_name || undefined,
+          }}
+          logo={{
+            mode: (siteData.logoMode as "image" | "text") || undefined,
+            url: (siteData.logoUrl as string) || undefined,
+            lightUrl: (siteData.logoLightUrl as string) || undefined,
+            text: (siteData.logoText as string) || undefined,
+          }}
+          extraNav={[{ label: "Painel", href: user ? "/painel" : "/login" }]}
+      />
       </>
     );
   }

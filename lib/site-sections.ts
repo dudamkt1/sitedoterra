@@ -119,7 +119,7 @@ export const DEFAULT_SECTION_CONTENT: Record<SectionType, Record<string, unknown
     title: "Você é consultora doTERRA? Tenha um site profissional como este!",
     subtitle: "Ferramenta completa com IA, agendamento, CRM e muito mais",
     buttonText: "Quero um site assim",
-    buttonUrl: "#pricing",
+    buttonUrl: "#planos",
   },
   about: {
     eyebrow: "Tecnologia + Natureza",

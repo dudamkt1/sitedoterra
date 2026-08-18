@@ -20,7 +20,7 @@ values
   (
     'trustbar', 'trustbar', 'Barra de destaque', 'Faixa de confiança', 'Chamada que destaca o produto/proposta no topo da página.', true, false, 30,
     '{"showInNav": false}'::jsonb,
-    '{"badge": "✨", "title": "Você é consultora doTERRA? Tenha um site profissional como este!", "subtitle": "Ferramenta completa com IA, agendamento, CRM e muito mais", "buttonText": "Quero um site assim", "buttonUrl": "#pricing"}'::jsonb,
+    '{"badge": "✨", "title": "Você é consultora doTERRA? Tenha um site profissional como este!", "subtitle": "Ferramenta completa com IA, agendamento, CRM e muito mais", "buttonText": "Quero um site assim", "buttonUrl": "#planos"}'::jsonb,
     '{"can_edit": true, "can_toggle": true, "can_edit_image": false, "can_edit_video": false, "can_edit_button": true, "can_edit_colors": true, "can_edit_layout": false, "available_to_all": false}'::jsonb
   ),
   (
