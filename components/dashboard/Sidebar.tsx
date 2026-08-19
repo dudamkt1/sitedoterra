@@ -9,6 +9,7 @@ const USER_LINKS = [
   { href: "/painel/midias", label: "Biblioteca de Mídia", icon: "📁" },
   { href: "/painel/crm", label: "CRM", icon: "📇" },
   { href: "/painel/ia", label: "IA para seu site", icon: "🤖" },
+  { href: "/painel/ia/treinamento", label: "Treinar IA do site", icon: "🧠" },
   { href: "/painel/assinatura", label: "Minha Assinatura", icon: "💳" },
   { href: "/painel/dominio", label: "Domínio", icon: "🔗" },
   { href: "/painel/pagamentos", label: "Pagamentos", icon: "🧾" },

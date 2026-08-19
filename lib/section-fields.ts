@@ -88,12 +88,12 @@ export const SECTION_CONTENT_FIELDS: Record<SectionType, ContentFieldDef[]> = {
     },
     {
       key: "knowledge",
-      label: "Treinamento da assistente (respostas personalizadas)",
+      label: "Treinamento da assistente (perguntas e respostas pré-prontas)",
       type: "list",
-      itemLabel: "Resposta",
+      itemLabel: "Pergunta/Resposta",
       fields: [
-        { key: "keywords", label: "Palavras-chave (separadas por vírgula)", type: "text" },
-        { key: "text", label: "Resposta do assistente", type: "textarea" },
+        { key: "keywords", label: "Pergunta (palavras-chave separadas por vírgula)", type: "text" },
+        { key: "text", label: "Resposta pronta do assistente", type: "textarea" },
         { key: "oils", label: "Óleos sugeridos (um por linha)", type: "list" },
       ],
     },

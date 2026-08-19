@@ -79,7 +79,7 @@ export function SiteHome({ slug, sections, contact, logo, extraNav = [] }: SiteH
           case "trustbar":
             return <Trustbar key={s.id} content={s.content as never} />;
           case "about":
-            return <About key={s.id} content={s.content as never} contactWhatsapp={whatsapp} profileName={profileName} />;
+            return <About key={s.id} content={s.content as never} contactWhatsapp={whatsapp} profileName={profileName} slug={slug} />;
           case "testimonials":
             return <Testimonials key={s.id} content={s.content as never} />;
           case "story":

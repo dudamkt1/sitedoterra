@@ -35,21 +35,44 @@ function escapeHtml(s: string) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-function buildBotHtml(text: string, oils: string[], whatsapp: string, profileName: string): string {
+function buildBotHtml(text: string, oils: string[], whatsapp: string, profileName: string, redirectWhatsApp = false): string {
+  const oilsHtml =
+    oils.length > 0
+      ? `<div class="ia-oil-chips">${oils.map((o) => `<span class="oil-chip">${escapeHtml(o)}</span>`).join("")}</div>`
+      : "";
   return `
     <div class="ia-oil-suggestion">
       <div class="oil-title">✨ ${escapeHtml(text)}</div>
-      <div class="ia-oil-chips">${oils.map((o) => `<span class="oil-chip">${escapeHtml(o)}</span>`).join("")}</div>
+      ${oilsHtml}
       <a href="${whatsapp}" target="_blank" class="ia-wpp-btn" style="color:#fff;font-weight:600;background:#1D5C3A;padding:0.6rem 1.2rem;border-radius:8px;font-size:0.82rem;display:inline-flex;gap:8px;align-items:center;text-decoration:none">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.133.558 4.135 1.535 5.875L0 24l6.29-1.503A11.954 11.954 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0z"/></svg>
-        Conversar agora
+        ${redirectWhatsApp ? "Falar com a consultora" : "Conversar agora"}
       </a>
     </div>
     <span class="msg-time">agora</span>
   `;
 }
 
-export function About({ content, contactWhatsapp, profileName }: { content: AboutContent; contactWhatsapp?: string; profileName?: string }) {
+interface ChatApiResponse {
+  text: string;
+  oils: string[];
+  matched: boolean;
+  redirectWhatsApp: boolean;
+  whatsapp?: string;
+  profileName?: string;
+}
+
+export function About({
+  content,
+  contactWhatsapp,
+  profileName,
+  slug,
+}: {
+  content: AboutContent;
+  contactWhatsapp?: string;
+  profileName?: string;
+  slug?: string;
+}) {
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const [messages, setMessages] = useState<ChatMsg[]>([
@@ -73,24 +96,64 @@ export function About({ content, contactWhatsapp, profileName }: { content: Abou
     scrollToBottom();
   }
 
-  function sendChat(raw?: string) {
+  async function sendChat(raw?: string) {
     const input = inputRef.current;
     const value = (raw ?? input?.value ?? "").trim();
-    if (!value) return;
+    if (!value || typing) return;
     if (input) input.value = "";
     pushMessage({ id: Date.now(), kind: "user", html: `<div class="msg-bubble">${escapeHtml(value)}</div><span class="msg-time">agora</span>` });
 
     setTyping(true);
     scrollToBottom();
-    const resp = findIaResponse(value, content.knowledge);
+
+    let resp: ChatApiResponse | null = null;
+    if (slug) {
+      try {
+        const res = await fetch("/api/ia/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: value, slug }),
+        });
+        if (res.ok) {
+          const json = (await res.json()) as Partial<ChatApiResponse>;
+          resp = {
+            text: json.text || "Ainda não sei responder isso com segurança!",
+            oils: json.oils || [],
+            matched: json.matched ?? false,
+            redirectWhatsApp: json.redirectWhatsApp ?? false,
+            whatsapp: json.whatsapp,
+            profileName: json.profileName,
+          };
+        }
+      } catch {
+        // falha de rede → usa o match local abaixo
+      }
+    }
+
+    if (!resp) {
+      const local = findIaResponse(value, content.knowledge);
+      resp = {
+        text: local.text,
+        oils: local.oils,
+        matched: local.matched,
+        redirectWhatsApp: !local.matched,
+        whatsapp,
+        profileName: name,
+      };
+    }
+
+    const finalWpp = resp.whatsapp || whatsapp;
+    const finalWppLink = `https://wa.me/${finalWpp}`;
+    const finalName = resp.profileName || name;
+
     setTimeout(() => {
       setTyping(false);
       pushMessage({
         id: Date.now(),
         kind: "bot",
-        html: buildBotHtml(resp.text, resp.oils, wppLink, name),
+        html: buildBotHtml(resp!.text, resp!.oils, finalWppLink, finalName, resp!.redirectWhatsApp),
       });
-    }, 1400);
+    }, 900);
   }
 
   return (

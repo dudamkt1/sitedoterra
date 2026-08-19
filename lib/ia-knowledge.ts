@@ -19,6 +19,13 @@ export interface IaTrainingEntry {
   oils?: string[];
 }
 
+export interface IaResponse {
+  text: string;
+  oils: string[];
+  /** true quando houve correspondência real (base padrão ou treinamento). */
+  matched: boolean;
+}
+
 const DOTERRA_KNOWLEDGE: IaKnowledgeEntry[] = [
   {
     match: ["ansiedad", "ansios", "estresse", "stress", "nervos", "preocup", "calm", "relax"],
@@ -140,6 +147,41 @@ const DOTERRA_KNOWLEDGE: IaKnowledgeEntry[] = [
     text: "Posso te ajudar com detalhes! Para tirar todas as suas dúvidas e receber um atendimento personalizado, fale comigo agora:",
     oils: [],
   },
+  {
+    match: ["o que é doterra", "que é a doterra", "sobre a doterra", "quem é a doterra", "empresa doterra", "marca"],
+    text: "A doTERRA é uma empresa líder em óleos essenciais de alta qualidade, com a linha CPTG Certified Pure Therapeutic Grade®. Toda a produção passa por rígidos testes de pureza e potência, garantindo óleos puros e seguros para o dia a dia.",
+    oils: ["Lavender", "Lemon", "Peppermint"],
+  },
+  {
+    match: ["cptg", "certified pure", "pureza", "terapeutic grade", "qualidade", "puro", "puros", "testados"],
+    text: "O selo CPTG® (Certified Pure Therapeutic Grade) garante que cada óleo passou por testes rigorosos de pureza, potência e ausência de contaminantes. É a promessa da doTERRA de que você recebe o que há de mais puro da natureza.",
+    oils: [],
+  },
+  {
+    match: ["comprar", "como comprar", "adquirir", "adquirir óleos", "pedido", "fazer pedido", "link de compra", "loja", "cadastro", "cadastrar"],
+    text: "Para comprar, é só falar comigo! Te envio o link da minha loja oficial doTERRA, faço o acompanhamento do seu pedido e te ajudo a escolher os melhores produtos. Fale comigo no WhatsApp:",
+    oils: [],
+  },
+  {
+    match: ["validade", "vence", "expira", "tempo de uso", "duram", "duração", "armazen", "guardar", "conserva"],
+    text: "Óleos essenciais bem armazenados (frasco fechado, longe de luz e calor) duram em média de 3 a 5 anos. O cítrico, como o Lemon, pode oxidar mais rápido. Mantenha longe do sol e do calor para preservar a qualidade.",
+    oils: [],
+  },
+  {
+    match: ["quanto custa", "valores", "custo", "preços", "preço", "cara", "caro", "investimento", "valores dos óleos"],
+    text: "Os valores variam conforme o produto e o programa de fidelidade doTERRA (compra em Wholesale costuma ter melhores preços). Me chame no WhatsApp que te passo a lista de valores atualizada!",
+    oils: [],
+  },
+  {
+    match: ["oi", "olá", "ola", "bom dia", "boa tarde", "boa noite", "eai", "e aí", "tudo bem", "tudo bom", "iniciar", "começar"],
+    text: "Olá! Que bom te ver por aqui 🌿 Me conte como você está se sentindo hoje — física ou emocionalmente — e vou indicar os melhores óleos para o seu momento!",
+    oils: [],
+  },
+  {
+    match: ["obrigad", "valeu", "agradec", "muito bom", "gostei", "adorei", "top", "ótimo", "otimo", "perfeito", "amei"],
+    text: "Eu que agradeço! 💚 Se precisar de mais indicações ou quiser conhecer os óleos de perto, estou à disposição. Fale comigo no WhatsApp quando quiser!",
+    oils: [],
+  },
 ];
 
 const DEFAULT_RESPONSE: IaKnowledgeEntry = {
@@ -171,20 +213,22 @@ function oilsOf(entry: IaTrainingEntry): string[] {
 }
 
 /** Encontra a melhor resposta combinando o treinamento do consultor (prioridade) e a base padrão. */
-export function findIaResponse(raw: string, training?: IaTrainingEntry[]): IaKnowledgeEntry {
+export function findIaResponse(raw: string, training?: IaTrainingEntry[]): IaResponse {
   const input = normalize(raw);
-  if (!input) return DEFAULT_RESPONSE;
+  if (!input) return { text: DEFAULT_RESPONSE.text, oils: DEFAULT_RESPONSE.oils, matched: false };
 
   for (const entry of training || []) {
     if (!entry.text) continue;
     const kws = keywordsOf(entry);
     if (kws.length > 0 && kws.some((k) => input.includes(k))) {
-      return { match: kws, text: entry.text, oils: oilsOf(entry) };
+      return { text: entry.text, oils: oilsOf(entry), matched: true };
     }
   }
 
   const hit = DOTERRA_KNOWLEDGE.find((r) => r.match.some((k) => input.includes(k)));
-  return hit || DEFAULT_RESPONSE;
+  return hit
+    ? { text: hit.text, oils: hit.oils, matched: true }
+    : { text: DEFAULT_RESPONSE.text, oils: DEFAULT_RESPONSE.oils, matched: false };
 }
 
 export { DOTERRA_KNOWLEDGE, DEFAULT_RESPONSE };
