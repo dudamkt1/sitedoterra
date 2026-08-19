@@ -188,6 +188,7 @@ export function MediaLibrary({
                 />
                 {selectable && (
                   <button
+                    type="button"
                     onClick={() => onSelect && onSelect(m)}
                     className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-[#1d5c3a]/70 text-white text-sm font-semibold flex items-center justify-center"
                   >
@@ -210,14 +211,14 @@ export function MediaLibrary({
                   </p>
                 )}
                 <div className="flex gap-2 mt-2">
-                  <button className="text-xs text-[#1d5c3a] underline" onClick={() => copyUrl(m)}>
+                  <button type="button" className="text-xs text-[#1d5c3a] underline" onClick={() => copyUrl(m)}>
                     {copied === m.id ? "✓ Copiada" : "Copiar URL"}
                   </button>
                   <a href={m.public_url} target="_blank" rel="noopener noreferrer" className="text-xs text-gray-400 underline">
                     Abrir
                   </a>
                   {!selectable && (
-                    <button className="text-xs text-red-600 underline ml-auto" onClick={() => remove(m)}>
+                    <button type="button" className="text-xs text-red-600 underline ml-auto" onClick={() => remove(m)}>
                       Excluir
                     </button>
                   )}

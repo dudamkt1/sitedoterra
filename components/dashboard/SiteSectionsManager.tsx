@@ -127,6 +127,7 @@ export function SiteSectionsManager({ slug, appUrl }: { slug: string; appUrl: st
               </div>
               {section.can_toggle ? (
                 <button
+                  type="button"
                   onClick={() => toggle(section)}
                   disabled={saving}
                   className={`relative w-10 h-6 rounded-full transition-colors ${isOn ? "bg-[#1d5c3a]" : "bg-gray-300"}`}
@@ -138,11 +139,11 @@ export function SiteSectionsManager({ slug, appUrl }: { slug: string; appUrl: st
                 <span className="text-xs text-gray-400">—</span>
               )}
               {section.can_edit ? (
-                <button className="btn btn-outline !py-1.5 !px-3 !text-xs" onClick={() => openEdit(section)} disabled={saving}>
+                <button type="button" className="btn btn-outline !py-1.5 !px-3 !text-xs" onClick={() => openEdit(section)} disabled={saving}>
                   Editar
                 </button>
               ) : (
-                <button className="btn btn-outline !py-1.5 !px-3 !text-xs" disabled>
+                <button type="button" className="btn btn-outline !py-1.5 !px-3 !text-xs" disabled>
                   Bloqueada
                 </button>
               )}
@@ -156,7 +157,7 @@ export function SiteSectionsManager({ slug, appUrl }: { slug: string; appUrl: st
           <div className="card w-full max-w-3xl my-8">
             <div className="flex items-center justify-between mb-1">
               <h3 className="card-title">Editar — {editing.label}</h3>
-              <button className="text-gray-400 text-xl" onClick={() => setEditing(null)}>✕</button>
+              <button type="button" className="text-gray-400 text-xl" onClick={() => setEditing(null)}>✕</button>
             </div>
             <p className="text-xs text-gray-400 mb-4">
               {editing.can_edit ? "Salve suas alterações para refletir na página pública." : "Você não tem permissão para editar esta seção."}
@@ -165,8 +166,8 @@ export function SiteSectionsManager({ slug, appUrl }: { slug: string; appUrl: st
               <SectionContentEditor sectionType={editing.type} value={draft} onChange={setDraft} mediaScope="tenant" />
             </div>
             <div className="flex justify-end gap-2 mt-5">
-              <button className="btn btn-outline" onClick={() => setEditing(null)}>Cancelar</button>
-              <button className="btn btn-primary" onClick={saveEdit} disabled={saving}>
+              <button type="button" className="btn btn-outline" onClick={() => setEditing(null)}>Cancelar</button>
+              <button type="button" className="btn btn-primary" onClick={saveEdit} disabled={saving}>
                 {saving ? "Salvando..." : "Salvar seção"}
               </button>
             </div>

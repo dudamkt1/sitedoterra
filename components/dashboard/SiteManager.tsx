@@ -196,7 +196,7 @@ export function SiteManager({ slug, pendingSlug, siteData, appUrl, hasSubscripti
               onChange={(e) => setNewSlug(e.target.value.toLowerCase())}
             />
           </div>
-          <button className="btn btn-primary" disabled={!slugCheck?.available || savingSlug} onClick={saveSlug}>
+          <button type="button" className="btn btn-primary" disabled={!slugCheck?.available || savingSlug} onClick={saveSlug}>
             {savingSlug ? "Salvando..." : "Salvar"}
           </button>
         </div>
@@ -329,7 +329,7 @@ export function SiteManager({ slug, pendingSlug, siteData, appUrl, hasSubscripti
         </div>
 
         <div className="mt-5 flex items-center gap-3">
-          <button className="btn btn-primary" onClick={saveSite} disabled={savingSite}>
+          <button type="button" className="btn btn-primary" onClick={saveSite} disabled={savingSite}>
             {savingSite ? "Salvando..." : "Salvar logo"}
           </button>
           {siteMsg && (
@@ -379,7 +379,7 @@ export function SiteManager({ slug, pendingSlug, siteData, appUrl, hasSubscripti
         </div>
 
         <div className="mt-5 flex items-center gap-3">
-          <button className="btn btn-primary" onClick={saveSite} disabled={savingSite}>
+          <button type="button" className="btn btn-primary" onClick={saveSite} disabled={savingSite}>
             {savingSite ? "Salvando..." : "Salvar favicon"}
           </button>
           {siteMsg && (
@@ -424,7 +424,7 @@ export function SiteManager({ slug, pendingSlug, siteData, appUrl, hasSubscripti
         </div>
 
         <div className="mt-5 flex items-center gap-3">
-          <button className="btn btn-primary" onClick={saveSite} disabled={savingSite}>
+          <button type="button" className="btn btn-primary" onClick={saveSite} disabled={savingSite}>
             {savingSite ? "Salvando..." : "Salvar conteúdo"}
           </button>
           {siteMsg && (
@@ -474,7 +474,7 @@ export function SiteManager({ slug, pendingSlug, siteData, appUrl, hasSubscripti
         </div>
 
         <div className="mt-5 flex items-center gap-3">
-          <button className="btn btn-primary" onClick={saveSite} disabled={savingSite}>
+          <button type="button" className="btn btn-primary" onClick={saveSite} disabled={savingSite}>
             {savingSite ? "Salvando..." : "Salvar redes sociais"}
           </button>
           {siteMsg && (

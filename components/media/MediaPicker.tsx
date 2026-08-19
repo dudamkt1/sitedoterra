@@ -39,7 +39,7 @@ export function MediaPicker({
           <div className="card w-full max-w-4xl my-8">
             <div className="flex items-center justify-between mb-4">
               <h3 className="card-title">Biblioteca de mídia</h3>
-              <button className="text-gray-400 text-xl" onClick={() => setOpen(false)}>✕</button>
+              <button type="button" className="text-gray-400 text-xl" onClick={() => setOpen(false)}>✕</button>
             </div>
             <p className="text-xs text-gray-400 mb-4">
               Escolha uma imagem ou envie uma nova. Ela será armazenada no Cloudflare R2.
@@ -49,7 +49,7 @@ export function MediaPicker({
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={value} alt="atual" className="w-16 h-12 object-cover rounded" referrerPolicy="no-referrer" />
                 <p className="text-xs text-gray-500 truncate flex-1">{value}</p>
-                <button className="text-xs text-red-600 underline" onClick={() => { onChange?.(""); setOpen(false); }}>
+                <button type="button" className="text-xs text-red-600 underline" onClick={() => { onChange?.(""); setOpen(false); }}>
                   Remover imagem
                 </button>
               </div>
@@ -65,7 +65,7 @@ export function MediaPicker({
               />
             </div>
             <div className="flex justify-end mt-4">
-              <button className="btn btn-outline" onClick={() => setOpen(false)}>Fechar</button>
+              <button type="button" className="btn btn-outline" onClick={() => setOpen(false)}>Fechar</button>
             </div>
           </div>
         </div>

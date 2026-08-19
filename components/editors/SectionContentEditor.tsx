@@ -307,7 +307,7 @@ export function SectionContentEditor({ sectionType, value, onChange, mediaScope 
                   updated[idx] = e.target.value;
                   onChangeItem({ [field.key]: updated });
                 }} />
-                <button className="text-xs text-red-600" onClick={() => onChangeItem({ [field.key]: list.filter((_, i) => i !== idx) })}>✕</button>
+                <button type="button" className="text-xs text-red-600" onClick={() => onChangeItem({ [field.key]: list.filter((_, i) => i !== idx) })}>✕</button>
               </div>
             ))}
             <button type="button" className="text-xs text-[#1d5c3a] underline" onClick={() => onChangeItem({ [field.key]: [...list, ""] })}>
