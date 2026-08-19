@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isR2Configured, createPresignedPutUrl, r2PublicUrl } from "@/lib/r2";
+import { isR2Configured, createPresignedPutUrl, r2PublicUrl, ensureR2BucketCors } from "@/lib/r2";
 import {
   mediaContext,
   validateUpload,
@@ -110,6 +110,10 @@ export async function POST(request: Request) {
     category: validation.category,
     extension: validation.extension,
   });
+
+  // Auto-healing: garante que o bucket aceite a origem do browser no PUT direto.
+  const origin = request.headers.get("origin") || "";
+  await ensureR2BucketCors(origin ? [origin] : []);
 
   let uploadUrl: string;
   try {

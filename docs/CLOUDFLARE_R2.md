@@ -123,12 +123,19 @@ Browser ──PUT uploadUrl──▶ Cloudflare R2 (binário direto)
 Browser ──POST /api/media/complete──▶ API (verifica objeto, marca 'uploaded')
 ```
 
+> **Auto-healing de CORS + fallback server-side:** o backend tenta atualizar o
+> CORS do bucket automaticamente a cada presign (origem da requisição + padrões).
+> Se o PUT direto ainda falhar por CORS (ex.: token R2 sem permissão de bucket),
+> o cliente reenvia o arquivo via `/api/media/upload`, que faz o PUT ao R2 pelo
+> servidor — o envio funciona mesmo sem configuração manual de CORS.
+
 ### Rotas/API criadas
 
 | Rota | Método | Uso |
 |---|---|---|
 | `/api/media/presign` | POST | Valida e devolve URL pré-assinada de upload (reserva metadado `uploading`) |
 | `/api/media/complete` | POST | Confirma o objeto no R2 e marca `uploaded` (+ auditoria) |
+| `/api/media/upload` | POST | **Fallback**: recebe o binário (multipart) e faz o PUT ao R2 pelo servidor — sem CORS do browser |
 | `/api/media` | GET | Lista mídias (`?scope=tenant\|system\|admin&category=&q=&sort=&tenant_id=`) |
 | `/api/media/[id]` | DELETE | Exclui do R2 + banco, com checagem de referência |
 | `/api/media/stats` | GET | Uso/quota do tenant ou agregado da plataforma (`?all=1`) |

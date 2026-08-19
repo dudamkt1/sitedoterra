@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, DeleteObjectCommand, HeadObjectCommand, PutBucketCorsCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 /**
@@ -114,5 +114,77 @@ export async function r2DeleteObject(key: string): Promise<void> {
     );
   } catch (err) {
     console.error("Erro ao excluir objeto do R2", key, err);
+  }
+}
+
+/**
+ * Envia um objeto ao R2 PELO SERVIDOR (sem CORS/preflight do browser).
+ * Usado como fallback quando o upload direto do browser falha.
+ */
+export async function r2PutObject(params: {
+  key: string;
+  body: Uint8Array | Buffer | string;
+  contentType?: string;
+}): Promise<void> {
+  await getR2Client().send(
+    new PutObjectCommand({
+      Bucket: getR2Bucket(),
+      Key: params.key,
+      Body: params.body,
+      ContentType: params.contentType || "application/octet-stream",
+    })
+  );
+}
+
+/**
+ * AUTO-HEALING DE CORS NO BUCKET R2.
+ *
+ * O browser envia o binário DIRETO ao R2 (PUT pré-assinado). Para isso, o
+ * bucket precisa aceitar a origem (CORS) — senão o navegador bloqueia a
+ * requisição e o usuário vê "Falha de rede no upload."
+ *
+ * Em vez de depender de configuração manual (que quebra a cada preview/domínio
+ * novo), este método atualiza o CORS do bucket automaticamente com a origem da
+ * requisição + origens padrão conhecidas. Idempotente e best-effort.
+ */
+export async function ensureR2BucketCors(extraOrigins: string[] = []): Promise<void> {
+  const env = r2Env();
+  if (!env.accountId) return;
+
+  const defaultOrigins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://sitedoterra-psi.vercel.app",
+    "https://www.sitedoterra.com.br",
+    "https://sitedoterra.com.br",
+  ];
+
+  const origins = Array.from(
+    new Set(
+      [...defaultOrigins, ...extraOrigins]
+        .map((o) => (o || "").replace(/\/+$/, ""))
+        .filter((o) => o.startsWith("http://") || o.startsWith("https://"))
+    )
+  );
+
+  try {
+    await getR2Client().send(
+      new PutBucketCorsCommand({
+        Bucket: getR2Bucket(),
+        CORSConfiguration: {
+          CORSRules: [
+            {
+              AllowedOrigins: origins,
+              AllowedMethods: ["PUT", "GET", "HEAD"],
+              AllowedHeaders: ["Content-Type"],
+              ExposeHeaders: ["ETag"],
+              MaxAgeSeconds: 3600,
+            },
+          ],
+        },
+      })
+    );
+  } catch (err) {
+    console.error("Erro ao atualizar CORS do bucket R2 (best-effort)", err);
   }
 }

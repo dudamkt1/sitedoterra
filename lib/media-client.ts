@@ -82,7 +82,9 @@ export async function confirmUpload(id: string): Promise<MediaFile> {
 
 /**
  * Pipeline completo de upload (R2): presign → PUT direto → confirmar.
- * Use `onProgress` para exibir % de envio (PUT para R2 dispara upload progress).
+ * Se o PUT direto falhar por CORS/rede do bucket, faz FALLBACK enviando o
+ * arquivo PELO SERVIDOR (/api/media/upload), que faz o PUT ao R2 server-side
+ * (sem CORS) — garantindo que o envio funcione em qualquer origem.
  */
 export async function uploadMedia(args: {
   file: File;
@@ -94,31 +96,48 @@ export async function uploadMedia(args: {
   const file = args.file;
   const mimeType = file.type || "application/octet-stream";
 
-  const presign = await requestPresign({
-    scope,
-    category: args.category,
-    mimeType,
-    fileName: file.name,
-    fileSize: file.size,
-  });
+  try {
+    const presign = await requestPresign({
+      scope,
+      category: args.category,
+      mimeType,
+      fileName: file.name,
+      fileSize: file.size,
+    });
 
-  // PUT ao R2 via XHR para progresso real.
-  await new Promise<void>((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open("PUT", presign.uploadUrl);
-    xhr.setRequestHeader("Content-Type", mimeType);
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable && args.onProgress) {
-        args.onProgress(Math.round((e.loaded / e.total) * 100));
-      }
-    };
-    xhr.onload = () =>
-      xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error("Falha no upload para o armazenamento."));
-    xhr.onerror = () => reject(new Error("Falha de rede no upload."));
-    xhr.send(file);
-  });
+    // PUT ao R2 via XHR para progresso real.
+    await new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("PUT", presign.uploadUrl);
+      xhr.setRequestHeader("Content-Type", mimeType);
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable && args.onProgress) {
+          args.onProgress(Math.round((e.loaded / e.total) * 100));
+        }
+      };
+      xhr.onload = () =>
+        xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error("Falha no upload para o armazenamento."));
+      xhr.onerror = () => reject(new Error("Falha de rede no upload."));
+      xhr.send(file);
+    });
 
-  return confirmUpload(presign.id);
+    return confirmUpload(presign.id);
+  } catch (e) {
+    // Fallback: envia pelo servidor (sem CORS). Preserva a mensagem de erro se
+    // o fallback também falhar (ex.: arquivo grande além do limite do servidor).
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      form.append("category", args.category);
+      form.append("scope", scope);
+      const { res, data } = await json("/api/media/upload", { method: "POST", body: form });
+      if (!res.ok) throw new Error(data?.error || "Falha no envio do arquivo.");
+      if (args.onProgress) args.onProgress(100);
+      return data.media as MediaFile;
+    } catch (fallbackErr) {
+      throw e instanceof Error ? e : new Error("Erro no upload.");
+    }
+  }
 }
 
 /** Lista mídias de um tenant/sistema/admin. */
