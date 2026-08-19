@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 
 const LINKS = [
   { href: "/admin", label: "Visão geral", icon: "📊" },
@@ -18,13 +18,6 @@ const LINKS = [
 
 export default function AdminSidebar({ email }: { email: string }) {
   const pathname = usePathname();
-  const router = useRouter();
-
-  async function signOut() {
-    await fetch("/auth/signout", { method: "POST" });
-    router.push("/login");
-    router.refresh();
-  }
 
   return (
     <aside className="w-64 shrink-0 border-r border-gray-200 bg-[#0d3320] text-white min-h-screen flex flex-col sticky top-0 h-screen">
@@ -58,13 +51,15 @@ export default function AdminSidebar({ email }: { email: string }) {
       </nav>
       <div className="px-4 py-4 border-t border-white/10 space-y-3">
         <p className="text-xs text-white/40">Controle global da plataforma</p>
-        <button
-          onClick={signOut}
-          className="flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-white/70 bg-white/5 hover:bg-red-600/20 hover:text-red-200 transition-colors"
-        >
-          <span>🚪</span>
-          Sair
-        </button>
+        <form action="/auth/signout" method="POST">
+          <button
+            type="submit"
+            className="flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-white/70 bg-white/5 hover:bg-red-600/20 hover:text-red-200 transition-colors"
+          >
+            <span>🚪</span>
+            Sair
+          </button>
+        </form>
       </div>
     </aside>
   );

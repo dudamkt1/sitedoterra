@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 
 const USER_LINKS = [
   { href: "/painel", label: "Visão geral", icon: "📊" },
@@ -28,13 +28,6 @@ export default function DashboardSidebar({
   siteSlug: string | null;
 }) {
   const pathname = usePathname();
-  const router = useRouter();
-
-  async function signOut() {
-    await fetch("/auth/signout", { method: "POST" });
-    router.push("/login");
-    router.refresh();
-  }
 
   return (
     <aside className="w-64 shrink-0 border-r border-gray-200 bg-white min-h-screen flex flex-col sticky top-0 h-screen">
@@ -90,13 +83,15 @@ export default function DashboardSidebar({
 
       <div className="px-4 py-4 border-t border-gray-100 space-y-2">
         <p className="text-sm font-medium text-gray-700 truncate">{name}</p>
-        <button
-          onClick={signOut}
-          className="flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
-        >
-          <span>🚪</span>
-          Sair
-        </button>
+        <form action="/auth/signout" method="POST">
+          <button
+            type="submit"
+            className="flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
+          >
+            <span>🚪</span>
+            Sair
+          </button>
+        </form>
       </div>
     </aside>
   );
