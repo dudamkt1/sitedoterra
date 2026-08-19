@@ -40,14 +40,14 @@ function LoginForm() {
     router.refresh();
   }
 
-  async function quickLogin(account: "superadmin" | "client") {
+  async function quickLogin() {
     setError(null);
     setLoading(true);
     try {
       const res = await fetch("/api/test-login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ account }),
+        body: JSON.stringify({}),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -117,24 +117,16 @@ function LoginForm() {
         <div className="space-y-2">
           <button
             type="button"
-            onClick={() => quickLogin("superadmin")}
+            onClick={quickLogin}
             disabled={loading}
             className="w-full btn border border-amber-300 bg-amber-100 text-amber-800 hover:bg-amber-200 !shadow-none"
           >
-            🛡️ Entrar como Super Admin
-          </button>
-          <button
-            type="button"
-            onClick={() => quickLogin("client")}
-            disabled={loading}
-            className="w-full btn border border-amber-300 bg-white text-amber-700 hover:bg-amber-100 !shadow-none"
-          >
-            🧪 Entrar como Conta de Usuário
+            🚀 Entrar como contato@keroimpresso.com.br
           </button>
         </div>
         <p className="mt-3 text-[0.65rem] text-amber-600">
-          Contas de TESTE configuradas em variáveis de ambiente no servidor
-          (<code className="mx-1 font-mono text-amber-700">TEST_SUPERADMIN_EMAIL</code> e{" "}
+          Acesso rápido de TESTE configurado em variáveis de ambiente no servidor
+          (<code className="mx-1 font-mono text-amber-700">TEST_SUPERADMIN_EMAIL</code> /{" "}
           <code className="mx-1 font-mono text-amber-700">TEST_USER_EMAIL</code>). O login só é
           efetivado se as credenciais estiverem configuradas.
         </p>

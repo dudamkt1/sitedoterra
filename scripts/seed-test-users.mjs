@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // ============================================================================
-// SEED — Usuários de teste (Super Admin + Cliente Teste)
+// SEED — Conta única de teste (Super Admin + Usuário)
 // ----------------------------------------------------------------------------
 // Uso:  npm run seed:test
 //       (ou: node scripts/seed-test-users.mjs)
@@ -279,8 +279,8 @@ async function ensureSubscription({ tenantId, planId }) {
   const payload = {
     tenant_id: tenantId,
     plan_id: planId,
-    stripe_customer_id: "cus_TESTE_cliente_teste",
-    stripe_subscription_id: "sub_TESTE_cliente_teste",
+    stripe_customer_id: "cus_TESTE_usuario_teste",
+    stripe_subscription_id: "sub_TESTE_usuario_teste",
     stripe_price_id: STRIPE_MONTHLY_PRICE_ID,
     status: "active",
     current_period_start: now.toISOString(),
@@ -351,16 +351,16 @@ async function ensurePayment({ tenantId, subscriptionId, type, amountCents, piId
 
 async function ensureSiteData({ tenantId }) {
   const data = {
-    name: "Cliente",
+    name: "Usuário",
     surname: "Teste",
-    fullName: "Cliente Teste",
+    fullName: "Usuário Teste",
     role: "Consultora de demonstração · Site de teste",
-    eyebrow: "Site de demonstração — Cliente Teste",
-    description: "Site de demonstração — Cliente Teste. Conteúdo criado apenas para testes da plataforma.",
+    eyebrow: "Site de demonstração — Usuário Teste",
+    description: "Site de demonstração — Usuário Teste. Conteúdo criado apenas para testes da plataforma.",
     whatsapp: null,
     email: USER_EMAIL,
     instagram: null,
-    site_title: "Site de demonstração — Cliente Teste",
+    site_title: "Site de demonstração — Usuário Teste",
     social: {},
   };
 
@@ -369,7 +369,7 @@ async function ensureSiteData({ tenantId }) {
     .upsert({ tenant_id: tenantId, data }, { onConflict: "tenant_id" });
 }
 
-// Seções da HOME que devem ficar ATIVAS no site do Cliente Teste.
+// Seções da HOME que devem ficar ATIVAS no site da conta única de teste.
 // CTA → seção "pricing" (Planos/Oferta), a CTA de conversão da plataforma.
 const SECTIONS_TO_ENABLE = [
   "hero",          // Hero
@@ -415,52 +415,35 @@ async function ensureTenantSections({ tenantId }) {
 // ---------------------------------------------------------------------------
 async function main() {
   console.log("==================================================");
-  console.log(" SEED — Usuários de teste (idempotente)");
+  console.log(" SEED — Conta única de teste (idempotente)");
   console.log(" Supabase:", env.NEXT_PUBLIC_SUPABASE_URL);
   console.log("==================================================\n");
 
-  // ---------- 1) SUPER ADMIN ----------
-  console.log("• Super Admin");
+  // ---------- 1) CONTA ÚNICA DE TESTE (super admin + usuário) ----------
+  console.log("• Conta única de teste (super admin + usuário)");
   const superadmin = await ensureAuthUser({
     email: SUPERADMIN_EMAIL,
     password: SUPERADMIN_PASSWORD,
-    name: "Super Admin Teste",
+    name: "Usuário Teste",
   });
   log.superadmin = superadmin.created ? "criado" : "já existia — atualizado";
 
   await ensureProfile({
     userId: superadmin.id,
     email: SUPERADMIN_EMAIL,
-    name: "Super Admin Teste",
+    name: "Usuário Teste",
     role: "superadmin",
     status: "active",
   });
   console.log(`   ${SUPERADMIN_EMAIL} → role=superadmin · status=active (${log.superadmin})`);
 
-  // ---------- 2) CLIENTE TESTE ----------
-  console.log("\n• Cliente Teste");
-  const client = await ensureAuthUser({
-    email: USER_EMAIL,
-    password: USER_PASSWORD,
-    name: "Cliente Teste",
-  });
-  log.client = client.created ? "criado" : "já existia — atualizado";
-
-  await ensureProfile({
-    userId: client.id,
-    email: USER_EMAIL,
-    name: "Cliente Teste",
-    role: "user",
-    status: "active",
-  });
-
+  // ---------- 2) TENANT / SITE ----------
   const tenantId = await ensureTenant({
-    userId: client.id,
-    slug: "cliente-teste",
-    siteName: "Site de demonstração — Cliente Teste",
+    userId: superadmin.id,
+    slug: "usuarioteste",
+    siteName: "Usuário Teste",
   });
-  console.log(`   ${USER_EMAIL} → role=user · status=active (${log.client})`);
-  console.log(`   tenant: /cliente-teste · site_status=active`);
+  console.log(`   tenant: /usuarioteste · site_status=active`);
 
   // ---------- 3) FINANCEIRO (registros internos de TESTE) ----------
   const planId = await ensurePlanMonthly();
@@ -473,8 +456,8 @@ async function main() {
     subscriptionId: null,
     type: "activation",
     amountCents: 29700,
-    piId: "pi_TESTE_ativacao_cliente_teste",
-    csId: "cs_TESTE_ativacao_cliente_teste",
+    piId: "pi_TESTE_ativacao_usuario_teste",
+    csId: "cs_TESTE_ativacao_usuario_teste",
     invoiceId: null,
   });
   await ensurePayment({
@@ -482,9 +465,9 @@ async function main() {
     subscriptionId,
     type: "subscription",
     amountCents: 4700,
-    piId: "pi_TESTE_mensalidade_cliente_teste",
+    piId: "pi_TESTE_mensalidade_usuario_teste",
     csId: null,
-    invoiceId: "in_TESTE_mensalidade_cliente_teste",
+    invoiceId: "in_TESTE_mensalidade_usuario_teste",
   });
   console.log("   pagamento ativação R$ 297,00 = succeeded (TESTE)");
   console.log("   pagamento mensalidade R$ 47,00 = succeeded (TESTE)");
@@ -496,9 +479,8 @@ async function main() {
 
   console.log("\n==================================================");
   console.log(" ✅ Seed concluído.");
-  console.log("    Super Admin:  " + SUPERADMIN_EMAIL);
-  console.log("    Cliente:      " + USER_EMAIL);
-  console.log("    URL pública:  " + (env.NEXT_PUBLIC_APP_URL || "https://sitedoterra-psi.vercel.app") + "/cliente-teste");
+  console.log("    Conta única:  " + SUPERADMIN_EMAIL + " (super admin + usuário)");
+  console.log("    URL pública:  " + (env.NEXT_PUBLIC_APP_URL || "https://sitedoterra-psi.vercel.app") + "/usuarioteste");
   console.log("==================================================");
 }
 

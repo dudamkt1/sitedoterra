@@ -7,26 +7,21 @@ export const runtime = "nodejs";
 /**
  * ACESSO RÁPIDO — TESTES
  *
- * Login server-side das contas de teste. As credenciais NUNCA chegam ao
- * frontend (ficam apenas em variáveis de ambiente no servidor).
+ * Login server-side da conta única de teste (contato@keroimpresso.com.br).
+ * As credenciais NUNCA chegam ao frontend (ficam apenas em variáveis de
+ * ambiente no servidor).
  *
- * Os botões ficam sempre visíveis na tela /login; o login só é efetivado
- * quando as credenciais (TEST_SUPERADMIN_EMAIL/SENHA e TEST_USER_EMAIL/SENHA)
- * estão configuradas no servidor.
+ * O botão fica sempre visível na tela /login; o login só é efetivado quando
+ * as credenciais (TEST_USER_EMAIL / TEST_USER_PASSWORD) estão configuradas.
  *
- * POST /api/test-login   body: { account: "superadmin" | "client" }
+ * POST /api/test-login
  */
 
 const ACCOUNTS = {
   superadmin: {
-    emailKey: "TEST_SUPERADMIN_EMAIL",
-    passwordKey: "TEST_SUPERADMIN_PASSWORD",
-    redirect: "/admin",
-  },
-  client: {
     emailKey: "TEST_USER_EMAIL",
     passwordKey: "TEST_USER_PASSWORD",
-    redirect: "/painel",
+    redirect: "/admin",
   },
 } as const;
 
@@ -35,11 +30,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const body = await request.json().catch(() => ({}));
-  const account = ACCOUNTS[String(body.account || "") as keyof typeof ACCOUNTS];
-  if (!account) {
-    return NextResponse.json({ error: "Conta de teste inválida." }, { status: 400 });
-  }
+  await request.json().catch(() => ({}));
+  const account = ACCOUNTS.superadmin;
 
   const email = process.env[account.emailKey];
   const password = process.env[account.passwordKey];
