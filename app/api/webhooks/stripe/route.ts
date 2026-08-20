@@ -6,6 +6,7 @@ import {
   getOrCreateCustomer,
   createRecurringSubscription,
   upsertSubscriptionFromStripe,
+  activateTenant,
 } from "@/lib/billing";
 
 export const runtime = "nodejs";
@@ -303,31 +304,4 @@ function mapForDb(status: string): string {
   if (status === "unpaid") return "unpaid";
   if (status === "canceled") return "canceled";
   return status;
-}
-
-/**
- * Ativa tenant + perfil: marca conta ativa, site ativo.
- * Só ativa quando há assinatura ativa (evita ativação sem pagamento recorrente confirmado).
- */
-async function activateTenant(tenantId: string, userId?: string) {
-  const admin = createAdminClient();
-  const { data: sub } = await admin
-    .from("subscriptions")
-    .select("status")
-    .eq("tenant_id", tenantId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (sub?.status === "active") {
-    await admin.from("tenants").update({ site_status: "active", suspended_at: null }).eq("id", tenantId);
-    if (userId) {
-      await admin.from("profiles").update({ status: "active", activated_at: new Date().toISOString() }).eq("user_id", userId);
-    } else {
-      const { data: t } = await admin.from("tenants").select("user_id").eq("id", tenantId).single();
-      if (t?.user_id) {
-        await admin.from("profiles").update({ status: "active", activated_at: new Date().toISOString() }).eq("user_id", t.user_id);
-      }
-    }
-  }
 }

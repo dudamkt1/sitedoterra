@@ -36,15 +36,17 @@ export function SubscriptionManager({
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [gateway, setGateway] = useState<"stripe" | "mercadopago">("stripe");
 
   const paymentOk = searchParams.get("sucesso") === "1";
 
   const activationPaid = activation?.status === "succeeded";
 
-  async function checkout(planId: string) {
+  async function checkout(planId: string, gateway: "stripe" | "mercadopago" = "stripe") {
     setLoading(true);
     setMsg(null);
-    const res = await fetch("/api/checkout", {
+    const endpoint = gateway === "mercadopago" ? "/api/checkout/mp" : "/api/checkout";
+    const res = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ planId }),
@@ -128,6 +130,9 @@ export function SubscriptionManager({
             {subscription?.plan?.name || "Nenhum plano ativo"}
           </p>
           {monthlyPriceCents > 0 && <p className="text-sm text-gray-400 mt-1">{formatBRL(monthlyPriceCents)}/mês</p>}
+          {subscription?.gateway === "mercadopago" && (
+            <p className="text-xs text-gray-400 mt-1">Pagamento via Mercado Pago</p>
+          )}
         </div>
         <div className="card">
           <p className="text-xs uppercase tracking-wider text-gray-400 font-semibold">Status</p>
@@ -165,9 +170,11 @@ export function SubscriptionManager({
         <div className="flex flex-wrap gap-3">
           {isActive && billingEnabled && (
             <>
-              <button className="btn btn-outline" onClick={openBillingPortal} disabled={loading}>
-                💳 Atualizar forma de pagamento
-              </button>
+              {subscription?.gateway !== "mercadopago" && (
+                <button className="btn btn-outline" onClick={openBillingPortal} disabled={loading}>
+                  💳 Atualizar forma de pagamento
+                </button>
+              )}
               {allowCancel && !confirmCancel && (
                 <button className="btn btn-danger" onClick={() => setConfirmCancel(true)} disabled={loading}>
                   Cancelar assinatura
@@ -189,11 +196,26 @@ export function SubscriptionManager({
             </button>
           )}
 
-          {!subscription && billingEnabled && plans.map((p) => (
-            <button key={p.id} className="btn btn-gold" onClick={() => checkout(p.id)} disabled={loading}>
-              Ativar site ({p.name}) — {formatBRL(monthlyPriceCents)}/mês + ativação {formatBRL(activationPriceCents)}
-            </button>
-          ))}
+          {!subscription && billingEnabled && (
+            <>
+              <div className="w-full flex flex-wrap items-center gap-4 text-sm">
+                <span className="text-gray-500 font-medium">Forma de pagamento:</span>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" name="gateway" checked={gateway === "stripe"} onChange={() => setGateway("stripe")} />
+                  💳 Cartão (Stripe)
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" name="gateway" checked={gateway === "mercadopago"} onChange={() => setGateway("mercadopago")} />
+                  Mercado Pago (PIX / Cartão)
+                </label>
+              </div>
+              {plans.map((p) => (
+                <button key={p.id} className="btn btn-gold" onClick={() => checkout(p.id, gateway)} disabled={loading}>
+                  Ativar site ({p.name}) — {formatBRL(monthlyPriceCents)}/mês + ativação {formatBRL(activationPriceCents)}
+                </button>
+              ))}
+            </>
+          )}
 
           {!billingEnabled && (
             <p className="text-sm text-emerald-700 bg-emerald-50 rounded-lg px-4 py-3">
@@ -228,7 +250,10 @@ export function SubscriptionManager({
                     <td><StatusBadge status={h.status} /></td>
                   </tr>
                 ))}
-                {payments.filter((p) => !billingHistory.some((b) => b.stripe_charge_id === p.stripe_payment_intent_id)).map((p) => (
+                {payments.filter((p) => !billingHistory.some((b) =>
+                  (b.stripe_charge_id && b.stripe_charge_id === p.stripe_payment_intent_id) ||
+                  (b.mercadopago_payment_id && b.mercadopago_payment_id === p.mercadopago_payment_id)
+                )).map((p) => (
                   <tr key={p.id}>
                     <td>{formatDate(p.created_at)}</td>
                     <td>{p.type === "activation" ? "Ativação" : p.type === "subscription" ? "Mensalidade" : p.type}</td>

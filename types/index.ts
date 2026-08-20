@@ -63,9 +63,16 @@ export interface Subscription {
   id: string;
   tenant_id: string;
   plan_id: string | null;
+  /** Gateway de pagamento da assinatura (padrão: stripe). */
+  gateway: "stripe" | "mercadopago";
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
   stripe_price_id: string | null;
+  mercadopago_customer_id: string | null;
+  mercadopago_subscription_id: string | null;
+  mercadopago_plan_id: string | null;
+  /** Termos contratuais congelados na contratação (preços não mudam para contratos existentes). */
+  snapshot: Record<string, unknown> | null;
   status: SubscriptionStatus;
   current_period_start: string | null;
   current_period_end: string | null;
@@ -132,6 +139,10 @@ export interface Plan {
   activation_price_id: string | null;
   /** Price ID da mensalidade no Stripe (recorrente). */
   monthly_price_id: string | null;
+  /** Cache do plano recorrente do Mercado Pago (criado automaticamente). */
+  mercadopago_plan_id: string | null;
+  /** Valor da mensalidade no momento em que o plano MP foi criado (cache). */
+  mercadopago_plan_amount_cents: number | null;
   /** Limite de armazenamento de mídia (bytes) permitido por este plano. */
   media_quota_bytes: number;
   is_active: boolean;

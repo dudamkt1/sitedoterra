@@ -82,6 +82,42 @@ export async function getDashboardContext(): Promise<DashboardContext | null> {
 
   const subscription = (subResult.data as (Subscription & { plan?: Plan | null }) | null) || null;
 
+  // Finalização "preguiçosa" de cancelamento agendado no Mercado Pago:
+  // sem cron, quando o período pago termina, o próximo acesso ao painel
+  // converte o cancelamento agendado em "canceled" e suspende o site.
+  if (
+    subscription &&
+    tenant &&
+    subscription.gateway === "mercadopago" &&
+    subscription.cancel_at_period_end &&
+    (subscription.status === "active" || subscription.status === "paused") &&
+    subscription.current_period_end &&
+    new Date(subscription.current_period_end).getTime() <= Date.now()
+  ) {
+    await admin
+      .from("subscriptions")
+      .update({
+        status: "canceled",
+        canceled_at: new Date().toISOString(),
+        cancel_at_period_end: false,
+      })
+      .eq("id", subscription.id);
+
+    const { data: tenantRow } = await admin
+      .from("tenants")
+      .select("monthly_billing_enabled")
+      .eq("id", tenant.id)
+      .maybeSingle();
+    if (tenantRow?.monthly_billing_enabled !== false) {
+      await admin
+        .from("tenants")
+        .update({ site_status: "suspended", suspended_at: new Date().toISOString() })
+        .eq("id", tenant.id);
+    }
+    subscription.status = "canceled";
+    subscription.cancel_at_period_end = false;
+  }
+
   return {
     profile,
     tenant: tenant ? { ...tenant, site_data: (settingsResult.data?.data as Record<string, unknown>) || null } : null,

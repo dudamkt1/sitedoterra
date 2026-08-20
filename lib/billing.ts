@@ -105,12 +105,40 @@ export async function getOrCreateCustomer(metadata: BillingUser): Promise<Stripe
  * Adiciona `months` meses a uma data, preservando o dia do mês
  * (com clamp para meses mais curtos, ex.: 31 → último dia).
  */
-function addMonths(date: Date, months: number): Date {
+export function addMonths(date: Date, months: number): Date {
   const d = new Date(date);
   const day = d.getDate();
   d.setMonth(d.getMonth() + months);
   if (d.getDate() < day) d.setDate(0);
   return d;
+}
+
+/**
+ * Ativa tenant + perfil: marca conta ativa e site ativo.
+ * Só ativa quando há assinatura ativa (evita ativação sem pagamento recorrente confirmado).
+ * Fonte compartilhada entre os webhooks de Stripe e Mercado Pago.
+ */
+export async function activateTenant(tenantId: string, userId?: string) {
+  const admin = createAdminClient();
+  const { data: sub } = await admin
+    .from("subscriptions")
+    .select("status")
+    .eq("tenant_id", tenantId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (sub?.status === "active") {
+    await admin.from("tenants").update({ site_status: "active", suspended_at: null }).eq("id", tenantId);
+    if (userId) {
+      await admin.from("profiles").update({ status: "active", activated_at: new Date().toISOString() }).eq("user_id", userId);
+    } else {
+      const { data: t } = await admin.from("tenants").select("user_id").eq("id", tenantId).single();
+      if (t?.user_id) {
+        await admin.from("profiles").update({ status: "active", activated_at: new Date().toISOString() }).eq("user_id", t.user_id);
+      }
+    }
+  }
 }
 
 /**

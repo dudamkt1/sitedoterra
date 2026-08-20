@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser, getProfile } from "@/lib/auth";
 import { ensureTenantForUser } from "@/lib/onboarding";
 import { getOrCreateCustomer, createRecurringSubscription } from "@/lib/billing";
+import { createRecurringSubscriptionMp, resumeMpSubscription } from "@/lib/mercadopago";
 
 export const runtime = "nodejs";
 
@@ -62,6 +63,93 @@ export async function POST() {
       entity_type: "subscription",
       entity_id: sub.id,
       metadata: { tenant_id: tenant.id, monthly_billing_enabled: false },
+    });
+    return NextResponse.json({ success: true });
+  }
+
+  // ---- Mercado Pago ----
+  if (sub.gateway === "mercadopago") {
+    const plan = sub.plan as {
+      id: string;
+      name: string;
+      monthly_price_cents: number;
+      activation_price_cents: number;
+      trial_months: number;
+    } | null;
+
+    // Tenta retomar a assinatura pausada existente no MP (cancelamento agendado).
+    if (sub.mercadopago_subscription_id && (sub.status === "paused" || sub.status === "canceled" || sub.cancel_at_period_end)) {
+      try {
+        await resumeMpSubscription(sub.mercadopago_subscription_id);
+        await admin.from("subscriptions").update({
+          status: "active",
+          cancel_at_period_end: false,
+          reactivated_at: new Date().toISOString(),
+          canceled_at: null,
+        }).eq("id", sub.id);
+        await admin.from("tenants").update({ site_status: "active", suspended_at: null, reactivated_at: new Date().toISOString() }).eq("id", tenant.id);
+        await admin.from("profiles").update({ status: "active" }).eq("user_id", user.id);
+        await admin.from("audit_logs").insert({
+          actor_id: user.id,
+          actor_role: "user",
+          action: "subscription.reactivated",
+          entity_type: "subscription",
+          entity_id: sub.id,
+          metadata: { tenant_id: tenant.id, gateway: "mercadopago" },
+        });
+        return NextResponse.json({ success: true });
+      } catch {
+        // assinatura MP não existe mais → cria nova abaixo
+      }
+    }
+
+    if (!plan) return NextResponse.json({ error: "Plano não encontrado" }, { status: 400 });
+
+    const trialMonths = Math.max(1, plan.trial_months || 3);
+    const trialEnd = new Date();
+    trialEnd.setMonth(trialEnd.getMonth() + trialMonths);
+    const monthlyAmountCents = plan.monthly_price_cents;
+
+    const mpSub = await createRecurringSubscriptionMp({
+      planId: plan.id,
+      tenantId: tenant.id,
+      email: profile?.email || "",
+      monthlyAmountCents,
+      trialEnd: trialEnd.toISOString(),
+    });
+
+    await admin.from("subscriptions").insert({
+      tenant_id: tenant.id,
+      plan_id: plan.id,
+      gateway: "mercadopago",
+      mercadopago_subscription_id: mpSub.id,
+      mercadopago_plan_id: mpSub.plan_id || null,
+      status: "active",
+      current_period_start: new Date().toISOString(),
+      current_period_end: trialEnd.toISOString(),
+      next_billing_at: trialEnd.toISOString(),
+      trial_end: trialEnd.toISOString(),
+      reactivated_at: new Date().toISOString(),
+      snapshot: {
+        gateway: "mercadopago",
+        plan_id: plan.id,
+        currency: "brl",
+        activation_amount_cents: plan.activation_price_cents,
+        monthly_amount_cents: monthlyAmountCents,
+        trial_months: trialMonths,
+        trial_period_days: trialMonths * 30,
+      },
+    });
+
+    await admin.from("tenants").update({ site_status: "active", suspended_at: null, reactivated_at: new Date().toISOString() }).eq("id", tenant.id);
+    await admin.from("profiles").update({ status: "active" }).eq("user_id", user.id);
+    await admin.from("audit_logs").insert({
+      actor_id: user.id,
+      actor_role: "user",
+      action: "subscription.reactivated",
+      entity_type: "subscription",
+      entity_id: sub.id,
+      metadata: { tenant_id: tenant.id, gateway: "mercadopago", new_subscription: true },
     });
     return NextResponse.json({ success: true });
   }

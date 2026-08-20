@@ -3,11 +3,15 @@ import { getStripe } from "@/lib/stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/auth";
 import { ensureTenantForUser } from "@/lib/onboarding";
+import { pauseMpSubscription } from "@/lib/mercadopago";
 
 export const runtime = "nodejs";
 
 /**
- * Cancela a assinatura no Stripe (ao final do período vigente).
+ * Cancela a assinatura ao final do período vigente.
+ *  - Stripe: cancel_at_period_end (webhook confirma no fim do período).
+ *  - Mercado Pago: pausa a assinatura (para as cobranças, mantém o registro e
+ *    permite reativação); o site segue público até o fim do período pago.
  * Dados NÃO são apagados; a recorrência é interrompida.
  */
 export async function POST() {
@@ -27,6 +31,42 @@ export async function POST() {
     .limit(1)
     .maybeSingle();
 
+  if (!sub) {
+    return NextResponse.json({ error: "Nenhuma assinatura ativa para cancelar" }, { status: 400 });
+  }
+
+  // ---- Mercado Pago ----
+  if (sub.gateway === "mercadopago") {
+    if (!sub.mercadopago_subscription_id) {
+      return NextResponse.json({ error: "Nenhuma assinatura ativa para cancelar" }, { status: 400 });
+    }
+    try {
+      await pauseMpSubscription(sub.mercadopago_subscription_id);
+    } catch (err) {
+      console.error("Falha ao pausar assinatura no Mercado Pago", err);
+      return NextResponse.json({ error: "Falha ao cancelar a assinatura. Tente novamente." }, { status: 502 });
+    }
+
+    // Cancelamento agendado: site público até o fim do período; finalização
+    // automática ocorre ao expirar o período (getDashboardContext) ou na reativação.
+    await admin.from("subscriptions").update({
+      cancel_at_period_end: true,
+      canceled_at: new Date().toISOString(),
+    }).eq("id", sub.id);
+
+    await admin.from("audit_logs").insert({
+      actor_id: user.id,
+      actor_role: "user",
+      action: "subscription.cancel_requested",
+      entity_type: "subscription",
+      entity_id: sub.id,
+      metadata: { tenant_id: tenant.id, gateway: "mercadopago" },
+    });
+
+    return NextResponse.json({ success: true });
+  }
+
+  // ---- Stripe ----
   if (!sub?.stripe_subscription_id) {
     return NextResponse.json({ error: "Nenhuma assinatura ativa para cancelar" }, { status: 400 });
   }
