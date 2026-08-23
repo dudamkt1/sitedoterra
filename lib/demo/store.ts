@@ -10,22 +10,14 @@ import {
 } from "./storage";
 import type { DemoData } from "./types";
 
-const DEMO_FLAG = "sitedoterra_demo_active";
-
-function detectDemoActive(): boolean {
-  if (typeof document === "undefined") return false;
-  return document.cookie.split("; ").some((c) => c.startsWith("sitedoterra_demo="));
-}
-
 export function useDemoStore() {
   const [ready, setReady] = useState(false);
   const [data, setData] = useState<DemoData | null>(null);
 
   useEffect(() => {
-    if (!detectDemoActive()) {
-      setReady(true);
-      return;
-    }
+    // Os componentes de demonstração só são renderizados quando o servidor
+    // valida o cookie DEMO (httpOnly, invisível para document.cookie).
+    // Portanto basta carregar os dados locais do dispositivo.
     setData(loadDemoData());
     setReady(true);
   }, []);
@@ -59,5 +51,3 @@ export function useDemoStore() {
     genId,
   };
 }
-
-export { DEMO_FLAG };
