@@ -78,6 +78,11 @@ export interface DemoFinanceEntry {
   date: string;
 }
 
+export interface DemoSocialLink {
+  enabled: boolean;
+  url: string;
+}
+
 export interface DemoSiteData {
   site_title: string;
   name: string;
@@ -95,20 +100,25 @@ export interface DemoSiteData {
   logoMode: "text" | "image";
   logoText: string;
   logoUrl: string;
+  logoLightUrl: string;
+  faviconUrl: string;
   primaryColor: string;
   accentColor: string;
+  stats: {
+    years: string;
+    clients: string;
+    satisfaction: string;
+  };
+  social: {
+    instagram: DemoSocialLink;
+    facebook: DemoSocialLink;
+    youtube: DemoSocialLink;
+  };
 }
 
-export interface DemoSections {
-  hero: boolean;
-  stats: boolean;
-  about: boolean;
-  products: boolean;
-  testimonials: boolean;
-  history: boolean;
-  faq: boolean;
-  schedule: boolean;
-  cta: boolean;
+export interface DemoSectionState {
+  enabled: boolean;
+  content: Record<string, unknown>;
 }
 
 export interface DemoData {
@@ -121,7 +131,7 @@ export interface DemoData {
   media: DemoMediaItem[];
   finance: DemoFinanceEntry[];
   site: DemoSiteData;
-  sections: DemoSections;
+  sections: Record<string, DemoSectionState>;
   crmSettings: {
     modules: Record<string, boolean>;
     loyalty: {

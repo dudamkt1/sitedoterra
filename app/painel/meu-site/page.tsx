@@ -9,7 +9,7 @@ export default async function MeuSitePage() {
   if (isDemo) {
     return (
       <div className="space-y-8">
-        <SectionTitle sub="Personalize a aparência e as seções do seu site (somente neste dispositivo).">
+        <SectionTitle sub="Edite tudo à vontade — logo, conteúdo, redes sociais e seções. Salvo somente neste dispositivo.">
           Meu Site
         </SectionTitle>
         <PainelDemoMeuSite />

@@ -1,12 +1,64 @@
 "use client";
 
 import { DEMO_NAMESPACE, buildDemoSeed } from "./seed";
-import type { DemoData } from "./types";
+import type { DemoData, DemoSectionState } from "./types";
 
 const STORAGE_KEY = `${DEMO_NAMESPACE}data`;
 
 function isBrowser() {
   return typeof window !== "undefined" && typeof localStorage !== "undefined";
+}
+
+/**
+ * Une dados salvos (formatos antigos incluídos) com o seed atual, garantindo
+ * que campos/seções novos existam mesmo para quem já tinha demo no navegador.
+ */
+function normalizeDemoData(raw: unknown): DemoData {
+  const seed = buildDemoSeed();
+  if (!raw || typeof raw !== "object") return seed;
+  const saved = raw as Partial<DemoData> & { sections?: Record<string, unknown> };
+
+  const merged: DemoData = {
+    ...seed,
+    ...saved,
+    site: { ...seed.site, ...(saved.site || {}) },
+  } as DemoData;
+
+  const stats = (merged.site as { stats?: unknown }).stats;
+  merged.site.stats =
+    stats && typeof stats === "object"
+      ? { ...seed.site.stats, ...(stats as Record<string, string>) }
+      : seed.site.stats;
+
+  const social = (merged.site as { social?: unknown }).social;
+  if (!social || typeof social !== "object") {
+    merged.site.social = seed.site.social;
+  } else {
+    const s: DemoData["site"]["social"] = { ...seed.site.social };
+    for (const key of Object.keys(s) as Array<keyof DemoData["site"]["social"]>) {
+      s[key] = { ...s[key], ...((social as Record<string, object>)[key] || {}) };
+    }
+    merged.site.social = s;
+  }
+
+  const sections: Record<string, DemoSectionState> = {};
+  for (const [key, def] of Object.entries(seed.sections)) {
+    const savedSection = (saved.sections || {})[key];
+    if (typeof savedSection === "boolean") {
+      sections[key] = { enabled: savedSection, content: def.content };
+    } else if (savedSection && typeof savedSection === "object") {
+      const obj = savedSection as { enabled?: boolean; content?: Record<string, unknown> };
+      sections[key] = {
+        enabled: obj.enabled !== false,
+        content: { ...def.content, ...(obj.content || {}) },
+      };
+    } else {
+      sections[key] = def;
+    }
+  }
+  merged.sections = sections;
+
+  return merged;
 }
 
 export function loadDemoData(): DemoData {
@@ -18,7 +70,7 @@ export function loadDemoData(): DemoData {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(seed));
       return seed;
     }
-    return JSON.parse(raw) as DemoData;
+    return normalizeDemoData(JSON.parse(raw));
   } catch {
     const seed = buildDemoSeed();
     try {

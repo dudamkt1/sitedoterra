@@ -12,6 +12,8 @@ interface SectionContentEditorProps {
   onChange: (next: Record<string, unknown>) => void;
   /** Escopo de mídia: "system" (Super Admin/global) ou "tenant" (padrão). */
   mediaScope?: "tenant" | "system";
+  /** Esconde o botão da biblioteca (usado na demonstração local). */
+  disableLibrary?: boolean;
 }
 
 interface Suggestion {
@@ -63,7 +65,7 @@ const AI_KIND_PROMPTS: Record<string, string> = {
   default: "Escreva um texto claro e elegante em português do Brasil.",
 };
 
-export function SectionContentEditor({ sectionType, value, onChange, mediaScope }: SectionContentEditorProps) {
+export function SectionContentEditor({ sectionType, value, onChange, mediaScope, disableLibrary }: SectionContentEditorProps) {
   const fields = useMemo(() => SECTION_CONTENT_FIELDS[sectionType] || [], [sectionType]);
   const [suggestions, setSuggestions] = useState<Record<string, Suggestion>>({});
 
@@ -146,14 +148,16 @@ export function SectionContentEditor({ sectionType, value, onChange, mediaScope 
                   type="text"
                   className="input flex-1"
                   value={typeof current === "string" ? current : ""}
-                  placeholder="URL da imagem ou escolha na biblioteca"
+                  placeholder={disableLibrary ? "URL da imagem" : "URL da imagem ou escolha na biblioteca"}
                   onChange={(e) => onChange(setPath(value, path, e.target.value))}
                 />
-                <MediaPicker
-                  scope={mediaScope || "tenant"}
-                  value={typeof current === "string" ? current : ""}
-                  onChange={(url) => onChange(setPath(value, path, url))}
-                />
+                {!disableLibrary && (
+                  <MediaPicker
+                    scope={mediaScope || "tenant"}
+                    value={typeof current === "string" ? current : ""}
+                    onChange={(url) => onChange(setPath(value, path, url))}
+                  />
+                )}
               </div>
               {typeof current === "string" && current && (
                 <div className="mt-2 rounded-lg bg-gray-50 p-2 inline-block">

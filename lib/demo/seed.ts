@@ -1,4 +1,22 @@
 import type { DemoData } from "./types";
+import { DEFAULT_SECTION_CONTENT } from "@/lib/site-sections";
+
+/** Tipos de seção gerenciáveis (exclui header/footer, como no painel real). */
+export const DEMO_SECTION_TYPES = [
+  "hero",
+  "trustbar",
+  "about",
+  "testimonials",
+  "story",
+  "video",
+  "booking",
+  "tips",
+  "products",
+  "faq",
+  "pricing",
+] as const;
+
+const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v));
 
 const now = () => new Date().toISOString();
 const daysAgo = (n: number) =>
@@ -361,20 +379,27 @@ export function buildDemoSeed(): DemoData {
       logoMode: "text",
       logoText: "Carla doTERRA",
       logoUrl: "",
+      logoLightUrl: "",
+      faviconUrl: "",
       primaryColor: "#1D5C3A",
       accentColor: "#C7A661",
+      stats: {
+        years: "7+",
+        clients: "850+",
+        satisfaction: "98%",
+      },
+      social: {
+        instagram: { enabled: true, url: "https://instagram.com/carla.doterra" },
+        facebook: { enabled: false, url: "" },
+        youtube: { enabled: false, url: "" },
+      },
     },
-    sections: {
-      hero: true,
-      stats: true,
-      about: true,
-      products: true,
-      testimonials: true,
-      history: true,
-      faq: true,
-      schedule: true,
-      cta: true,
-    },
+    sections: Object.fromEntries(
+      DEMO_SECTION_TYPES.map((type) => [
+        type,
+        { enabled: true, content: clone(DEFAULT_SECTION_CONTENT[type]) },
+      ])
+    ),
     crmSettings: {
       modules: {
         clients: true,
