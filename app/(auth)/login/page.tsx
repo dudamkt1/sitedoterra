@@ -20,6 +20,8 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showAdminArea, setShowAdminArea] = useState(false);
+  const [demoStarting, setDemoStarting] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -55,11 +57,30 @@ function LoginForm() {
         setLoading(false);
         return;
       }
-      router.push(json.redirect || "/painel");
+      router.push(json.redirect || "/admin");
       router.refresh();
     } catch {
       setError("Falha de conexão com o servidor. Tente novamente.");
       setLoading(false);
+    }
+  }
+
+  async function startDemo() {
+    setError(null);
+    setDemoStarting(true);
+    try {
+      const res = await fetch("/api/demo/start", { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error || "Não foi possível iniciar a demonstração.");
+        setDemoStarting(false);
+        return;
+      }
+      router.push(json.redirect || "/painel");
+      router.refresh();
+    } catch {
+      setError("Falha de conexão com o servidor. Tente novamente.");
+      setDemoStarting(false);
     }
   }
 
@@ -110,27 +131,70 @@ function LoginForm() {
         </Link>
       </p>
 
-      <div className="mt-8 rounded-xl border border-dashed border-amber-400 bg-amber-50 p-4">
-        <p className="text-[0.7rem] font-bold uppercase tracking-wider text-amber-700 mb-3">
-          Acesso rápido — Testes
+      <div className="mt-8 relative rounded-xl border-2 border-[#1d5c3a] bg-gradient-to-br from-[#e5f4ea] via-[#faf8f2] to-[#fdf6e9] p-5 shadow-md overflow-hidden">
+        <span
+          aria-hidden
+          className="absolute -right-4 -top-4 text-6xl opacity-10 select-none pointer-events-none"
+        >
+          🔓
+        </span>
+
+        <span className="inline-block mb-2 rounded-full bg-[#1d5c3a] px-3 py-1 text-[0.6rem] font-bold uppercase tracking-widest text-white">
+          Acesso rápido • Sem cadastro
+        </span>
+
+        <h2
+          className="text-lg font-bold text-[#1d5c3a] leading-snug mb-1.5"
+          style={{ fontFamily: "var(--font-display)" }}
+        >
+          👀 Acesse e veja por dentro tudo o que você poderá adquirir!
+        </h2>
+
+        <p className="text-xs text-gray-700 leading-relaxed mb-3">
+          Entre com <strong>1 clique</strong> e explore o painel completo como se
+          o site já fosse seu: edite seções, teste a IA, gerencie clientes no
+          CRM e muito mais.
         </p>
-        <div className="space-y-2">
+
+        <ul className="text-xs text-gray-600 space-y-1 mb-4">
+          <li>✅ Tudo liberado para você explorar</li>
+          <li>🔒 Suas alterações ficam salvas apenas neste navegador/celular</li>
+          <li>🛡️ Nada é alterado em nenhum site real</li>
+        </ul>
+
+        <button
+          type="button"
+          onClick={startDemo}
+          disabled={demoStarting || loading}
+          className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-[#1d5c3a] px-4 py-3 text-sm font-bold text-white shadow hover:bg-[#154730] transition-colors disabled:opacity-60"
+        >
+          ⚡{" "}
+          {demoStarting ? "Preparando seu acesso..." : "Entrar agora — ver demonstração"}
+        </button>
+      </div>
+
+      <div className="mt-8 pt-4 border-t border-gray-100 flex justify-center">
+        <button
+          type="button"
+          onClick={() => setShowAdminArea((v) => !v)}
+          className="text-[0.65rem] text-gray-400 hover:text-gray-600 transition-colors"
+        >
+          {showAdminArea ? "Ocultar área de testes" : "Área de testes"}
+        </button>
+      </div>
+
+      {showAdminArea && (
+        <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
           <button
             type="button"
             onClick={quickLogin}
             disabled={loading}
-            className="w-full btn border border-amber-300 bg-amber-100 text-amber-800 hover:bg-amber-200 !shadow-none"
+            className="w-full text-xs font-medium text-gray-700 hover:text-gray-900 underline underline-offset-2"
           >
-            🚀 Entrar como contato@keroimpresso.com.br
+            Entrar como administrador de testes
           </button>
         </div>
-        <p className="mt-3 text-[0.65rem] text-amber-600">
-          Acesso rápido de TESTE configurado em variáveis de ambiente no servidor
-          (<code className="mx-1 font-mono text-amber-700">TEST_SUPERADMIN_EMAIL</code> /{" "}
-          <code className="mx-1 font-mono text-amber-700">TEST_USER_EMAIL</code>). O login só é
-          efetivado se as credenciais estiverem configuradas.
-        </p>
-      </div>
+      )}
     </div>
   );
 }

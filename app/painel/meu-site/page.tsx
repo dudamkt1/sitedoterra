@@ -1,13 +1,27 @@
-import { getDashboardContext } from "@/lib/auth";
+import { getPainelContext } from "@/lib/demo/painel-context";
 import { SectionTitle } from "@/components/dashboard/ui";
-import { SiteManager } from "@/components/dashboard/SiteManager";
-import { SiteSectionsManager } from "@/components/dashboard/SiteSectionsManager";
+import { PainelDemoMeuSite } from "@/components/demo/PainelDemoMeuSite";
 
 export default async function MeuSitePage() {
-  const ctx = await getDashboardContext();
-  if (!ctx?.profile) return null;
+  const { isDemo, ctx } = await getPainelContext();
+  if (!ctx) return null;
+
+  if (isDemo) {
+    return (
+      <div className="space-y-8">
+        <SectionTitle sub="Personalize a aparência e as seções do seu site (somente neste dispositivo).">
+          Meu Site
+        </SectionTitle>
+        <PainelDemoMeuSite />
+      </div>
+    );
+  }
 
   const siteData = (ctx.tenant?.site_data || {}) as Record<string, any>;
+
+  // Lazy-load the real components to keep the demo path self-contained
+  const { SiteManager } = await import("@/components/dashboard/SiteManager");
+  const { SiteSectionsManager } = await import("@/components/dashboard/SiteSectionsManager");
 
   return (
     <div className="space-y-8">

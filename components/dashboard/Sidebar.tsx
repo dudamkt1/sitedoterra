@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useState } from "react";
 
 const USER_LINKS = [
   { href: "/painel", label: "Visão geral", icon: "📊" },
@@ -21,13 +22,31 @@ export default function DashboardSidebar({
   email,
   isSuperAdmin,
   siteSlug,
+  isDemo,
 }: {
   name: string;
   email: string;
   isSuperAdmin: boolean;
   siteSlug: string | null;
+  isDemo?: boolean;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [leaving, setLeaving] = useState(false);
+
+  async function leaveDemo() {
+    if (!confirm("Sair do modo demonstração? Suas alterações locais serão preservadas neste dispositivo.")) {
+      return;
+    }
+    setLeaving(true);
+    try {
+      await fetch("/api/demo/exit", { method: "POST" });
+      router.push("/login");
+      router.refresh();
+    } finally {
+      setLeaving(false);
+    }
+  }
 
   return (
     <aside className="w-64 shrink-0 border-r border-gray-200 bg-white min-h-screen flex flex-col sticky top-0 h-screen">
@@ -38,7 +57,7 @@ export default function DashboardSidebar({
         <p className="text-xs text-gray-400 mt-1 truncate">{email}</p>
       </div>
 
-      <nav className="flex-1 py-4 px-3 space-y-1">
+      <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
         {USER_LINKS.map((l) => {
           const active = l.href === "/painel/crm"
             ? pathname === "/painel/crm" || pathname.startsWith("/painel/crm/")
@@ -57,7 +76,7 @@ export default function DashboardSidebar({
           );
         })}
 
-        {isSuperAdmin && (
+        {isSuperAdmin && !isDemo && (
           <Link
             href="/admin"
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-[#92400e] bg-amber-50 hover:bg-amber-100 mt-4"
@@ -67,7 +86,7 @@ export default function DashboardSidebar({
           </Link>
         )}
 
-        {siteSlug && (
+        {siteSlug && !isDemo && (
           <div className="mt-6 px-3">
             <p className="text-[0.65rem] uppercase tracking-wider text-gray-400 mb-2">Seu site público</p>
             <Link
@@ -83,15 +102,27 @@ export default function DashboardSidebar({
 
       <div className="px-4 py-4 border-t border-gray-100 space-y-2">
         <p className="text-sm font-medium text-gray-700 truncate">{name}</p>
-        <form action="/auth/signout" method="POST">
+        {isDemo ? (
           <button
-            type="submit"
-            className="flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
+            type="button"
+            onClick={leaveDemo}
+            disabled={leaving}
+            className="flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-amber-800 bg-amber-50 hover:bg-amber-100 transition-colors disabled:opacity-50"
           >
             <span>🚪</span>
-            Sair
+            {leaving ? "Saindo..." : "Sair da demonstração"}
           </button>
-        </form>
+        ) : (
+          <form action="/auth/signout" method="POST">
+            <button
+              type="submit"
+              className="flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
+            >
+              <span>🚪</span>
+              Sair
+            </button>
+          </form>
+        )}
       </div>
     </aside>
   );

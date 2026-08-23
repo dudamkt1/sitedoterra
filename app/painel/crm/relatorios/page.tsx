@@ -1,19 +1,9 @@
-import { getDashboardContext } from "@/lib/auth";
-import { createAdminClient } from "@/lib/supabase/admin";
-import CrmNav from "@/components/crm/CrmNav";
-import CrmReports from "@/components/crm/CrmReports";
-import { getCrmSettings } from "@/lib/crm";
+import { getPainelContext } from "@/lib/demo/painel-context";
+import { PainelDemoRelatorios } from "@/components/demo/PainelDemoRelatorios";
+import RealPage from "./real-page";
 
 export default async function CrmRelatoriosPage() {
-  const ctx = await getDashboardContext();
-  if (!ctx?.profile) return null;
-  const admin = createAdminClient();
-  const settings = ctx.tenant ? await getCrmSettings(admin, ctx.tenant.id) : null;
-
-  return (
-    <div>
-      <CrmNav modules={settings?.modules || {}} activePrefix="/painel/crm/relatorios" />
-      <CrmReports />
-    </div>
-  );
+  const { isDemo } = await getPainelContext();
+  if (isDemo) return <PainelDemoRelatorios />;
+  return <RealPage />;
 }

@@ -1,11 +1,25 @@
-import { getDashboardContext } from "@/lib/auth";
+import { getPainelContext } from "@/lib/demo/painel-context";
 import { SectionTitle, StatusBadge } from "@/components/dashboard/ui";
 import { formatDate } from "@/lib/utils";
+import { PainelDemoConta } from "@/components/demo/PainelDemoConta";
 
 export default async function ContaPage() {
-  const ctx = await getDashboardContext();
-  if (!ctx?.profile) return null;
+  const { isDemo, ctx } = await getPainelContext();
+  if (!ctx) return null;
+
+  if (isDemo) {
+    return (
+      <div>
+        <SectionTitle sub="Esta conta é uma demonstração. Nada é gravado em servidores reais.">
+          Minha Conta
+        </SectionTitle>
+        <PainelDemoConta />
+      </div>
+    );
+  }
+
   const p = ctx.profile;
+  if (!p) return null;
 
   return (
     <div>

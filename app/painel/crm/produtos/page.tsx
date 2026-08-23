@@ -1,19 +1,9 @@
-import { getDashboardContext } from "@/lib/auth";
-import { createAdminClient } from "@/lib/supabase/admin";
-import CrmNav from "@/components/crm/CrmNav";
-import CrmProducts from "@/components/crm/CrmProducts";
-import { getCrmSettings } from "@/lib/crm";
+import { getPainelContext } from "@/lib/demo/painel-context";
+import { PainelDemoProdutos } from "@/components/demo/PainelDemoProdutos";
+import RealPage from "./real-page";
 
 export default async function CrmProdutosPage() {
-  const ctx = await getDashboardContext();
-  if (!ctx?.profile) return null;
-  const admin = createAdminClient();
-  const settings = ctx.tenant ? await getCrmSettings(admin, ctx.tenant.id) : null;
-
-  return (
-    <div>
-      <CrmNav modules={settings?.modules || {}} activePrefix="/painel/crm/produtos" />
-      <CrmProducts />
-    </div>
-  );
+  const { isDemo } = await getPainelContext();
+  if (isDemo) return <PainelDemoProdutos />;
+  return <RealPage />;
 }

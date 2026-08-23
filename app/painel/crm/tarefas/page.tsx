@@ -1,19 +1,9 @@
-import { getDashboardContext } from "@/lib/auth";
-import { createAdminClient } from "@/lib/supabase/admin";
-import CrmNav from "@/components/crm/CrmNav";
-import CrmTasks from "@/components/crm/CrmTasks";
-import { getCrmSettings } from "@/lib/crm";
+import { getPainelContext } from "@/lib/demo/painel-context";
+import { PainelDemoTarefas } from "@/components/demo/PainelDemoTarefas";
+import RealPage from "./real-page";
 
 export default async function CrmTarefasPage() {
-  const ctx = await getDashboardContext();
-  if (!ctx?.profile) return null;
-  const admin = createAdminClient();
-  const settings = ctx.tenant ? await getCrmSettings(admin, ctx.tenant.id) : null;
-
-  return (
-    <div>
-      <CrmNav modules={settings?.modules || {}} activePrefix="/painel/crm/tarefas" />
-      <CrmTasks />
-    </div>
-  );
+  const { isDemo } = await getPainelContext();
+  if (isDemo) return <PainelDemoTarefas />;
+  return <RealPage />;
 }

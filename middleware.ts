@@ -4,6 +4,57 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 const PROTECTED_PREFIXES = ["/painel", "/admin"];
 const AUTH_PREFIXES = ["/login", "/cadastro", "/signup"];
 
+const DEMO_COOKIE_NAME = "sitedoterra_demo";
+
+function getDemoSecret(): string {
+  return (
+    process.env.DEMO_SECRET ||
+    process.env.TEST_USER_PASSWORD ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    "sitedoterra-demo-fallback-secret"
+  );
+}
+
+function toHex(bytes: Uint8Array): string {
+  let out = "";
+  for (let i = 0; i < bytes.length; i++) {
+    out += bytes[i].toString(16).padStart(2, "0");
+  }
+  return out;
+}
+
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let mismatch = 0;
+  for (let i = 0; i < a.length; i++) {
+    mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return mismatch === 0;
+}
+
+async function hmacHex(secret: string, message: string): Promise<string> {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(message));
+  return toHex(new Uint8Array(sig));
+}
+
+async function isDemoCookieValid(raw: string | undefined | null): Promise<boolean> {
+  if (!raw) return false;
+  const parts = raw.split(".");
+  if (parts.length !== 3) return false;
+  const [nonce, startedAt, sig] = parts;
+  if (!nonce || !startedAt || !sig) return false;
+  const expected = await hmacHex(getDemoSecret(), `${nonce}.${startedAt}`);
+  return timingSafeEqual(sig, expected);
+}
+
 const MAIN_HOST = (process.env.NEXT_PUBLIC_APP_URL || "")
   .replace(/^https?:\/\//, "")
   .replace(/\/$/, "");
@@ -103,7 +154,37 @@ async function handleMiddleware(request: NextRequest) {
   const needsAuth = PROTECTED_PREFIXES.some((p) => pathname.startsWith(p));
   const isAuthPage = AUTH_PREFIXES.some((p) => pathname.startsWith(p));
 
-  if (needsAuth && !user) {
+  // ---- Identidade DEMO ----
+  // O cookie DEMO é independente do Supabase Auth: permite acesso a /painel
+  // SEM usuário real, mas é estritamente bloqueado em /admin/* e em APIs.
+  const demoCookie = request.cookies.get(DEMO_COOKIE_NAME)?.value;
+  const isDemo = await isDemoCookieValid(demoCookie);
+
+  // Bloqueio absoluto: usuários em modo DEMO nunca acessam /admin
+  if (isDemo && pathname.startsWith("/admin")) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/painel";
+    url.searchParams.set("demo_blocked", "1");
+    return NextResponse.redirect(url);
+  }
+
+  // Bloqueio absoluto: APIs reais nunca executam em modo DEMO.
+  // Exceção: rotas /api/demo/* (start, exit, reset) que são o próprio
+  // mecanismo de gestão da sessão de demonstração.
+  if (isDemo && pathname.startsWith("/api/") && !pathname.startsWith("/api/demo/")) {
+    return new NextResponse(
+      JSON.stringify({
+        error:
+          "Operação bloqueada: ambiente de demonstração. Suas alterações ficam somente neste dispositivo.",
+      }),
+      {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  }
+
+  if (needsAuth && !user && !isDemo) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", pathname);

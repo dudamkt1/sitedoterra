@@ -1,19 +1,9 @@
-import { getDashboardContext } from "@/lib/auth";
-import { createAdminClient } from "@/lib/supabase/admin";
-import CrmNav from "@/components/crm/CrmNav";
-import CrmClientDetail from "@/components/crm/CrmClientDetail";
-import { getCrmSettings } from "@/lib/crm";
+import { getPainelContext } from "@/lib/demo/painel-context";
+import { PainelDemoClienteDetalhe } from "@/components/demo/PainelDemoClienteDetalhe";
+import RealPage from "./real-page";
 
-export default async function CrmClientDetailPage({ params }: { params: { id: string } }) {
-  const ctx = await getDashboardContext();
-  if (!ctx?.profile) return null;
-  const admin = createAdminClient();
-  const settings = ctx.tenant ? await getCrmSettings(admin, ctx.tenant.id) : null;
-
-  return (
-    <div>
-      <CrmNav modules={settings?.modules || {}} activePrefix="/painel/crm/clientes" />
-      <CrmClientDetail clientId={params.id} />
-    </div>
-  );
+export default async function CrmClientDetailPage(props: { params: { id: string } }) {
+  const { isDemo } = await getPainelContext();
+  if (isDemo) return <PainelDemoClienteDetalhe clientId={props.params.id} />;
+  return <RealPage {...props} />;
 }

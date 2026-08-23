@@ -1,21 +1,9 @@
-import { getDashboardContext } from "@/lib/auth";
-import { SectionTitle } from "@/components/dashboard/ui";
-import { DomainManager } from "@/components/dashboard/DomainManager";
+import { getPainelContext } from "@/lib/demo/painel-context";
+import { PainelDemoDominio } from "@/components/demo/PainelDemoDominio";
+import RealPage from "./real-page";
 
 export default async function DominioPage() {
-  const ctx = await getDashboardContext();
-  if (!ctx?.profile) return null;
-
-  return (
-    <div>
-      <SectionTitle sub="Conecte seu próprio domínio ao seu site. O site continua o mesmo — só muda o endereço.">
-        Domínio Personalizado
-      </SectionTitle>
-      <DomainManager
-        domains={ctx.domains as any}
-        slug={ctx.tenant?.slug || ""}
-        appUrl={process.env.NEXT_PUBLIC_APP_URL || ""}
-      />
-    </div>
-  );
+  const { isDemo } = await getPainelContext();
+  if (isDemo) return <PainelDemoDominio />;
+  return <RealPage />;
 }

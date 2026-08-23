@@ -1,24 +1,28 @@
 import type { ReactNode } from "react";
-import { redirect } from "next/navigation";
 import DashboardSidebar from "@/components/dashboard/Sidebar";
-import { getDashboardContext } from "@/lib/auth";
+import { DashboardBannerDemo } from "@/components/demo/DashboardBannerDemo";
+import { getPainelContext } from "@/lib/demo/painel-context";
 
 export default async function PainelLayout({ children }: { children: ReactNode }) {
-  const ctx = await getDashboardContext();
+  const { isDemo, ctx } = await getPainelContext();
 
-  if (!ctx?.profile) {
-    redirect("/login");
-  }
+  const name = isDemo ? "Acesso Rápido" : ctx.profile!.name || ctx.profile!.email;
+  const email = isDemo ? "Demonstração • salva só neste dispositivo" : ctx.profile!.email;
+  const siteSlug = isDemo ? null : ctx.tenant?.slug ?? null;
 
   return (
     <div className="flex min-h-screen bg-[#faf8f2]">
       <DashboardSidebar
-        name={ctx.profile.name || ctx.profile.email}
-        email={ctx.profile.email}
-        isSuperAdmin={ctx.isSuperAdmin}
-        siteSlug={ctx.tenant?.slug ?? null}
+        name={name}
+        email={email}
+        isSuperAdmin={false}
+        siteSlug={siteSlug}
+        isDemo={isDemo}
       />
-      <main className="flex-1 px-8 py-8 max-w-6xl">{children}</main>
+      <main className="flex-1 px-8 py-8 max-w-6xl">
+        {isDemo && <DashboardBannerDemo />}
+        {children}
+      </main>
     </div>
   );
 }
