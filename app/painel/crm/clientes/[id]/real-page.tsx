@@ -1,19 +1,17 @@
-import { getDashboardContext } from "@/lib/auth";
-import { createAdminClient } from "@/lib/supabase/admin";
+import type { DashboardContext } from "@/lib/auth";
 import CrmNav from "@/components/crm/CrmNav";
 import CrmClientDetail from "@/components/crm/CrmClientDetail";
-import { getCrmSettings } from "@/lib/crm";
 
-export default async function CrmClientDetailPage({ params }: { params: { id: string } }) {
-  const ctx = await getDashboardContext();
-  if (!ctx?.profile) return null;
-  const admin = createAdminClient();
-  const settings = ctx.tenant ? await getCrmSettings(admin, ctx.tenant.id) : null;
+export default async function CrmClientDetailPage(
+  p: { demoCtx?: DashboardContext; params?: { id: string } }
+) {
+  if (!p.demoCtx?.profile) return null;
+  const id = p.params?.id;
 
   return (
     <div>
-      <CrmNav modules={settings?.modules || {}} activePrefix="/painel/crm/clientes" />
-      <CrmClientDetail clientId={params.id} />
+      <CrmNav modules={{}} activePrefix="/painel/crm/clientes" />
+      <CrmClientDetail clientId={id || ""} />
     </div>
   );
 }

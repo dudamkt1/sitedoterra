@@ -10,6 +10,8 @@ interface SiteManagerProps {
   siteStatus: string;
   appUrl: string;
   hasSubscription: boolean;
+  /** Demonstração: URL pública fixa, sem edição de slug. */
+  lockUrl?: boolean;
 }
 
 const SOCIAL_NETWORKS = [
@@ -42,7 +44,7 @@ function socialUrl(key: "instagram" | "facebook" | "youtube", raw: string): stri
   return `${base[key]}${value.replace(/^@/, "")}`;
 }
 
-export function SiteManager({ slug, pendingSlug, siteData, appUrl, hasSubscription }: SiteManagerProps) {
+export function SiteManager({ slug, pendingSlug, siteData, appUrl, hasSubscription, lockUrl }: SiteManagerProps) {
   const [newSlug, setNewSlug] = useState(pendingSlug ? "" : slug);
   const [slugCheck, setSlugCheck] = useState<null | { slug: string; valid: boolean; available: boolean; reason?: string }>(null);
   const [checking, setChecking] = useState(false);
@@ -78,6 +80,7 @@ export function SiteManager({ slug, pendingSlug, siteData, appUrl, hasSubscripti
   const publicUrl = newSlug || slug;
 
   useEffect(() => {
+    if (lockUrl) return;
     if (!newSlug) {
       setSlugCheck(null);
       return;
@@ -90,7 +93,7 @@ export function SiteManager({ slug, pendingSlug, siteData, appUrl, hasSubscripti
       setChecking(false);
     }, 350);
     return () => clearTimeout(t);
-  }, [newSlug]);
+  }, [newSlug, lockUrl]);
 
   async function saveSlug() {
     setSavingSlug(true);
@@ -180,43 +183,61 @@ export function SiteManager({ slug, pendingSlug, siteData, appUrl, hasSubscripti
     <div className="space-y-6">
       {/* ---------- Nome de usuário / URL ---------- */}
       <div className="card">
-        <h2 className="card-title mb-1">Nome de usuário e URL</h2>
-        <p className="text-sm text-gray-500 mb-4">
-          Seu site público ficará disponível em <strong>{appUrl}/{publicUrl || "seu-usuario"}</strong>.
-          Use letras, números e hífens. Não pode ter espaços nem duplicar outro usuário.
-        </p>
-
-        <div className="flex items-end gap-3">
-          <div className="flex-1">
-            <label className="label">Nome de usuário</label>
-            <input
-              className="input"
-              value={newSlug}
-              placeholder="ex.: joao, maria, anabeatriz"
-              onChange={(e) => setNewSlug(e.target.value.toLowerCase())}
-            />
-          </div>
-          <button type="button" className="btn btn-primary" disabled={!slugCheck?.available || savingSlug} onClick={saveSlug}>
-            {savingSlug ? "Salvando..." : "Salvar"}
-          </button>
-        </div>
-
-        <div className="mt-2 min-h-6 text-sm">
-          {checking && newSlug && <span className="text-gray-400">Verificando...</span>}
-          {!checking && slugCheck && (
-            <span className={slugCheck.available ? "text-green-600" : "text-red-600"}>
-              {slugCheck.available ? "✓ Disponível! URL: " + appUrl + "/" + slugCheck.slug : slugCheck.reason}
-            </span>
-          )}
-        </div>
-
-        {slugMsg && (
-          <p className={`mt-2 text-sm rounded-lg px-3 py-2 ${slugMsg.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"}`}>
-            {slugMsg.text}
-          </p>
+        {lockUrl ? (
+          <>
+            <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
+              <h2 className="card-title mb-0">Nome de usuário e URL</h2>
+              <span className="badge badge-gray">🔒 Fixo na demonstração</span>
+            </div>
+            <p className="text-sm text-gray-500 mb-4">
+              Aqui é só um endereço de exemplo para você explorar o painel.
+            </p>
+          </>
+        ) : (
+          <>
+            <h2 className="card-title mb-1">Nome de usuário e URL</h2>
+            <p className="text-sm text-gray-500 mb-4">
+              Seu site público ficará disponível em <strong>{appUrl}/{publicUrl || "seu-usuario"}</strong>.
+              Use letras, números e hífens. Não pode ter espaços nem duplicar outro usuário.
+            </p>
+          </>
         )}
 
-        <div className="mt-4 rounded-lg bg-gray-50 border border-gray-100 p-4">
+        {!lockUrl && (
+          <>
+            <div className="flex items-end gap-3">
+              <div className="flex-1">
+                <label className="label">Nome de usuário</label>
+                <input
+                  className="input"
+                  value={newSlug}
+                  placeholder="ex.: joao, maria, anabeatriz"
+                  onChange={(e) => setNewSlug(e.target.value.toLowerCase())}
+                />
+              </div>
+              <button type="button" className="btn btn-primary" disabled={!slugCheck?.available || savingSlug} onClick={saveSlug}>
+                {savingSlug ? "Salvando..." : "Salvar"}
+              </button>
+            </div>
+
+            <div className="mt-2 min-h-6 text-sm">
+              {checking && newSlug && <span className="text-gray-400">Verificando...</span>}
+              {!checking && slugCheck && (
+                <span className={slugCheck.available ? "text-green-600" : "text-red-600"}>
+                  {slugCheck.available ? "✓ Disponível! URL: " + appUrl + "/" + slugCheck.slug : slugCheck.reason}
+                </span>
+              )}
+            </div>
+
+            {slugMsg && (
+              <p className={`mt-2 text-sm rounded-lg px-3 py-2 ${slugMsg.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"}`}>
+                {slugMsg.text}
+              </p>
+            )}
+          </>
+        )}
+
+        <div className={`rounded-lg bg-gray-50 border border-gray-100 p-4 ${lockUrl ? "" : "mt-4"}`}>
           <p className="text-xs uppercase tracking-wider text-gray-400 font-semibold mb-1">URL pública atual</p>
           <a href={`/${publicUrl}`} target="_blank" className="text-sm text-[#1d5c3a] underline break-all">
             {appUrl}/{publicUrl} ↗
@@ -225,6 +246,28 @@ export function SiteManager({ slug, pendingSlug, siteData, appUrl, hasSubscripti
             <p className="mt-2 text-xs text-gray-400">O site entra no ar após a ativação da assinatura.</p>
           )}
         </div>
+
+        {lockUrl && (
+          <div className="mt-4 rounded-xl border border-[#cfe8d8] bg-gradient-to-br from-[#f2faf5] to-[#faf8f2] p-4">
+            <p className="text-sm font-semibold text-[#1d5c3a] mb-1">
+              💚 Ao adquirir seu SITE DOTERRA, esse campo vira seu!
+            </p>
+            <ul className="text-xs text-gray-700 space-y-1.5 leading-relaxed">
+              <li>
+                ✅ Você escolhe o <strong>seu próprio nome de usuário</strong>: seu site fica em{" "}
+                <strong>seusite.com/seu-nome</strong> (ex.: /joao, /anabeatriz).
+              </li>
+              <li>
+                ✅ Pode vincular um <strong>domínio próprio</strong> (ex.: <strong>www.suamarca.com.br</strong>)
+                direto pelo painel, sem mexer em código.
+              </li>
+              <li>
+                ✅ Na demonstração o endereço é fixo — no seu site real, essa edição fica{" "}
+                <strong>100% liberada</strong>.
+              </li>
+            </ul>
+          </div>
+        )}
       </div>
 
       {/* ---------- Logo do site ---------- */}

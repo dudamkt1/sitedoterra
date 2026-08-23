@@ -1,14 +1,18 @@
-import { getDashboardContext } from "@/lib/auth";
+import { getDashboardContext, type DashboardContext } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import CrmNav from "@/components/crm/CrmNav";
 import CrmProducts from "@/components/crm/CrmProducts";
-import { getCrmSettings } from "@/lib/crm";
+import { getCrmSettings, normalizeCrmSettings } from "@/lib/crm";
 
-export default async function CrmProdutosPage() {
-  const ctx = await getDashboardContext();
+export default async function CrmProdutosPage(p: { demoCtx?: DashboardContext }) {
+  const ctx = p.demoCtx ?? (await getDashboardContext());
   if (!ctx?.profile) return null;
-  const admin = createAdminClient();
-  const settings = ctx.tenant ? await getCrmSettings(admin, ctx.tenant.id) : null;
+  const admin = p.demoCtx ? null : createAdminClient();
+  const settings = ctx.tenant
+    ? admin
+      ? await getCrmSettings(admin, ctx.tenant.id)
+      : normalizeCrmSettings(ctx.tenant.id, null)
+    : null;
 
   return (
     <div>

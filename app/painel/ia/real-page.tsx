@@ -1,9 +1,9 @@
-import { getDashboardContext } from "@/lib/auth";
+import { getDashboardContext, type DashboardContext } from "@/lib/auth";
 import { SectionTitle } from "@/components/dashboard/ui";
 import { AiCenter } from "@/components/dashboard/AiCenter";
 
-export default async function IaPage() {
-  const ctx = await getDashboardContext();
+export default async function IaPage(p: { demoCtx?: DashboardContext }) {
+  const ctx = p.demoCtx ?? (await getDashboardContext());
   if (!ctx?.profile) return null;
 
   return (

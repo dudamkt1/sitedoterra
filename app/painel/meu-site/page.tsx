@@ -1,25 +1,14 @@
 import { getPainelContext } from "@/lib/demo/painel-context";
 import { SectionTitle } from "@/components/dashboard/ui";
-import { PainelDemoMeuSite } from "@/components/demo/PainelDemoMeuSite";
 
 export default async function MeuSitePage() {
   const { isDemo, ctx } = await getPainelContext();
   if (!ctx) return null;
 
-  if (isDemo) {
-    return (
-      <div className="space-y-8">
-        <SectionTitle sub="Edite tudo à vontade — logo, conteúdo, redes sociais e seções. Salvo somente neste dispositivo.">
-          Meu Site
-        </SectionTitle>
-        <PainelDemoMeuSite />
-      </div>
-    );
-  }
-
   const siteData = (ctx.tenant?.site_data || {}) as Record<string, any>;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
 
-  // Lazy-load the real components to keep the demo path self-contained
+  // Lazy-load dos componentes reais
   const { SiteManager } = await import("@/components/dashboard/SiteManager");
   const { SiteSectionsManager } = await import("@/components/dashboard/SiteSectionsManager");
 
@@ -33,8 +22,9 @@ export default async function MeuSitePage() {
         pendingSlug={ctx.tenant?.slug?.startsWith("aguardando-") ?? true}
         siteData={siteData}
         siteStatus={ctx.tenant?.site_status || "pending"}
-        appUrl={process.env.NEXT_PUBLIC_APP_URL || ""}
+        appUrl={appUrl}
         hasSubscription={Boolean(ctx.subscription)}
+        lockUrl={isDemo ? true : undefined}
       />
       <div className="card">
         <div className="flex items-center justify-between mb-1">
@@ -45,7 +35,7 @@ export default async function MeuSitePage() {
         </p>
         <SiteSectionsManager
           slug={ctx.tenant?.slug || ""}
-          appUrl={process.env.NEXT_PUBLIC_APP_URL || ""}
+          appUrl={appUrl}
         />
       </div>
     </div>

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import DashboardSidebar from "@/components/dashboard/Sidebar";
 import { DashboardBannerDemo } from "@/components/demo/DashboardBannerDemo";
+import { DemoFetchBridge } from "@/components/demo/DemoFetchBridge";
 import { getPainelContext } from "@/lib/demo/painel-context";
 
 export default async function PainelLayout({ children }: { children: ReactNode }) {
@@ -12,6 +13,7 @@ export default async function PainelLayout({ children }: { children: ReactNode }
 
   return (
     <div className="flex min-h-screen bg-[#faf8f2]">
+      {isDemo && <DemoFetchBridge />}
       <DashboardSidebar
         name={name}
         email={email}

@@ -5,15 +5,11 @@ import { getSiteAccess } from "@/lib/access";
 import { formatBRL, formatDate } from "@/lib/utils";
 import { getActiveOffer } from "@/lib/commercial";
 import { StatCard, StatusBadge } from "@/components/dashboard/ui";
-import { PainelDemoOverview } from "@/components/demo/PainelDemoOverview";
 
 export default async function PainelHome() {
-  const { isDemo, ctx } = await getPainelContext();
-  if (!ctx) return null;
-
-  if (isDemo) {
-    return <PainelDemoOverview />;
-  }
+  const { ctx: rawCtx } = await getPainelContext();
+  if (!rawCtx) return null;
+  const ctx = rawCtx as never as import("@/lib/auth").DashboardContext;
 
   const { profile, tenant, subscription, domains } = ctx;
   if (!profile) return null;

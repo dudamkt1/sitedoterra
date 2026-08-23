@@ -8,6 +8,7 @@ import { DEMO_SECTION_TYPES } from "@/lib/demo/seed";
 import { anchorFor, DEFAULT_SECTION_CONTENT } from "@/lib/site-sections";
 import type { DemoData } from "@/lib/demo/types";
 import type { SectionType } from "@/types";
+import { DemoFetchBridge } from "@/components/demo/DemoFetchBridge";
 
 const HEADER_FOOTER: SectionType[] = ["header", "footer"];
 const NAV_TYPES = ["about", "testimonials", "story", "booking", "products", "faq"];
@@ -158,6 +159,7 @@ export function DemoPublicSite() {
 
   return (
     <div style={{ position: "relative" }}>
+      <DemoFetchBridge />
       {/* Faixa fixa informando que é uma demonstração local */}
       <div
         style={{

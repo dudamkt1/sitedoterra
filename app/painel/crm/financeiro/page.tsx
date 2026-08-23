@@ -1,9 +1,8 @@
 import { getPainelContext } from "@/lib/demo/painel-context";
-import { PainelDemoFinanceiro } from "@/components/demo/PainelDemoFinanceiro";
 import RealPage from "./real-page";
 
 export default async function CrmFinanceiroPage() {
-  const { isDemo } = await getPainelContext();
-  if (isDemo) return <PainelDemoFinanceiro />;
-  return <RealPage />;
+  const { isDemo, ctx } = await getPainelContext();
+  if (!ctx) return null;
+  return <RealPage demoCtx={isDemo ? (ctx as never) : undefined} />;
 }

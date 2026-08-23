@@ -1,9 +1,9 @@
 import { getPainelContext } from "@/lib/demo/painel-context";
-import { PainelDemoClienteDetalhe } from "@/components/demo/PainelDemoClienteDetalhe";
 import RealPage from "./real-page";
 
 export default async function CrmClientDetailPage(props: { params: { id: string } }) {
-  const { isDemo } = await getPainelContext();
-  if (isDemo) return <PainelDemoClienteDetalhe clientId={props.params.id} />;
-  return <RealPage {...props} />;
+  const { isDemo, ctx } = await getPainelContext();
+  if (!ctx) return null;
+  if (isDemo) return <RealPage demoCtx={ctx as never} params={props.params} />;
+  return <RealPage params={props.params} />;
 }

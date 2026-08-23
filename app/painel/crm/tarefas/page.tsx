@@ -1,9 +1,8 @@
 import { getPainelContext } from "@/lib/demo/painel-context";
-import { PainelDemoTarefas } from "@/components/demo/PainelDemoTarefas";
 import RealPage from "./real-page";
 
 export default async function CrmTarefasPage() {
-  const { isDemo } = await getPainelContext();
-  if (isDemo) return <PainelDemoTarefas />;
-  return <RealPage />;
+  const { isDemo, ctx } = await getPainelContext();
+  if (!ctx) return null;
+  return <RealPage demoCtx={isDemo ? (ctx as never) : undefined} />;
 }

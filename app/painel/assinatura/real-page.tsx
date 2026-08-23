@@ -1,4 +1,5 @@
-import { getDashboardContext } from "@/lib/auth";
+import { getDashboardContext, type DashboardContext } from "@/lib/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { SectionTitle } from "@/components/dashboard/ui";
 import { SubscriptionManager } from "@/components/dashboard/SubscriptionManager";
 import { getActivationPrice, getMonthlyPrice } from "@/lib/billing";
@@ -6,23 +7,51 @@ import { getActiveOffer } from "@/lib/commercial";
 
 export const dynamic = "force-dynamic";
 
-export default async function AssinaturaPage() {
-  const ctx = await getDashboardContext();
+// Histórico fictício da demonstração (mesma forma dos dados reais).
+const DEMO_ROWS = [
+  {
+    id: "bh_1",
+    created_at: new Date(Date.now() - 30 * 86400000).toISOString(),
+    type: "activation",
+    amount_cents: 29700,
+    status: "succeeded",
+    stripe_charge_id: null,
+    stripe_payment_intent_id: null,
+    mercadopago_payment_id: null,
+  },
+  {
+    id: "bh_2",
+    created_at: new Date(Date.now() - 15 * 86400000).toISOString(),
+    type: "subscription",
+    amount_cents: 4700,
+    status: "succeeded",
+    stripe_charge_id: null,
+    stripe_payment_intent_id: null,
+    mercadopago_payment_id: null,
+  },
+];
+
+export default async function AssinaturaPage(p: { demoCtx?: DashboardContext }) {
+  const ctx = p.demoCtx ?? (await getDashboardContext());
   if (!ctx?.profile) return null;
 
-  const admin = (await import("@/lib/supabase/admin")).createAdminClient();
   const tenantId = ctx.tenant?.id;
-  const [{ data: billingHistory }, { data: payments }, { data: activation }] = await Promise.all([
-    tenantId
-      ? admin.from("billing_history").select("*").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(20)
-      : Promise.resolve({ data: [] }),
-    tenantId
-      ? admin.from("payments").select("*").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(20)
-      : Promise.resolve({ data: [] }),
-    tenantId
-      ? admin.from("payments").select("*").eq("tenant_id", tenantId).eq("type", "activation").eq("status", "succeeded").order("created_at", { ascending: false }).limit(1).maybeSingle()
-      : Promise.resolve({ data: null }),
-  ]);
+
+  let billingHistory: any[] = DEMO_ROWS;
+  let payments: any[] = DEMO_ROWS;
+  let activation: any = null;
+
+  if (tenantId && !p.demoCtx) {
+    const admin = createAdminClient();
+    const [hist, pays, act] = await Promise.all([
+      admin.from("billing_history").select("*").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(20),
+      admin.from("payments").select("*").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(20),
+      admin.from("payments").select("*").eq("tenant_id", tenantId).eq("type", "activation").eq("status", "succeeded").order("created_at", { ascending: false }).limit(1).maybeSingle(),
+    ]);
+    billingHistory = (hist.data as any[]) || [];
+    payments = (pays.data as any[]) || [];
+    activation = act.data as any;
+  }
 
   const offer = await getActiveOffer();
   let activationPriceCents = offer?.activation_price_cents || 0;

@@ -1,17 +1,21 @@
-import { getDashboardContext } from "@/lib/auth";
+import { getDashboardContext, type DashboardContext } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import CrmNav from "@/components/crm/CrmNav";
 import CrmDashboard from "@/components/crm/CrmDashboard";
-import { SectionTitle } from "@/components/dashboard/ui";
-import { normalizeCrmSettings, getWhatsAppConfig } from "@/lib/crm";
+import { getCrmSettings, normalizeCrmSettings } from "@/lib/crm";
+import { getWhatsAppConfig } from "@/lib/crm";
 
-export default async function CrmDashboardPage() {
-  const ctx = await getDashboardContext();
+export default async function CrmDashboardPage(p: { demoCtx?: DashboardContext }) {
+  const ctx = p.demoCtx ?? (await getDashboardContext());
   if (!ctx?.profile) return null;
-  const admin = createAdminClient();
   const tenantId = ctx.tenant?.id;
-  const settings = tenantId ? normalizeCrmSettings(tenantId, null) : null;
-  const whatsapp = tenantId ? await getWhatsAppConfig(admin, tenantId) : null;
+  const admin = p.demoCtx ? null : tenantId ? createAdminClient() : null;
+  const settings = tenantId
+    ? admin
+      ? await getCrmSettings(admin, tenantId)
+      : normalizeCrmSettings(tenantId, null)
+    : null;
+  const whatsapp = tenantId && admin ? await getWhatsAppConfig(admin, tenantId) : null;
 
   return (
     <div>
