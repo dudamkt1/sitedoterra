@@ -196,11 +196,49 @@
 }
 
 
-#tenant-site .hamburger { display: none; flex-direction: column; gap: 5px; cursor: pointer; background: none; border: none; padding: 4px; }
+#tenant-site .hamburger {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.12);
+  border: none;
+  padding: 10px;
+  border-radius: 8px;
+  transition: background 0.3s;
+}
 
-#tenant-site .hamburger span { width: 22px; height: 1.5px; background: white; display: block; transition: all 0.3s; }
+#tenant-site .hamburger:hover { background: rgba(255, 255, 255, 0.2); }
+
+#tenant-site .hamburger span {
+  width: 22px;
+  height: 1.5px;
+  min-height: 1.5px;
+  background: white;
+  display: block;
+  border-radius: 2px;
+  transition: transform 0.3s ease, opacity 0.25s ease, background 0.3s;
+}
 
 #tenant-site nav.scrolled .hamburger span { background: var(--verde); }
+
+/* Hamburger → X quando aberto */
+#tenant-site nav.menu-open .hamburger span { background: var(--verde); }
+#tenant-site nav.menu-open .hamburger span:nth-child(1) { transform: translateY(6.5px) rotate(45deg); }
+#tenant-site nav.menu-open .hamburger span:nth-child(2) { opacity: 0; }
+#tenant-site nav.menu-open .hamburger span:nth-child(3) { transform: translateY(-6.5px) rotate(-45deg); }
+#tenant-site nav.menu-open.scrolled .hamburger,
+#tenant-site nav.menu-open .hamburger { background: rgba(29, 92, 58, 0.08); }
+
+/* ---------- Painel mobile (drawer) ---------- */
+#tenant-site .nav-mobile {
+  display: none;
+}
+
+#tenant-site .nav-backdrop {
+  display: none;
+}
 
 
 
@@ -2534,9 +2572,123 @@
 
 
 @media (max-width: 768px) {
-  #tenant-site .nav-links { display: none; }
+  #tenant-site .nav-links { display: none !important; }
 
   #tenant-site .hamburger { display: flex; }
+
+  /* ---------- Drawer do menu ---------- */
+  #tenant-site .nav-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    top: 70px;
+    background: rgba(10, 36, 24, 0.45);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    z-index: 98;
+    animation: nav-fade-in 0.25s ease both;
+  }
+
+  #tenant-site .nav-mobile {
+    display: block;
+    position: fixed;
+    top: 70px;
+    left: 0;
+    right: 0;
+    z-index: 99;
+    max-height: calc(100vh - 70px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(196, 150, 58, 0.18);
+    box-shadow: 0 18px 40px rgba(10, 36, 24, 0.16);
+    transform: translateY(-12px);
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 0.28s ease, opacity 0.22s ease;
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
+  #tenant-site nav.menu-open .nav-mobile {
+    transform: translateY(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  #tenant-site .nav-mobile-list {
+    list-style: none;
+    margin: 0;
+    padding: 0.5rem 1rem calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  #tenant-site .nav-mobile-list li {
+    opacity: 0;
+    transform: translateY(-6px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+  }
+
+  #tenant-site nav.menu-open .nav-mobile-list li {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  #tenant-site .nav-mobile-link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 0.85rem;
+    font-family: var(--font-body);
+    font-size: 0.82rem;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--cinza);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(29, 92, 58, 0.08);
+    transition: color 0.2s, background 0.2s, padding-left 0.2s;
+    border-radius: 8px;
+  }
+
+  #tenant-site .nav-mobile-link:hover,
+  #tenant-site .nav-mobile-link:active {
+    color: var(--verde);
+    background: rgba(29, 92, 58, 0.05);
+    padding-left: 1.05rem;
+  }
+
+  #tenant-site .nav-mobile-arrow {
+    color: var(--ouro);
+    font-size: 0.9rem;
+    opacity: 0.7;
+  }
+
+  #tenant-site .nav-mobile-extra {
+    margin-top: 0.6rem;
+    justify-content: center;
+    color: var(--verde);
+    font-weight: 600;
+    border: 1.5px solid var(--verde);
+    border-radius: 999px;
+    padding: 0.85rem 1rem;
+    background: rgba(29, 92, 58, 0.04);
+  }
+
+  #tenant-site .nav-mobile-extra:hover,
+  #tenant-site .nav-mobile-extra:active {
+    background: var(--verde) !important;
+    color: #fff !important;
+  }
+
+  #tenant-site .nav-mobile-extra .nav-mobile-arrow { display: none; }
+
+  @keyframes nav-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
 
   #tenant-site #hero { padding-top: 90px; }
 
