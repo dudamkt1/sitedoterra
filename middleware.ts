@@ -47,11 +47,12 @@ async function hmacHex(secret: string, message: string): Promise<string> {
 
 async function isDemoCookieValid(raw: string | undefined | null): Promise<boolean> {
   if (!raw) return false;
-  const parts = raw.split(".");
+  // Separador "|" pois o ISO timestamp contém "." (milissegundos).
+  const parts = raw.split("|");
   if (parts.length !== 3) return false;
   const [nonce, startedAt, sig] = parts;
   if (!nonce || !startedAt || !sig) return false;
-  const expected = await hmacHex(getDemoSecret(), `${nonce}.${startedAt}`);
+  const expected = await hmacHex(getDemoSecret(), `${nonce}|${startedAt}`);
   return timingSafeEqual(sig, expected);
 }
 

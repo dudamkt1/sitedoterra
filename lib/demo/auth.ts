@@ -51,18 +51,20 @@ function randomNonce(): string {
 export async function createDemoCookieValue(): Promise<{ value: string; nonce: string; startedAt: string }> {
   const nonce = randomNonce();
   const startedAt = new Date().toISOString();
-  const payload = `${nonce}.${startedAt}`;
+  // Separador "|" pois o ISO timestamp contém "." (milissegundos), o que
+  // quebraria o split por ".".
+  const payload = `${nonce}|${startedAt}`;
   const sig = await hmacHex(getSecret(), payload);
-  return { value: `${payload}.${sig}`, nonce, startedAt };
+  return { value: `${payload}|${sig}`, nonce, startedAt };
 }
 
 export async function isDemoCookieValid(raw: string | undefined | null): Promise<boolean> {
   if (!raw) return false;
-  const parts = raw.split(".");
+  const parts = raw.split("|");
   if (parts.length !== 3) return false;
   const [nonce, startedAt, sig] = parts;
   if (!nonce || !startedAt || !sig) return false;
-  const expected = await hmacHex(getSecret(), `${nonce}.${startedAt}`);
+  const expected = await hmacHex(getSecret(), `${nonce}|${startedAt}`);
   return timingSafeEqual(sig, expected);
 }
 
@@ -83,7 +85,7 @@ export async function getDemoSessionInfo(): Promise<{
   try {
     const c = cookies().get(DEMO_COOKIE_NAME);
     if (!(await isDemoCookieValid(c?.value))) return null;
-    const [nonce, startedAt] = c!.value.split(".");
+    const [nonce, startedAt] = c!.value.split("|");
     return { active: true, nonce, startedAt };
   } catch {
     return null;
