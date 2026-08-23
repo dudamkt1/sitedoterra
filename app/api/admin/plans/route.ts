@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser, getProfile } from "@/lib/auth";
+import { getStripeSecretKeyResolved } from "@/lib/gateway-config";
 
 export const runtime = "nodejs";
 
@@ -108,10 +109,10 @@ export async function POST(request: Request) {
 
   // ---------- Consistência com o Stripe (soft warning, não bloqueia) ----------
   const warnings: string[] = [];
-  if (process.env.STRIPE_SECRET_KEY) {
+  if (process.env.STRIPE_SECRET_KEY || (await getStripeSecretKeyResolved())) {
     try {
-      const { getStripe } = await import("@/lib/stripe");
-      const stripe = getStripe();
+      const { getStripeResolved } = await import("@/lib/stripe");
+      const stripe = await getStripeResolved();
       const checks: { label: string; priceId: string; expected: number }[] = [];
       if (payload.activation_price_id) {
         checks.push({

@@ -17,6 +17,8 @@ interface SubManagerProps {
   allowCancel?: boolean;
   trialMonths?: number;
   billingEnabled?: boolean;
+  /** Gateway ativo definido pelo Super Admin (/admin/pagamentos). */
+  activeGateway?: "stripe" | "mercadopago";
 }
 
 export function SubscriptionManager({
@@ -31,22 +33,22 @@ export function SubscriptionManager({
   allowCancel = true,
   trialMonths = 3,
   billingEnabled = true,
+  activeGateway = "stripe",
 }: SubManagerProps) {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
-  const [gateway, setGateway] = useState<"stripe" | "mercadopago">("stripe");
 
   const paymentOk = searchParams.get("sucesso") === "1";
 
   const activationPaid = activation?.status === "succeeded";
 
-  async function checkout(planId: string, gateway: "stripe" | "mercadopago" = "stripe") {
+  async function checkout(planId: string) {
     setLoading(true);
     setMsg(null);
-    const endpoint = gateway === "mercadopago" ? "/api/checkout/mp" : "/api/checkout";
-    const res = await fetch(endpoint, {
+    // O servidor decide o gateway conforme /admin/pagamentos.
+    const res = await fetch("/api/checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ planId }),
@@ -170,7 +172,7 @@ export function SubscriptionManager({
         <div className="flex flex-wrap gap-3">
           {isActive && billingEnabled && (
             <>
-              {subscription?.gateway !== "mercadopago" && (
+              {(subscription?.gateway ?? activeGateway) === "stripe" && (
                 <button className="btn btn-outline" onClick={openBillingPortal} disabled={loading}>
                   💳 Atualizar forma de pagamento
                 </button>
@@ -198,20 +200,18 @@ export function SubscriptionManager({
 
           {!subscription && billingEnabled && (
             <>
-              <div className="w-full flex flex-wrap items-center gap-4 text-sm">
-                <span className="text-gray-500 font-medium">Forma de pagamento:</span>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="radio" name="gateway" checked={gateway === "stripe"} onChange={() => setGateway("stripe")} />
-                  💳 Cartão (Stripe)
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="radio" name="gateway" checked={gateway === "mercadopago"} onChange={() => setGateway("mercadopago")} />
-                  Mercado Pago (PIX / Cartão)
-                </label>
-              </div>
+              <p className="w-full text-xs text-gray-400">
+                Forma de pagamento:{" "}
+                {activeGateway === "mercadopago"
+                  ? "🇧🇷 Mercado Pago (PIX ou cartão)"
+                  : "💳 Stripe (cartão de crédito)"}{" "}
+                — definida pela plataforma.
+              </p>
               {plans.map((p) => (
-                <button key={p.id} className="btn btn-gold" onClick={() => checkout(p.id, gateway)} disabled={loading}>
-                  Ativar site ({p.name}) — {formatBRL(monthlyPriceCents)}/mês + ativação {formatBRL(activationPriceCents)}
+                <button key={p.id} className="btn btn-gold" onClick={() => checkout(p.id)} disabled={loading}>
+                  {activeGateway === "mercadopago" ? "⚡ Ativar via PIX/cartão" : "⚡ Ativar site"} (
+                  {p.name}) — {formatBRL(monthlyPriceCents)}/mês + ativação{" "}
+                  {formatBRL(activationPriceCents)}
                 </button>
               ))}
             </>

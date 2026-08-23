@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getStripe } from "@/lib/stripe";
+import { getStripeResolved } from "@/lib/stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser, getProfile } from "@/lib/auth";
 import { ensureTenantForUser } from "@/lib/onboarding";
@@ -7,6 +7,8 @@ import { getOrCreateCustomer, resolveActivationPriceId } from "@/lib/billing";
 import { getActiveOffer, getPlanById } from "@/lib/commercial";
 import type { Plan } from "@/types";
 import { getPublicBaseUrl } from "@/lib/public-url";
+import { resolveGateways } from "@/lib/gateway-config";
+import { createActivationPreference } from "@/lib/mercadopago";
 
 export const runtime = "nodejs";
 
@@ -48,8 +50,35 @@ export async function POST(request: Request) {
   if (!plan) plan = await getActiveOffer();
   if (!plan) return NextResponse.json({ error: "Nenhuma oferta ativa disponível" }, { status: 400 });
 
+  // ---- Gateway definido pelo Super Admin (/admin/pagamentos) decide o fluxo ----
+  const gateways = await resolveGateways();
+  if (gateways.gateway === "mercadopago") {
+    if (!gateways.mercadopago.accessToken) {
+      return NextResponse.json(
+        { error: "Mercado Pago selecionado, mas sem Access Token configurado." },
+        { status: 503 }
+      );
+    }
+    const preference = await createActivationPreference({
+      tenantId: tenant.id,
+      planId: plan.id,
+      email: profile.email,
+      name: profile.name,
+      activationAmountCents: plan.activation_price_cents,
+      planName: plan.name,
+    });
+    return NextResponse.json({ url: preference.initPoint, gateway: "mercadopago" });
+  }
+
+  if (!gateways.stripe.secretKey) {
+    return NextResponse.json(
+      { error: "Stripe selecionado, mas sem Secret Key configurada." },
+      { status: 503 }
+    );
+  }
+
   const appUrl = getPublicBaseUrl();
-  const stripe = getStripe();
+  const stripe = await getStripeResolved();
 
   const customer = await getOrCreateCustomer({
     userId: user.id,

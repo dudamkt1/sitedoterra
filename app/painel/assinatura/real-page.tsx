@@ -4,6 +4,7 @@ import { SectionTitle } from "@/components/dashboard/ui";
 import { SubscriptionManager } from "@/components/dashboard/SubscriptionManager";
 import { getActivationPrice, getMonthlyPrice } from "@/lib/billing";
 import { getActiveOffer } from "@/lib/commercial";
+import { getActiveGateway } from "@/lib/gateway-config";
 
 export const dynamic = "force-dynamic";
 
@@ -86,6 +87,7 @@ export default async function AssinaturaPage(p: { demoCtx?: DashboardContext }) 
         allowCancel={allowCancel}
         trialMonths={trialMonths}
         billingEnabled={ctx.tenant?.monthly_billing_enabled !== false}
+        activeGateway={await getActiveGateway()}
       />
     </div>
   );

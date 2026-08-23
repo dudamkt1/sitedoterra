@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getStripe } from "@/lib/stripe";
+import { getStripeResolved } from "@/lib/stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser, getProfile } from "@/lib/auth";
 import { ensureTenantForUser } from "@/lib/onboarding";
@@ -33,7 +33,7 @@ export async function POST() {
   }
 
   const appUrl = getPublicBaseUrl();
-  const stripe = getStripe();
+  const stripe = await getStripeResolved();
   const session = await stripe.billingPortal.sessions.create({
     customer: sub.stripe_customer_id,
     return_url: `${appUrl}/painel/assinatura`,

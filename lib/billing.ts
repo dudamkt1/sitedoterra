@@ -1,5 +1,5 @@
 import Stripe from "stripe";
-import { getStripe } from "@/lib/stripe";
+import { getStripeResolved, getStripe } from "@/lib/stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getActiveOffer, getPlanById } from "@/lib/commercial";
 import type { Subscription } from "@/types";
@@ -45,18 +45,18 @@ export async function resolveMonthlyPriceId(planId?: string | null): Promise<str
 
 /** Retorna o objeto Price da ativação a partir do Stripe (fonte dos valores exibidos). */
 export async function getActivationPrice(): Promise<Stripe.Price> {
-  return getStripe().prices.retrieve(getActivationPriceId());
+  return (await getStripeResolved()).prices.retrieve(await resolveActivationPriceId());
 }
 
 /** Retorna o objeto Price da mensalidade a partir do Stripe (fonte dos valores exibidos). */
 export async function getMonthlyPrice(): Promise<Stripe.Price> {
-  return getStripe().prices.retrieve(getMonthlyPriceId());
+  return (await getStripeResolved()).prices.retrieve(await resolveMonthlyPriceId());
 }
 
 /** Busca ou cria um Customer no Stripe para o usuário (reutiliza se já existir). */
 export async function getOrCreateCustomer(metadata: BillingUser): Promise<Stripe.Customer> {
   const admin = createAdminClient();
-  const stripe = getStripe();
+  const stripe = await getStripeResolved();
 
   // 1) Já vinculado ao tenant (persistido no momento do primeiro checkout)
   const { data: tenant } = await admin
@@ -151,7 +151,7 @@ export async function createRecurringSubscription(
   customerId: string,
   metadata: BillingUser & { planId?: string | null }
 ): Promise<Stripe.Subscription> {
-  const stripe = getStripe();
+  const stripe = await getStripeResolved();
 
   const plan = metadata.planId ? await getPlanById(metadata.planId) : await getActiveOffer();
   const priceId = plan?.monthly_price_id || getMonthlyPriceId();
@@ -175,8 +175,65 @@ export async function createRecurringSubscription(
   });
 }
 
-/** Upsert de assinatura local a partir de dados do Stripe (fonte de verdade = webhook). */
-export async function upsertSubscriptionFromStripe(sub: Stripe.Subscription): Promise<Subscription | null> {
+/**
+ * Garante Price IDs do Stripe para o plano ATIVO, criando-os via API com os
+ * valores configurados pelo Super Admin (ativação + mensalidade). Recria os
+ * preços quando o valor muda e persiste os IDs na tabela `plans`.
+ * Assim o checkout funciona sem precisar criar nada manualmente no dashboard.
+ */
+export async function ensureStripePricesForPlan(
+  planId: string
+): Promise<{ activation_price_id: string; monthly_price_id: string; created: boolean }> {
+  const admin = createAdminClient();
+  const plan = await getPlanById(planId);
+  if (!plan) throw new Error("Plano não encontrado");
+
+  const stripe = await getStripeResolved();
+
+  const needsActivation =
+    !plan.activation_price_id || plan.activation_price_amount_cents !== plan.activation_price_cents;
+  const needsMonthly =
+    !plan.monthly_price_id || plan.monthly_price_amount_cents !== plan.monthly_price_cents;
+
+  let activationPriceId = plan.activation_price_id || "";
+  let monthlyPriceId = plan.monthly_price_id || "";
+  let created = false;
+
+  if (needsActivation && plan.activation_price_cents > 0) {
+    const price = await stripe.prices.create({
+      unit_amount: plan.activation_price_cents,
+      currency: "brl",
+      product_data: { name: `${plan.name} — Ativação do site` },
+    });
+    activationPriceId = price.id;
+    created = true;
+  }
+
+  if (needsMonthly && plan.monthly_price_cents > 0) {
+    const price = await stripe.prices.create({
+      unit_amount: plan.monthly_price_cents,
+      currency: "brl",
+      recurring: { interval: "month" },
+      product_data: { name: `${plan.name} — Mensalidade` },
+    });
+    monthlyPriceId = price.id;
+    created = true;
+  }
+
+  await admin
+    .from("plans")
+    .update({
+      activation_price_id: activationPriceId || null,
+      monthly_price_id: monthlyPriceId || null,
+      activation_price_amount_cents: plan.activation_price_cents,
+      monthly_price_amount_cents: plan.monthly_price_cents,
+    })
+    .eq("id", planId);
+
+  return { activation_price_id: activationPriceId, monthly_price_id: monthlyPriceId, created };
+}
+
+/** Upsert de assinatura local a partir de dados do Stripe (fonte de verdade = webhook). */export async function upsertSubscriptionFromStripe(sub: Stripe.Subscription): Promise<Subscription | null> {
   const admin = createAdminClient();
   const tenantId = sub.metadata?.tenant_id as string | undefined;
   const planId = sub.metadata?.plan_id as string | undefined;

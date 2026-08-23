@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getStripe } from "@/lib/stripe";
+import { getStripeResolved } from "@/lib/stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/auth";
 import { ensureTenantForUser } from "@/lib/onboarding";
@@ -71,7 +71,7 @@ export async function POST() {
     return NextResponse.json({ error: "Nenhuma assinatura ativa para cancelar" }, { status: 400 });
   }
 
-  const stripe = getStripe();
+  const stripe = await getStripeResolved();
   await stripe.subscriptions.update(sub.stripe_subscription_id, { cancel_at_period_end: true });
 
   // Status local: cancelamento agendado (webhook confirmará ao final do período)

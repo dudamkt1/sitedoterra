@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getStripe } from "@/lib/stripe";
+import { getStripeResolved } from "@/lib/stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser, getProfile } from "@/lib/auth";
 import { ensureTenantForUser } from "@/lib/onboarding";
@@ -154,7 +154,7 @@ export async function POST() {
     return NextResponse.json({ success: true });
   }
 
-  const stripe = getStripe();
+  const stripe = await getStripeResolved();
   const plan = sub.plan as { id: string; monthly_price_cents: number; billing_interval: string; code: string; name: string; activation_price_cents: number; stripe_product_id: string | null; stripe_price_id: string | null } | null;
 
   if (sub.stripe_subscription_id) {

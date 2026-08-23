@@ -18,7 +18,7 @@ export const runtime = "nodejs";
  *  - O frontend nunca é a fonte de verdade.
  */
 export async function POST(request: Request) {
-  if (!isMercadoPagoEnabled()) {
+  if (!(await isMercadoPagoEnabled())) {
     return NextResponse.json({ error: "Mercado Pago não configurado" }, { status: 503 });
   }
 

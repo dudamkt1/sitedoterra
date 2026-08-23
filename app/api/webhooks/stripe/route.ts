@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
-import { getStripe } from "@/lib/stripe";
+import { getStripeResolved } from "@/lib/stripe";
+import { getStripeWebhookSecretResolved } from "@/lib/gateway-config";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   getOrCreateCustomer,
@@ -19,8 +20,8 @@ export const runtime = "nodejs";
  * Um webhook recebido 2x não duplica dados.
  */
 export async function POST(request: Request) {
-  const stripe = getStripe();
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  const stripe = await getStripeResolved();
+  const webhookSecret = await getStripeWebhookSecretResolved();
   const admin = createAdminClient();
 
   if (!webhookSecret) {
@@ -94,7 +95,7 @@ async function resolveTenantFromInvoice(invoice: Stripe.Invoice): Promise<string
 
 async function handleEvent(event: Stripe.Event) {
   const admin = createAdminClient();
-  const stripe = getStripe();
+  const stripe = await getStripeResolved();
 
   switch (event.type) {
     // ---------------- ATIVAÇÃO PAGA ----------------

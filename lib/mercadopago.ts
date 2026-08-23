@@ -3,6 +3,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getPlanById } from "@/lib/commercial";
 import { addMonths } from "@/lib/billing";
 import { getPublicBaseUrl } from "@/lib/public-url";
+import {
+  getMercadoPagoTokenResolved,
+  isMercadoPagoSandboxResolved,
+} from "@/lib/gateway-config";
 
 /**
  * MERCADO PAGO — cliente server-only (nunca exposto ao browser).
@@ -22,18 +26,18 @@ import { getPublicBaseUrl } from "@/lib/public-url";
 
 export const MERCADOPAGO_API = "https://api.mercadopago.com";
 
-export function isMercadoPagoEnabled(): boolean {
-  return !!process.env.MERCADOPAGO_ACCESS_TOKEN;
+export async function isMercadoPagoEnabled(): Promise<boolean> {
+  return Boolean(await getMercadoPagoTokenResolved());
 }
 
-export function getMercadoPagoAccessToken(): string {
-  const token = process.env.MERCADOPAGO_ACCESS_TOKEN;
-  if (!token) throw new Error("MERCADOPAGO_ACCESS_TOKEN não configurada no ambiente");
+export async function getMercadoPagoAccessToken(): Promise<string> {
+  const token = await getMercadoPagoTokenResolved();
+  if (!token) throw new Error("Mercado Pago não configurado (admin → Pagamentos ou MERCADOPAGO_ACCESS_TOKEN)");
   return token;
 }
 
 async function mpFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const token = getMercadoPagoAccessToken();
+  const token = await getMercadoPagoAccessToken();
   const res = await fetch(`${MERCADOPAGO_API}${path}`, {
     ...init,
     cache: "no-store",
@@ -138,7 +142,7 @@ export async function createActivationPreference(
     sandbox_init_point?: string | null;
   }>("/checkout/preferences", { method: "POST", body: JSON.stringify(body) });
 
-  const sandbox = process.env.MERCADOPAGO_SANDBOX === "true";
+  const sandbox = await isMercadoPagoSandboxResolved();
   const initPoint = sandbox ? pref.sandbox_init_point : pref.init_point;
   if (!initPoint) throw new Error("Mercado Pago não retornou um init_point");
 
@@ -261,11 +265,11 @@ export async function cancelMpSubscription(id: string): Promise<MpSubscription> 
  * Manifest: `id:<data.id>;request-id:<x-request-id>;ts:<ts>`
  * HMAC-SHA256 com a Access Token (ou MERCADOPAGO_WEBHOOK_SECRET, se configurada).
  */
-export function verifyMpSignature(input: {
+export async function verifyMpSignature(input: {
   xSignature: string | null;
   xRequestId: string | null;
   dataId: string;
-}): boolean {
+}): Promise<boolean> {
   if (!input.xSignature) return false;
   let ts: string | null = null;
   let v1: string | null = null;
@@ -279,7 +283,9 @@ export function verifyMpSignature(input: {
   }
   if (!ts || !v1) return false;
 
-  const secret = process.env.MERCADOPAGO_WEBHOOK_SECRET || getMercadoPagoAccessToken();
+  const secret =
+    process.env.MERCADOPAGO_WEBHOOK_SECRET || (await getMercadoPagoTokenResolved());
+  if (!secret) return false;
   const manifest = `id:${input.dataId};request-id:${input.xRequestId || ""};ts:${ts}`;
   const hash = crypto.createHmac("sha256", secret).update(manifest).digest("hex");
   return hash === v1;

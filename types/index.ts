@@ -139,6 +139,9 @@ export interface Plan {
   activation_price_id: string | null;
   /** Price ID da mensalidade no Stripe (recorrente). */
   monthly_price_id: string | null;
+  /** Cache do valor usado ao criar os Price IDs no Stripe (recria quando muda). */
+  activation_price_amount_cents?: number | null;
+  monthly_price_amount_cents?: number | null;
   /** Cache do plano recorrente do Mercado Pago (criado automaticamente). */
   mercadopago_plan_id: string | null;
   /** Valor da mensalidade no momento em que o plano MP foi criado (cache). */

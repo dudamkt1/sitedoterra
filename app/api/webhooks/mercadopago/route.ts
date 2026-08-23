@@ -26,7 +26,7 @@ export const runtime = "nodejs";
  *   - "sub_<tenantId>" → cobrança recorrente da mensalidade.
  */
 export async function POST(request: Request) {
-  if (!isMercadoPagoEnabled()) {
+  if (!(await isMercadoPagoEnabled())) {
     return NextResponse.json({ error: "Mercado Pago não configurado" }, { status: 500 });
   }
 
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "payload inválido" }, { status: 400 });
   }
 
-  if (!verifyMpSignature({ xSignature, xRequestId, dataId })) {
+  if (!(await verifyMpSignature({ xSignature, xRequestId, dataId }))) {
     console.warn("Mercado Pago webhook: assinatura inválida", { xSignature, xRequestId, dataId });
     return NextResponse.json({ error: "invalid signature" }, { status: 401 });
   }
