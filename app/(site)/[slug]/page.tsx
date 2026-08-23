@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { SiteHome } from "@/components/site/SiteHome";
 import { LoggedInNotice } from "@/components/site/LoggedInNotice";
 import { SuspendedSitePage } from "@/components/site/SuspendedSitePage";
+import { DemoPublicSite } from "@/components/demo/DemoPublicSite";
 import { resolveTenantAccess } from "@/lib/tenant";
 import { resolveHomeSections } from "@/lib/home";
 import { getCurrentUser } from "@/lib/auth";
@@ -12,6 +13,14 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
+  if (params.slug === "demonstracao") {
+    return {
+      title: "Demonstração | SITE DOTERRA — TopConsultores",
+      description:
+        "Site de demonstração do SITE DOTERRA. Explore um site profissional de consultora doTERRA com IA, agendamento, produtos e mais.",
+      robots: { index: false },
+    };
+  }
   const { tenant } = await resolveTenantAccess({ slug: params.slug });
   if (!tenant) return { title: "Site não encontrado" };
   const name = tenant.profile_name || tenant.site_name || tenant.slug;
@@ -25,6 +34,12 @@ export async function generateMetadata({ params }: { params: { slug: string } })
 }
 
 export default async function TenantSitePage({ params }: { params: { slug: string } }) {
+  // Site público de DEMONSTRAÇÃO: renderiza com os dados locais do visitante
+  // (localStorage) sem tocar em nenhum tenant real.
+  if (params.slug === "demonstracao") {
+    return <DemoPublicSite />;
+  }
+
   const { tenant, access } = await resolveTenantAccess({ slug: params.slug });
 
   if (!tenant) {

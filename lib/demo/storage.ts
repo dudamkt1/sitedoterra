@@ -48,9 +48,15 @@ function normalizeDemoData(raw: unknown): DemoData {
       sections[key] = { enabled: savedSection, content: def.content };
     } else if (savedSection && typeof savedSection === "object") {
       const obj = savedSection as { enabled?: boolean; content?: Record<string, unknown> };
+      // Descarta valores nulos salvos para que melhorias futuras nos padrões
+      // (ex.: novas imagens padrão) alcancem demonstrações já iniciadas.
+      const cleaned: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(obj.content || {})) {
+        if (v !== null) cleaned[k] = v;
+      }
       sections[key] = {
         enabled: obj.enabled !== false,
-        content: { ...def.content, ...(obj.content || {}) },
+        content: { ...def.content, ...cleaned },
       };
     } else {
       sections[key] = def;

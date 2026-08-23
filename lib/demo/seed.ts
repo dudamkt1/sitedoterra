@@ -18,6 +18,33 @@ export const DEMO_SECTION_TYPES = [
 
 const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v));
 
+// Retratos fotorrealistas usados como padrão da consultora na demonstração.
+const DEMO_HERO_IMAGE =
+  "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=1000&auto=format&fit=crop";
+const DEMO_STORY_IMAGE =
+  "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?q=80&w=900&auto=format&fit=crop";
+
+function buildSeedSections() {
+  const sections = Object.fromEntries(
+    DEMO_SECTION_TYPES.map((type) => [
+      type,
+      { enabled: true, content: clone(DEFAULT_SECTION_CONTENT[type]) },
+    ])
+  ) as Record<string, { enabled: boolean; content: Record<string, unknown> }>;
+
+  // Imagens de consultora (fotorrealistas) apenas na demonstração — os
+  // padrões da plataforma permanecem intactos.
+  if (sections.hero?.content) {
+    sections.hero.content.image = DEMO_HERO_IMAGE;
+    sections.hero.content.imageAlt = "Carla Oliveira — Consultora doTERRA";
+  }
+  if (sections.story?.content) {
+    sections.story.content.image = DEMO_STORY_IMAGE;
+    sections.story.content.imageAlt = "Carla atendendo clientes";
+  }
+  return sections;
+}
+
 const now = () => new Date().toISOString();
 const daysAgo = (n: number) =>
   new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString();
@@ -394,12 +421,7 @@ export function buildDemoSeed(): DemoData {
         youtube: { enabled: false, url: "" },
       },
     },
-    sections: Object.fromEntries(
-      DEMO_SECTION_TYPES.map((type) => [
-        type,
-        { enabled: true, content: clone(DEFAULT_SECTION_CONTENT[type]) },
-      ])
-    ),
+    sections: buildSeedSections(),
     crmSettings: {
       modules: {
         clients: true,
