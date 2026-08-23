@@ -27,6 +27,20 @@ function filterContentByPermissions(content: Record<string, unknown>, perms: Sec
   return out;
 }
 
+/** Chaves internas (prefixo "_") são calculadas na renderização — nunca salvar. */
+function stripInternalKeys(content: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(content)) {
+    if (key.startsWith("_")) continue;
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      out[key] = stripInternalKeys(value as Record<string, unknown>);
+    } else {
+      out[key] = value;
+    }
+  }
+  return out;
+}
+
 /**
  * GET /api/sections
  * Retorna as seções da HOME para o painel do usuário logado, com as
@@ -147,7 +161,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Você não tem permissão para editar esta seção." }, { status: 403 });
     }
     const incoming = (body.content && typeof body.content === "object" ? body.content : {}) as Record<string, unknown>;
-    const filtered = filterContentByPermissions(incoming, perms);
+    const filtered = stripInternalKeys(filterContentByPermissions(incoming, perms));
     content = filtered;
     if (body.settings && typeof body.settings === "object") {
       if (perms.can_edit_colors) settings = { ...settings, ...(body.settings as Record<string, unknown>) };

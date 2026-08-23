@@ -49,6 +49,7 @@ export function PwaManager() {
   const platformUrl = useMemo(() => {
     if (!data?.slug) return "";
     const base =
+      process.env.NEXT_PUBLIC_HOME_URL ||
       process.env.NEXT_PUBLIC_APP_URL ||
       (typeof window !== "undefined" ? window.location.origin : "");
     return `${base.replace(/\/$/, "")}/${data.slug}`;

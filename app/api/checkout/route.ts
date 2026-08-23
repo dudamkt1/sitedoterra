@@ -6,6 +6,7 @@ import { ensureTenantForUser } from "@/lib/onboarding";
 import { getOrCreateCustomer, resolveActivationPriceId } from "@/lib/billing";
 import { getActiveOffer, getPlanById } from "@/lib/commercial";
 import type { Plan } from "@/types";
+import { getPublicBaseUrl } from "@/lib/public-url";
 
 export const runtime = "nodejs";
 
@@ -47,7 +48,7 @@ export async function POST(request: Request) {
   if (!plan) plan = await getActiveOffer();
   if (!plan) return NextResponse.json({ error: "Nenhuma oferta ativa disponível" }, { status: 400 });
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const appUrl = getPublicBaseUrl();
   const stripe = getStripe();
 
   const customer = await getOrCreateCustomer({

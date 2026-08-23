@@ -1,12 +1,13 @@
 import { getPainelContext } from "@/lib/demo/painel-context";
 import { SectionTitle } from "@/components/dashboard/ui";
+import { getPublicBaseUrl } from "@/lib/public-url";
 
 export default async function MeuSitePage() {
   const { isDemo, ctx } = await getPainelContext();
   if (!ctx) return null;
 
   const siteData = (ctx.tenant?.site_data || {}) as Record<string, any>;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
+  const appUrl = getPublicBaseUrl();
 
   // Lazy-load dos componentes reais
   const { SiteManager } = await import("@/components/dashboard/SiteManager");

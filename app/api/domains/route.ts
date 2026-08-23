@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { ensureTenantForUser } from "@/lib/onboarding";
 import { isValidDomain, normalizeDomain, isApexDomain, domainBase } from "@/lib/utils";
 import { addVercelDomain, buildDnsInstructions, getVercelDomain } from "@/lib/vercel";
+import { getPublicBaseUrl } from "@/lib/public-url";
 
 export const runtime = "nodejs";
 
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
   const base = domainBase(domain);
 
   // Domínio principal da plataforma
-  const mainDomain = (process.env.NEXT_PUBLIC_APP_URL || "")
+  const mainDomain = getPublicBaseUrl()
     .replace(/^https?:\/\//, "")
     .replace(/\/$/, "")
     .replace(/^www\./, "");

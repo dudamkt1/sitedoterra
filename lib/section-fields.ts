@@ -33,15 +33,11 @@ export const SECTION_CONTENT_FIELDS: Record<SectionType, ContentFieldDef[]> = {
     { key: "logoUrl", label: "Logo (imagem)", type: "image" },
   ],
   hero: [
-    { key: "eyebrow", label: "Selo / subtítulo do topo", type: "text", ai: true, aiKind: "title" },
-    { key: "firstName", label: "Nome", type: "text" },
-    { key: "lastName", label: "Sobrenome", type: "text" },
-    { key: "role", label: "Título / cargo", type: "text" },
-    { key: "description", label: "Descrição principal", type: "textarea", ai: true, aiKind: "description" },
+    // Nome, cargo, descrição, selos e estatísticas são gerenciados em
+    // "Informações do site" (site_settings) e injetados na Hero — editar aqui
+    // congelaria esses valores. O editor da seção cuida do visual:
     { key: "image", label: "Foto (URL)", type: "image" },
     { key: "imageAlt", label: "Texto alternativo da foto", type: "text" },
-    { key: "badgeTitle", label: "Selo da foto — título (ex.: Certified Wellness)", type: "text" },
-    { key: "badgeSubtitle", label: "Selo da foto — subtítulo (ex.: Expert em bem-estar)", type: "text" },
     {
       key: "primaryBtn", label: "Botão principal", type: "object", fields: [
         { key: "text", label: "Texto", type: "text" },
@@ -150,8 +146,7 @@ export const SECTION_CONTENT_FIELDS: Record<SectionType, ContentFieldDef[]> = {
   tips: [
     { key: "eyebrow", label: "Selo superior", type: "text" },
     { key: "title", label: "Título", type: "text", ai: true, aiKind: "title" },
-    { key: "instagramHandle", label: "Mostrar como (ex.: @perfil)", type: "text" },
-    { key: "instagramUrl", label: "Link do perfil", type: "url" },
+    // instagramHandle/instagramUrl vêm de "Informações do site" (Instagram) —
     {
       key: "items", label: "Publicações", type: "list", itemLabel: "Publicação", fields: [
         { key: "emoji", label: "Emoji", type: "text" },

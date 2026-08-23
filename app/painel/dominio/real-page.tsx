@@ -1,6 +1,7 @@
 import { getDashboardContext, type DashboardContext } from "@/lib/auth";
 import { SectionTitle } from "@/components/dashboard/ui";
 import { DomainManager } from "@/components/dashboard/DomainManager";
+import { getPublicBaseUrl } from "@/lib/public-url";
 
 export default async function DominioPage(p: { demoCtx?: DashboardContext }) {
   const ctx = p.demoCtx ?? (await getDashboardContext());
@@ -14,7 +15,7 @@ export default async function DominioPage(p: { demoCtx?: DashboardContext }) {
       <DomainManager
         domains={ctx.domains as any}
         slug={ctx.tenant?.slug || ""}
-        appUrl={process.env.NEXT_PUBLIC_APP_URL || ""}
+        appUrl={getPublicBaseUrl()}
       />
     </div>
   );

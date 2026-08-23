@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPlanById } from "@/lib/commercial";
 import { addMonths } from "@/lib/billing";
+import { getPublicBaseUrl } from "@/lib/public-url";
 
 /**
  * MERCADO PAGO — cliente server-only (nunca exposto ao browser).
@@ -99,7 +100,7 @@ export interface ActivationPreferenceInput {
 export async function createActivationPreference(
   input: ActivationPreferenceInput
 ): Promise<{ id: string; initPoint: string }> {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const appUrl = getPublicBaseUrl();
   const notificationUrl = `${appUrl}/api/webhooks/mercadopago`;
 
   const body = {
@@ -165,7 +166,7 @@ export async function ensureRecurringPlan(
     return { id: plan.mercadopago_plan_id, amountCents };
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const appUrl = getPublicBaseUrl();
   const created = await mpFetch<{ id: string }>("/v1/plans", {
     method: "POST",
     body: JSON.stringify({
@@ -206,7 +207,7 @@ export async function createRecurringSubscriptionMp(input: {
   const { id: planIdMp } = await ensureRecurringPlan(input.planId);
   const trialDate = new Date(input.trialEnd);
   const billingDay = Math.min(Math.max(trialDate.getDate(), 1), 28);
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const appUrl = getPublicBaseUrl();
 
   return mpFetch<MpSubscription>("/v1/subscriptions", {
     method: "POST",

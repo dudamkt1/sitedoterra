@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { HomeEditor } from "@/components/admin/HomeEditor";
 import type { SiteSection } from "@/types";
+import { getPublicBaseUrl } from "@/lib/public-url";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,7 @@ export default async function AdminEditorHomePage() {
           As alterações aqui valem para todos os sites. A ordem salva é refletida automaticamente na página pública.
         </p>
       </div>
-      <HomeEditor initialSections={sections} appUrl={process.env.NEXT_PUBLIC_APP_URL || ""} />
+      <HomeEditor initialSections={sections} appUrl={getPublicBaseUrl()} />
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { getStripe } from "@/lib/stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser, getProfile } from "@/lib/auth";
 import { ensureTenantForUser } from "@/lib/onboarding";
+import { getPublicBaseUrl } from "@/lib/public-url";
 
 export const runtime = "nodejs";
 
@@ -31,7 +32,7 @@ export async function POST() {
     return NextResponse.json({ error: "Nenhum customer no Stripe" }, { status: 400 });
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const appUrl = getPublicBaseUrl();
   const stripe = getStripe();
   const session = await stripe.billingPortal.sessions.create({
     customer: sub.stripe_customer_id,
