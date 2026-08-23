@@ -203,6 +203,19 @@ export interface DemoAiUserTemplate {
   created_at: string;
 }
 
+export interface DemoPwaSettings {
+  enabled: boolean;
+  app_name: string;
+  short_name: string;
+  description: string;
+  logo_url: string | null;
+  icon_192_url: string | null;
+  icon_512_url: string | null;
+  theme_color: string;
+  background_color: string;
+  canonical: "platform" | "custom";
+}
+
 export interface DemoCrmData {
   clients: DemoCrmClient[];
   products: DemoCrmProduct[];
@@ -224,6 +237,7 @@ export interface DemoCrmData {
   aiFavorites: string[];
   aiUserTemplates: DemoAiUserTemplate[];
   knowledge: { keywords: string; text: string; oils: string[] }[];
+  pwa: DemoPwaSettings;
 }
 
 const nowIso = () => new Date().toISOString();
@@ -397,6 +411,18 @@ export function buildDemoCrmSeed(): DemoCrmData {
     aiFavorites: [],
     aiUserTemplates: [],
     knowledge: [],
+    pwa: {
+      enabled: true,
+      app_name: "Demonstração",
+      short_name: "Demo",
+      description: "App da consultora Demonstração — óleos essenciais e bem-estar.",
+      logo_url: null,
+      icon_192_url: null,
+      icon_512_url: null,
+      theme_color: "#1d5c3a",
+      background_color: "#faf8f2",
+      canonical: "platform",
+    },
   };
 }
 

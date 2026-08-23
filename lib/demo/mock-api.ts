@@ -1195,6 +1195,48 @@ function handleBilling(pathname: string): DemoApiResult | null {
   return null;
 }
 
+function handlePwa(pathname: string, method: string, body: any): DemoApiResult | null {
+  if (pathname !== "/api/pwa") return null;
+  const db = loadDemoCrm();
+
+  if (method === "GET") {
+    return {
+      status: 200,
+      json: {
+        settings: db.pwa,
+        slug: "demonstracao",
+        customDomains: db.domains.filter((d) => d.status === "active").map((d) => d.domain),
+      },
+    };
+  }
+
+  if (method === "PUT") {
+    const str = (v: unknown, max: number): string =>
+      typeof v === "string" ? v.trim().slice(0, max) : "";
+    const HEX = /^#[0-9a-fA-F]{6}$/;
+    const safeUrl = (v: unknown): string | null => {
+      const s = str(v, 500);
+      return s && /^(https?:\/\/|\/|data:image)/i.test(s) ? s : null;
+    };
+    db.pwa = {
+      enabled: Boolean(body.enabled),
+      app_name: str(body.app_name, 60),
+      short_name: str(body.short_name, 20) || str(body.app_name, 12),
+      description: str(body.description, 160),
+      logo_url: safeUrl(body.logo_url),
+      icon_192_url: safeUrl(body.icon_192_url),
+      icon_512_url: safeUrl(body.icon_512_url),
+      theme_color: HEX.test(String(body.theme_color || "")) ? String(body.theme_color) : "#1d5c3a",
+      background_color: HEX.test(String(body.background_color || "")) ? String(body.background_color) : "#faf8f2",
+      canonical: body.canonical === "custom" ? "custom" : "platform",
+    };
+    saveDemoCrm(db);
+    return { status: 200, json: { success: true, settings: db.pwa } };
+  }
+
+  return null;
+}
+
 // ------------------------------------------------------------- MAIN ----
 
 export async function handleDemoApi(
@@ -1210,6 +1252,7 @@ export async function handleDemoApi(
       handleMedia(pathname, searchParams, method, body) ||
       handleAi(pathname, method, body) ||
       handleIaTraining(pathname, method, body) ||
+      handlePwa(pathname, method, body) ||
       handleBilling(pathname) || { status: 404, json: { error: "Não encontrado (demonstração)." } }
     );
   } catch (e) {

@@ -13,6 +13,7 @@ const USER_LINKS = [
   { href: "/painel/ia/treinamento", label: "Treinar IA do site", icon: "🧠" },
   { href: "/painel/assinatura", label: "Minha Assinatura", icon: "💳" },
   { href: "/painel/dominio", label: "Domínio", icon: "🔗" },
+  { href: "/painel/pwa", label: "PWA / Meu Aplicativo", icon: "📱" },
   { href: "/painel/pagamentos", label: "Pagamentos", icon: "🧾" },
   { href: "/painel/conta", label: "Minha Conta", icon: "👤" },
 ];
