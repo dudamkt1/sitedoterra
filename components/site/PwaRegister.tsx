@@ -20,14 +20,44 @@ export interface PwaRegisterProps {
   themeColor: string;
 }
 
-const DISMISS_KEY = (slug: string) => `pwa-dismiss-${slug}`;
-const DISMISS_DAYS = 7;
+type Platform = "ios" | "android" | "outro";
+
+/**
+ * Convite de instalação no MOBILE:
+ * - aparece em TODO novo acesso ao site (enquanto o app não estiver instalado);
+ * - quem não quiser pode fechar e seguir navegando sem ser incomodado
+ *   durante aquela visita (o flag vive em sessionStorage, não em localStorage);
+ * - no acesso seguinte o convite volta a aparecer.
+ */
+const DISMISS_KEY = (slug: string) => `pwa-convite-fechado-${slug}`;
+const SHOW_DELAY_MS = 2500;
+
+function detectPlatform(): Platform {
+  const ua = window.navigator.userAgent;
+  const isIOS =
+    /iPad|iPhone|iPod/.test(ua) ||
+    (ua.includes("Macintosh") && "ontouchend" in document);
+  if (isIOS) return "ios";
+  if (/Android/i.test(ua)) return "android";
+  if (/Mobile|IEMobile|Opera Mini/i.test(ua)) return "android";
+  return "outro";
+}
+
+function isMobileDevice(): boolean {
+  const ua = window.navigator.userAgent;
+  return (
+    /Android|iPhone|iPad|iPod|Mobile|IEMobile|Opera Mini/i.test(ua) ||
+    // iPadOS 13+ se identifica como Mac com suporte a toque
+    (ua.includes("Macintosh") && "ontouchend" in document)
+  );
+}
 
 export function PwaRegister(props: PwaRegisterProps) {
   const { enabled, slug, swUrl, scope, appName } = props;
 
-  const [invite, setInvite] = useState(false);
-  const [iosHelp, setIosHelp] = useState(false);
+  const [visible, setVisible] = useState(false);
+  const [manualSteps, setManualSteps] = useState(false);
+  const [platform, setPlatform] = useState<Platform>("outro");
   const deferredPrompt = useRef<BeforeInstallPromptEvent | null>(null);
 
   const isStandalone = useCallback(() => {
@@ -50,56 +80,75 @@ export function PwaRegister(props: PwaRegisterProps) {
     // 2) Já instalado? Não insistir.
     if (isStandalone()) return;
 
-    // 3) Usuário dispensou recentemente?
+    // 3) Convite persuasivo apenas no celular.
+    if (!isMobileDevice()) return;
+
+    // 4) Fechou nesta visita? Só reaparece no PRÓXIMO acesso.
     try {
-      const raw = localStorage.getItem(DISMISS_KEY(slug));
-      if (raw && Date.now() - Number(raw) < DISMISS_DAYS * 86400000) return;
+      if (sessionStorage.getItem(DISMISS_KEY(slug))) return;
     } catch {}
 
-    // 4) iOS não dispara beforeinstallprompt → instruções manuais.
-    const ua = window.navigator.userAgent;
-    const isIOS =
-      /iPad|iPhone|iPod/.test(ua) ||
-      (ua.includes("Macintosh") && "ontouchend" in document);
-    if (isIOS) {
-      const t = setTimeout(() => setIosHelp(true), 2500);
-      return () => clearTimeout(t);
-    }
+    setPlatform(detectPlatform());
 
-    // 5) Android/Chrome: espera o evento nativo.
+    // 5) Evento nativo (Android/Chrome) guarda o prompt para o botão instalar.
     function onPrompt(e: Event) {
       e.preventDefault();
       deferredPrompt.current = e as BeforeInstallPromptEvent;
-      setInvite(true);
+    }
+    function onInstalled() {
+      deferredPrompt.current = null;
+      setVisible(false);
+      setManualSteps(false);
+      try {
+        sessionStorage.setItem(DISMISS_KEY(slug), "1");
+      } catch {}
     }
     window.addEventListener("beforeinstallprompt", onPrompt);
-    return () => window.removeEventListener("beforeinstallprompt", onPrompt);
+    window.addEventListener("appinstalled", onInstalled);
+
+    // 6) Mostra em todo acesso mobile — mesmo antes do evento nativo chegar.
+    const t = setTimeout(() => {
+      setVisible(true);
+      // iOS nunca dispara beforeinstallprompt → passos manuais diretos.
+      if (detectPlatform() === "ios") setManualSteps(true);
+    }, SHOW_DELAY_MS);
+
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("beforeinstallprompt", onPrompt);
+      window.removeEventListener("appinstalled", onInstalled);
+    };
   }, [enabled, slug, swUrl, scope, isStandalone]);
 
   async function installNow() {
     const p = deferredPrompt.current;
-    if (!p) return;
+    if (!p) {
+      // Prompt nativo indisponível: ensina o caminho manual em vez de deixar
+      // o botão sem ação.
+      setManualSteps(true);
+      return;
+    }
     await p.prompt();
     try {
-      await p.userChoice;
+      const choice = await p.userChoice;
+      if (choice.outcome === "accepted") dismiss();
     } catch {}
     deferredPrompt.current = null;
-    setInvite(false);
   }
 
   function dismiss() {
     try {
-      localStorage.setItem(DISMISS_KEY(slug), String(Date.now()));
+      sessionStorage.setItem(DISMISS_KEY(slug), "1");
     } catch {}
-    setInvite(false);
-    setIosHelp(false);
+    setVisible(false);
+    setManualSteps(false);
   }
 
   if (!enabled) return null;
 
   return (
     <>
-      {(invite || iosHelp) && (
+      {visible && (
         <div
           role="dialog"
           aria-label="Instalar aplicativo"
@@ -114,22 +163,48 @@ export function PwaRegister(props: PwaRegisterProps) {
                   Instalar aplicativo
                 </p>
                 <p className="text-xs text-gray-600 mt-1 leading-relaxed">
-                  Tenha este aplicativo na tela inicial do seu celular para
-                  acessar rapidamente.
+                  Leve <strong>{appName}</strong> para a tela inicial do seu
+                  celular e volte aqui com 1 toque — mais rápido, sem digitar
+                  endereço. Leva menos de 10 segundos.
                 </p>
 
-                {iosHelp && (
+                {!manualSteps && (
+                  <p className="mt-2 text-[0.7rem] text-gray-500 flex flex-wrap gap-x-3 gap-y-1">
+                    <span>⚡ Abertura instantânea</span>
+                    <span>📌 Ícone na tela inicial</span>
+                  </p>
+                )}
+
+                {manualSteps && (
                   <ol className="mt-3 text-xs text-gray-700 space-y-1.5 list-decimal list-inside">
-                    <li>
-                      Toque em <strong>Compartilhar</strong> (ícone ▲ na barra
-                      do Safari).
-                    </li>
-                    <li>
-                      Escolha <strong>Adicionar à Tela de Início</strong>.
-                    </li>
-                    <li>
-                      Confirme tocando em <strong>Adicionar</strong>.
-                    </li>
+                    {platform === "ios" ? (
+                      <>
+                        <li>
+                          Toque em <strong>Compartilhar</strong> (ícone ▲ na
+                          barra do Safari).
+                        </li>
+                        <li>
+                          Escolha <strong>Adicionar à Tela de Início</strong>.
+                        </li>
+                        <li>
+                          Confirme tocando em <strong>Adicionar</strong>.
+                        </li>
+                      </>
+                    ) : (
+                      <>
+                        <li>
+                          Abra o menu do navegador (<strong>⋮</strong> ou{" "}
+                          <strong>⋯</strong>).
+                        </li>
+                        <li>
+                          Toque em <strong>Instalar app</strong> ou{" "}
+                          <strong>Adicionar à tela inicial</strong>.
+                        </li>
+                        <li>
+                          Confirme tocando em <strong>Instalar</strong>.
+                        </li>
+                      </>
+                    )}
                   </ol>
                 )}
               </div>
@@ -144,16 +219,14 @@ export function PwaRegister(props: PwaRegisterProps) {
             </div>
 
             <div className="mt-4 flex gap-2">
-              {!iosHelp && (
-                <button
-                  type="button"
-                  onClick={installNow}
-                  className="flex-1 rounded-lg px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-white hover:opacity-90 transition-opacity"
-                  style={{ background: props.themeColor }}
-                >
-                  ⚡ Instalar agora
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={installNow}
+                className="flex-1 rounded-lg px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-white hover:opacity-90 transition-opacity"
+                style={{ background: props.themeColor }}
+              >
+                ⚡ Instalar agora
+              </button>
               <button
                 type="button"
                 onClick={dismiss}
