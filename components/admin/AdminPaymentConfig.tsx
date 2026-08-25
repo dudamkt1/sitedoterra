@@ -61,8 +61,9 @@ export default function AdminPaymentConfig() {
           setStripePublishable(json.stripe.publishable_key || "");
           setSandbox(json.mercadopago.sandbox);
           if (json.policy) {
-            setActivation(json.policy.activation_price_cents);
-            setMonthly(json.policy.monthly_price_cents);
+            // Estado em REAIS (o banco guarda centavos) — exibição "R$ 00,00".
+            setActivation(json.policy.activation_price_cents / 100);
+            setMonthly(json.policy.monthly_price_cents / 100);
             setTrialMonths(json.policy.trial_months);
             setAllowCancel(json.policy.allow_cancel);
           }
@@ -93,8 +94,9 @@ export default function AdminPaymentConfig() {
           ...(mpToken ? { mercadopago_access_token: mpToken } : {}),
           ...(mpWebhook ? { mercadopago_webhook_secret: mpWebhook } : {}),
           policy: {
-            activation_price_cents: activation,
-            monthly_price_cents: monthly,
+            // Converte de volta para centavos ao salvar.
+            activation_price_cents: Math.round(activation * 100),
+            monthly_price_cents: Math.round(monthly * 100),
             trial_months: trialMonths,
             allow_cancel: allowCancel,
           },
@@ -285,16 +287,16 @@ export default function AdminPaymentConfig() {
           <>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className="label">Valor da aquisição (centavos)</label>
-                <input type="number" min={0} className="input" value={activation}
+                <label className="label">Valor da aquisição (R$)</label>
+                <input type="number" min={0} step="0.01" className="input" value={activation}
                   onChange={(e) => setActivation(Number(e.target.value))} />
-                <p className="text-xs text-gray-400 mt-1">{formatBRL(activation)} · pagamento único</p>
+                <p className="text-xs text-gray-400 mt-1">{formatBRL(activation * 100)} · pagamento único</p>
               </div>
               <div>
-                <label className="label">Mensalidade (centavos)</label>
-                <input type="number" min={0} className="input" value={monthly}
+                <label className="label">Mensalidade (R$)</label>
+                <input type="number" min={0} step="0.01" className="input" value={monthly}
                   onChange={(e) => setMonthly(Number(e.target.value))} />
-                <p className="text-xs text-gray-400 mt-1">{formatBRL(monthly)}/mês</p>
+                <p className="text-xs text-gray-400 mt-1">{formatBRL(monthly * 100)}/mês</p>
               </div>
               <div>
                 <label className="label">Cobrar mensal a partir de (meses)</label>
