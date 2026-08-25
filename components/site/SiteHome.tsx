@@ -13,6 +13,8 @@ import { Faq } from "@/components/site/sections/Faq";
 import { Pricing } from "@/components/site/sections/Pricing";
 import { Footer } from "@/components/site/sections/Footer";
 import { SiteEffects } from "@/components/site/sections/SiteEffects";
+import { ThemePickerSection } from "@/components/site/ThemePickerSection";
+import { themeStyleTag, type SiteThemeConfig } from "@/lib/site-theme";
 
 export interface SiteContact {
   whatsapp?: string;
@@ -34,6 +36,8 @@ interface SiteHomeProps {
   contact?: SiteContact;
   logo?: SiteLogo;
   extraNav?: { label: string; href: string; className?: string }[];
+  /** Tema de cores definido pelo dono em /painel/meu-site (site_settings.theme). */
+  theme?: SiteThemeConfig | null;
 }
 
 /**
@@ -42,7 +46,7 @@ interface SiteHomeProps {
  * renderiza cada uma como componente independente, na ordem correta.
  * Seções desativadas são simplesmente ignoradas.
  */
-export function SiteHome({ slug, sections, contact, logo, extraNav = [] }: SiteHomeProps) {
+export function SiteHome({ slug, sections, contact, logo, extraNav = [], theme }: SiteHomeProps) {
   const visible = sections.filter((s) => s.enabled);
 
   const headerSection = visible.find((s) => s.type === "header");
@@ -67,6 +71,8 @@ export function SiteHome({ slug, sections, contact, logo, extraNav = [] }: SiteH
 
   return (
     <div id="tenant-site" data-slug={slug}>
+      {/* Tema do dono do site (server-side): variáveis CSS em #tenant-site */}
+      <style dangerouslySetInnerHTML={{ __html: themeStyleTag(theme) }} />
       <SiteEffects />
       <Header logoText={logoText} logoUrl={logoUrl} logoLightUrl={logo?.lightUrl} navItems={navItems} extraNav={extraNav} />
 
@@ -102,6 +108,9 @@ export function SiteHome({ slug, sections, contact, logo, extraNav = [] }: SiteH
             return null;
         }
       })}
+
+      {/* Seção experimental: visitante testa combinações de cores (local apenas) */}
+      <ThemePickerSection slug={slug} />
 
       <Footer
         content={footerContent as never}

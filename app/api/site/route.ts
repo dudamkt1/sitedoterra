@@ -2,8 +2,21 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/auth";
 import { ensureTenantForUser } from "@/lib/onboarding";
+import type { SiteThemeConfig } from "@/lib/site-theme";
 
 export const runtime = "nodejs";
+
+/** Valida o tema salvo em site_settings.data.theme. */
+function sanitizeTheme(raw: unknown): SiteThemeConfig | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const t = raw as Record<string, unknown>;
+  const preset = ["verde", "roxo", "eucalipto"].includes(String(t.preset))
+    ? (String(t.preset) as SiteThemeConfig["preset"])
+    : "verde";
+  const primaryRaw = typeof t.primary === "string" ? t.primary.trim() : "";
+  const primary = /^#([0-9a-f]{6})$/i.test(primaryRaw) ? primaryRaw.toLowerCase() : null;
+  return { preset, primary };
+}
 
 /**
  * Salva o conteúdo/configurações do site do tenant (site_settings.data).
@@ -23,11 +36,13 @@ export async function POST(request: Request) {
     "video", "social", "site_title",
   ];
 
-  // Sanitiza: mantém apenas chaves permitidas
+  // Sanitiza: mantǸm apenas chaves permitidas
   const data: Record<string, unknown> = {};
   for (const key of allowed) {
     if (key in body) data[key] = body[key];
   }
+  const theme = sanitizeTheme(body.theme);
+  if (theme) data.theme = theme;
 
   const admin = createAdminClient();
   const tenant = await ensureTenantForUser(user.id);

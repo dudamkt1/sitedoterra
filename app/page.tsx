@@ -8,6 +8,7 @@ import { resolveHomeSections } from "@/lib/home";
 import { getPublicTenantBySlug } from "@/lib/tenant";
 import { resolvePwaForRequest } from "@/lib/pwa/resolver";
 import { pwaUrls } from "@/lib/pwa/config";
+import { themePrimaryColor, type SiteThemeConfig } from "@/lib/site-theme";
 import type { PublicTenant } from "@/types";
 import "@/app/(site)/site.css";
 
@@ -64,7 +65,14 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export async function generateViewport(): Promise<Viewport> {
   const pwa = await resolveHomePwa();
-  return { themeColor: pwa?.settings.theme_color || "#1d5c3a" };
+  let themeColor = pwa?.settings.theme_color || "#1d5c3a";
+  try {
+    const homeSlug = process.env.HOME_TENANT_SLUG || "usuarioteste";
+    const tenant = await getPublicTenantBySlug(homeSlug);
+    const theme = (tenant?.site_data as Record<string, unknown> | null)?.theme as SiteThemeConfig | undefined;
+    if (theme) themeColor = themePrimaryColor(theme);
+  } catch {}
+  return { themeColor };
 }
 
 export default async function HomePage() {
@@ -78,6 +86,7 @@ export default async function HomePage() {
 
   const sections = await resolveHomeSections({ tenant, tenantDataOverridesGlobal: true });
   const siteData = (tenant.site_data || {}) as Record<string, unknown>;
+  const theme = (siteData.theme as SiteThemeConfig | undefined) || null;
 
   return (
     <>
@@ -85,6 +94,7 @@ export default async function HomePage() {
       <SiteHome
         slug={tenant.slug}
         sections={sections}
+        theme={theme}
         contact={{
           whatsapp: (siteData.whatsapp as string) || undefined,
           email: (siteData.email as string) || tenant.email || undefined,

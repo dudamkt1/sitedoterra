@@ -11,6 +11,7 @@ import { resolveHomeSections } from "@/lib/home";
 import { getCurrentUser } from "@/lib/auth";
 import { resolvePwaForRequest } from "@/lib/pwa/resolver";
 import { pwaUrls } from "@/lib/pwa/config";
+import { themePrimaryColor, type SiteThemeConfig } from "@/lib/site-theme";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -78,7 +79,13 @@ export async function generateMetadata({ params }: { params: { slug: string } })
 
 export async function generateViewport({ params }: { params: { slug: string } }): Promise<Viewport> {
   const pwa = await resolvePwaForRequest({ slugParam: params.slug });
-  return { themeColor: pwa?.settings.theme_color || "#1d5c3a" };
+  let themeColor = pwa?.settings.theme_color || "#1d5c3a";
+  try {
+    const { tenant } = await resolveTenantAccess({ slug: params.slug });
+    const theme = (tenant?.site_data as Record<string, unknown> | null)?.theme as SiteThemeConfig | undefined;
+    if (theme) themeColor = themePrimaryColor(theme);
+  } catch {}
+  return { themeColor };
 }
 
 export default async function TenantSitePage({ params }: { params: { slug: string } }) {
@@ -127,6 +134,7 @@ export default async function TenantSitePage({ params }: { params: { slug: strin
     // editados em /painel/meu-site) têm prioridade sobre o template global.
     const sections = await resolveHomeSections({ tenant, tenantDataOverridesGlobal: true });
     const siteData = (tenant.site_data || {}) as Record<string, unknown>;
+    const theme = (siteData.theme as SiteThemeConfig | undefined) || null;
     const pwaEnabled = Boolean(pwa?.settings.enabled);
     const { manifestUrl, swUrl } = pwaUrls(pwa?.basePath || `/${params.slug}/`);
     return (
@@ -136,6 +144,7 @@ export default async function TenantSitePage({ params }: { params: { slug: strin
         <SiteHome
           slug={tenant.slug}
           sections={sections}
+          theme={theme}
           contact={{
             whatsapp: (siteData.whatsapp as string) || undefined,
             email: (siteData.email as string) || tenant.email || undefined,

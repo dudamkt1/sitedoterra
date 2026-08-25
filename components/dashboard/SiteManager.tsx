@@ -2,6 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { MediaPicker } from "@/components/media/MediaPicker";
+import {
+  THEME_PRESETS,
+  resolveSiteTheme,
+  type SiteThemeConfig,
+  type ThemePresetKey,
+} from "@/lib/site-theme";
 
 interface SiteManagerProps {
   slug: string;
@@ -76,6 +82,23 @@ export function SiteManager({ slug, pendingSlug, siteData, appUrl, hasSubscripti
   const [logoTouched, setLogoTouched] = useState(false);
   const [savingSite, setSavingSite] = useState(false);
   const [siteMsg, setSiteMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  // ---- Tema de cores do site (site_settings.data.theme) ----
+  const rawPreset: unknown = siteData?.theme?.preset;
+  const savedTheme: SiteThemeConfig = {
+    preset:
+      rawPreset === "verde" || rawPreset === "roxo" || rawPreset === "eucalipto"
+        ? rawPreset
+        : "verde",
+    primary:
+      typeof siteData?.theme?.primary === "string" && /^#[0-9a-fA-F]{6}$/.test(siteData.theme.primary)
+        ? siteData.theme.primary
+        : "",
+  };
+  const [themePreset, setThemePreset] = useState<ThemePresetKey>(savedTheme.preset ?? "verde");
+  const [themePrimary, setThemePrimary] = useState<string>(savedTheme.primary ?? "");
+  const [themeTouched, setThemeTouched] = useState(false);
+  const resolvedPalette = resolveSiteTheme({ preset: themePreset, primary: themePrimary || null }).palette;
 
   const publicUrl = newSlug || slug;
 
@@ -155,6 +178,10 @@ export function SiteManager({ slug, pendingSlug, siteData, appUrl, hasSubscripti
       payload.logoLightUrl = form.logoLightUrl || undefined;
       payload.logoText = form.logoText || undefined;
       payload.faviconUrl = form.faviconUrl || undefined;
+    }
+    // Tema de cores: enviado apenas quando o usuário alterou nesta tela.
+    if (themeTouched) {
+      payload.theme = { preset: themePreset, primary: themePrimary || undefined };
     }
     const res = await fetch("/api/site", {
       method: "POST",
@@ -424,6 +451,139 @@ export function SiteManager({ slug, pendingSlug, siteData, appUrl, hasSubscripti
         <div className="mt-5 flex items-center gap-3">
           <button type="button" className="btn btn-primary" onClick={saveSite} disabled={savingSite}>
             {savingSite ? "Salvando..." : "Salvar favicon"}
+          </button>
+          {siteMsg && (
+            <span className={`text-sm ${siteMsg.ok ? "text-green-600" : "text-red-600"}`}>{siteMsg.text}</span>
+          )}
+        </div>
+      </div>
+
+      {/* ---------- Tema de cores ---------- */}
+      <div className="card">
+        <h2 className="card-title mb-1">Tema de cores do site</h2>
+        <p className="text-sm text-gray-500 mb-4">
+          Escolha a combinação que combina com você — todo o site muda de cor. Depois pode
+          ajustar a tonalidade manualmente. Seus visitantes também podem testar as cores no
+          seu próprio navegador, sem alterar o padrão do seu site.
+        </p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {THEME_PRESETS.map((preset) => {
+            const active = !themePrimary && themePreset === preset.key;
+            return (
+              <button
+                key={preset.key}
+                type="button"
+                onClick={() => {
+                  setThemeTouched(true);
+                  setThemePreset(preset.key);
+                  setThemePrimary("");
+                }}
+                className={`text-left rounded-xl border-2 p-4 transition-all ${
+                  active
+                    ? "border-[#1d5c3a] bg-[#f2faf5] shadow-sm"
+                    : "border-gray-200 bg-white hover:border-gray-300"
+                }`}
+              >
+                <span
+                  className="block w-10 h-10 rounded-full mb-2"
+                  style={{
+                    background: `linear-gradient(135deg, ${preset.palette.main} 0%, ${preset.palette.medium} 60%, ${preset.palette.light} 100%)`,
+                  }}
+                />
+                <p className="font-bold text-sm">{preset.label}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{preset.description}</p>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Cor manual */}
+        <div className="mt-5 rounded-xl border border-gray-100 bg-gray-50 p-4">
+          <p className="text-xs uppercase tracking-wider text-gray-400 font-semibold mb-1">
+            Cor manual (opcional)
+          </p>
+          <p className="text-xs text-gray-500 mb-3">
+            Escolha uma cor exata e o resto da paleta é criado automaticamente a partir dela.
+            Deixe no tema para usar a combinação pronta acima.
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <input
+              type="color"
+              aria-label="Cor principal personalizada"
+              className="h-10 w-14 rounded border border-gray-200 cursor-pointer bg-white"
+              value={themePrimary || resolvedPalette.main}
+              onChange={(e) => {
+                setThemeTouched(true);
+                setThemePrimary(e.target.value.toLowerCase());
+              }}
+            />
+            <input
+              type="text"
+              className="input max-w-40"
+              value={themePrimary}
+              placeholder="#RRGGBB"
+              onChange={(e) => {
+                const v = e.target.value.trim();
+                setThemeTouched(true);
+                setThemePrimary(/^#[0-9a-fA-F]{6}$/.test(v) ? v.toLowerCase() : v);
+              }}
+            />
+            {themePrimary && (
+              <button
+                type="button"
+                className="btn btn-outline !py-2 !px-4 text-xs"
+                onClick={() => {
+                  setThemeTouched(true);
+                  setThemePrimary("");
+                }}
+              >
+                ↺ Usar só o tema ({THEME_PRESETS.find((p) => p.key === themePreset)?.label})
+              </button>
+            )}
+          </div>
+          {themePrimary && !/^#[0-9a-f]{6}$/i.test(themePrimary) && (
+            <p className="mt-2 text-xs text-red-600">Digite uma cor no formato #RRGGBB (ex.: #5B2D86).</p>
+          )}
+        </div>
+
+        {/* Prévia ao vivo */}
+        <div className="mt-5 rounded-xl overflow-hidden border border-gray-200">
+          <div
+            className="px-4 py-3"
+            style={{ background: `linear-gradient(160deg, ${resolvedPalette.main} 0%, ${resolvedPalette.dark} 60%, ${resolvedPalette.darker} 100%)` }}
+          >
+            <p className="text-white/80 text-[0.65rem] uppercase tracking-widest font-semibold">
+              {form.name || "Prévia"} · doTERRA
+            </p>
+            <p className="text-white font-bold" style={{ fontFamily: "var(--font-display)", fontSize: "1.35rem" }}>
+              Bem-vinda ao meu site
+            </p>
+          </div>
+          <div className="px-4 py-3 flex items-center gap-3 flex-wrap" style={{ background: "#FEFCF8" }}>
+            <span
+              className="rounded-full px-3 py-1.5 text-xs font-semibold text-white"
+              style={{ background: resolvedPalette.main }}
+            >
+              Botão principal
+            </span>
+            <span
+              className="rounded-full px-3 py-1.5 text-xs font-semibold"
+              style={{ background: resolvedPalette.soft, color: resolvedPalette.dark }}
+            >
+              Destaque suave
+            </span>
+            <span className="w-6 h-6 rounded-full" style={{ background: resolvedPalette.light }} title={resolvedPalette.light} />
+            <span className="w-6 h-6 rounded-full" style={{ background: resolvedPalette.medium }} title={resolvedPalette.medium} />
+            <span className="ml-auto text-xs text-gray-400">
+              {themePrimary ? `Personalizada ${themePrimary}` : THEME_PRESETS.find((p) => p.key === themePreset)?.label}
+            </span>
+          </div>
+        </div>
+
+        <div className="mt-5 flex items-center gap-3">
+          <button type="button" className="btn btn-primary" onClick={saveSite} disabled={savingSite || Boolean(themePrimary && !/^#[0-9a-f]{6}$/i.test(themePrimary))}>
+            {savingSite ? "Salvando..." : "Salvar tema"}
           </button>
           {siteMsg && (
             <span className={`text-sm ${siteMsg.ok ? "text-green-600" : "text-red-600"}`}>{siteMsg.text}</span>
