@@ -3,12 +3,12 @@ import { resolvePwaForRequest } from "@/lib/pwa/resolver";
 export const dynamic = "force-dynamic";
 
 /**
- * GET /pwa/icon.svg  (raiz — domínio próprio)
- * Mesmo ícone dinâmico, resolvido pelo hostname do domínio próprio.
+ * GET /pwa/icon.svg  (raiz — domínio próprio ou HOME do domínio principal)
+ * Mesmo ícone dinâmico, resolvido pelo hostname/tenant da HOME.
  */
 export async function GET() {
-  const resolved = await resolvePwaForRequest();
-  if (!resolved || !resolved.settings.enabled || !resolved.ref.isCustomDomain) {
+  const resolved = await resolvePwaForRequest({ home: true });
+  if (!resolved || !resolved.settings.enabled) {
     return new Response("Not Found", { status: 404 });
   }
   // Reaproveita o gerador do slug correspondente.

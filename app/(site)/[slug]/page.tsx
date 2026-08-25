@@ -10,17 +10,10 @@ import { resolveTenantAccess } from "@/lib/tenant";
 import { resolveHomeSections } from "@/lib/home";
 import { getCurrentUser } from "@/lib/auth";
 import { resolvePwaForRequest } from "@/lib/pwa/resolver";
+import { pwaUrls } from "@/lib/pwa/config";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-
-function pwaUrls(basePath: string) {
-  const manifestUrl =
-    basePath === "/" ? "/manifest.webmanifest" : `${basePath}manifest.webmanifest`;
-  const swUrl = basePath === "/" ? "/sw.js" : `${basePath}sw.js`;
-  const iconUrl = `${basePath}pwa/icon.svg`;
-  return { manifestUrl, swUrl, iconUrl };
-}
 
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
   if (params.slug === "demonstracao") {
@@ -52,23 +45,33 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   const siteData = (tenant.site_data || {}) as Record<string, unknown>;
   const faviconUrl = (siteData.faviconUrl as string) || undefined;
 
+  // PWA do usuário
+  const pwa = await resolvePwaForRequest({ slugParam: params.slug });
+
+  // IMPORTANTE: metadata.icons pode ser objeto OU array (quando há favicon).
+  // Constrói sempre um ARRAY novo — nunca espalhar (spread) meta.icons,
+  // que quebra o SSR com "(icons ?? []) is not iterable".
+  const iconList: { url: string; type?: string; sizes?: string }[] = [];
+  if (faviconUrl) iconList.push({ url: faviconUrl });
+
   const meta: Metadata = {
     title: `${name} | Consultora doTERRA`,
     description: `Site oficial de ${name} — consultora doTERRA. Óleos essenciais puros, dicas de bem-estar e agendamento de consultas.`,
-    icons: faviconUrl ? { icon: faviconUrl } : undefined,
   };
 
-  // PWA do usuário
-  const pwa = await resolvePwaForRequest({ slugParam: params.slug });
   if (pwa?.settings.enabled) {
     const { manifestUrl, iconUrl } = pwaUrls(pwa.basePath);
     meta.manifest = manifestUrl;
-    meta.icons = [...(meta.icons as never[] ?? []), { url: iconUrl, type: "image/svg+xml", sizes: "any" }];
+    iconList.push({ url: iconUrl, type: "image/svg+xml", sizes: "any" });
     meta.appleWebApp = {
       capable: true,
       title: pwa.settings.short_name || pwa.settings.app_name || name,
       statusBarStyle: "default",
     };
+  }
+
+  if (iconList.length > 0) {
+    meta.icons = iconList;
   }
   return meta;
 }

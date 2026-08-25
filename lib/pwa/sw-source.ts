@@ -6,6 +6,8 @@
  * - Nome de cache inclui o identificador do usuário (`uid`) — nunca mistura
  *   dados entre usuários, mesmo que um SW compartilhado sirva a raiz.
  * - NUNCA cacheia /api/*, /auth/* nem métodos não-GET.
+ * - Com escopo "/" (HOME/domínio próprio), áreas privadas da plataforma
+ *   (/painel, /admin, /login, /cadastro) também ficam de fora do app.
  */
 export function buildServiceWorkerSource(opts: {
   cacheName: string;
@@ -18,6 +20,8 @@ export function buildServiceWorkerSource(opts: {
 const CACHE = ${JSON.stringify(`pwa-${cacheName}-v1`)};
 const SCOPE = ${JSON.stringify(scope)};
 const STATIC_HINTS = ["/_next/static/", "/_next/image/", "/pwa/"];
+// Áreas privadas da plataforma: nunca interceptadas nem cacheadas pelo app.
+const EXCLUDED_PREFIXES = ["/api", "/auth", "/painel", "/admin", "/login", "/cadastro"];
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
@@ -37,6 +41,10 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+function isExcluded(pathname) {
+  return EXCLUDED_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
+}
+
 function isStatic(url) {
   if (STATIC_HINTS.some((h) => url.pathname.includes(h))) return true;
   return /\\.(css|js|mjs|woff2?|ttf|otf|png|jpe?g|gif|webp|svg|ico|avif)$/i.test(url.pathname);
@@ -49,7 +57,7 @@ self.addEventListener("fetch", (event) => {
   let url;
   try { url = new URL(req.url); } catch { return; }
   if (url.origin !== location.origin) return;
-  if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/auth/")) return;
+  if (isExcluded(url.pathname)) return;
 
   // Isolamento por escopo: fora do app do usuário, não interfere.
   const inScope = url.pathname === SCOPE || url.pathname.startsWith(SCOPE);

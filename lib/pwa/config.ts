@@ -57,6 +57,19 @@ export interface PwaUrlContext {
   basePath: string; // sempre com barras nas pontas
 }
 
+/** URLs PWA derivadas do basePath ("/" na HOME/domínio próprio; "/{slug}/" na plataforma). */
+export function pwaUrls(basePath: string): {
+  manifestUrl: string;
+  swUrl: string;
+  iconUrl: string;
+} {
+  const manifestUrl =
+    basePath === "/" ? "/manifest.webmanifest" : `${basePath}manifest.webmanifest`;
+  const swUrl = basePath === "/" ? "/sw.js" : `${basePath}sw.js`;
+  const iconUrl = `${basePath}pwa/icon.svg`;
+  return { manifestUrl, swUrl, iconUrl };
+}
+
 function joinOrigin(origin: string, path: string) {
   return `${origin.replace(/\/$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
 }

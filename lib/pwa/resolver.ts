@@ -58,10 +58,13 @@ export async function getRequestOrigin(): Promise<{ host: string; origin: string
 /**
  * Identifica o usuário atual:
  *  - domínio principal + rota → usa o parâmetro {slug}
+ *  - HOME do domínio principal ("/") → tenant de HOME_TENANT_SLUG (opts.home)
  *  - domínio próprio         → consulta RPC get_public_tenant_by_domain
  */
 export async function resolveCurrentUser(opts?: {
   slugParam?: string | null;
+  /** HOME "/" do domínio principal: o app é a própria raiz do domínio. */
+  home?: boolean;
 }): Promise<CurrentUserRef> {
   const { host, origin } = await getRequestOrigin();
 
@@ -70,6 +73,14 @@ export async function resolveCurrentUser(opts?: {
     return {
       slug: tenant?.slug ?? null,
       isCustomDomain: true,
+      origin,
+    };
+  }
+
+  if (!opts?.slugParam && opts?.home) {
+    return {
+      slug: process.env.HOME_TENANT_SLUG || "usuarioteste",
+      isCustomDomain: false,
       origin,
     };
   }
@@ -105,20 +116,24 @@ export interface ResolvedPwa {
  * (manifest, ícones, service worker, metadata das páginas públicas).
  *
  * - /demonstracao usa defaults embutidos (não existe linha no banco).
+ * - HOME do domínio principal (opts.home) → basePath "/".
  * - Domínio próprio sem identificação → null.
  */
 export async function resolvePwaForRequest(opts?: {
   slugParam?: string | null;
+  home?: boolean;
 }): Promise<ResolvedPwa | null> {
   const ref = await resolveCurrentUser(opts);
   if (!ref.slug) return null;
+
+  const rootBase = ref.isCustomDomain || opts?.home;
 
   // Demonstração: ambiente local do visitante — manifest com identidade padrão.
   if (ref.slug === "demonstracao") {
     return {
       ref,
       settings: { ...DEMO_PWA_SETTINGS },
-      basePath: ref.isCustomDomain ? "/" : "/demonstracao/",
+      basePath: rootBase ? "/" : "/demonstracao/",
     };
   }
 
@@ -133,6 +148,6 @@ export async function resolvePwaForRequest(opts?: {
   return {
     ref,
     settings,
-    basePath: ref.isCustomDomain ? "/" : `/${ref.slug}/`,
+    basePath: rootBase ? "/" : `/${ref.slug}/`,
   };
 }

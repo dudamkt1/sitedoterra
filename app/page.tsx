@@ -1,9 +1,13 @@
+import type { Metadata, Viewport } from "next";
 import { getCurrentUser } from "@/lib/auth";
 import { SiteHome } from "@/components/site/SiteHome";
 import { LoggedInNotice } from "@/components/site/LoggedInNotice";
+import { PwaRegister } from "@/components/site/PwaRegister";
 import { DEFAULT_SITE_DATA } from "@/lib/site-data";
 import { resolveHomeSections } from "@/lib/home";
 import { getPublicTenantBySlug } from "@/lib/tenant";
+import { resolvePwaForRequest } from "@/lib/pwa/resolver";
+import { pwaUrls } from "@/lib/pwa/config";
 import type { PublicTenant } from "@/types";
 import "@/app/(site)/site.css";
 
@@ -32,12 +36,45 @@ const DEMO_TENANT: PublicTenant = {
  *
  * Se o tenant de demonstração não estiver disponível (ex.: sem Supabase ou
  * suspenso), cai no DEMO_TENANT estático com o conteúdo padrão.
+ *
+ * PWA: quando o app está ativo, a HOME também convida à instalação — o
+ * manifest/service worker são servidos na RAIZ (scope "/") e o app instalado
+ * abre direto no domínio principal.
  */
+
+async function resolveHomePwa() {
+  return resolvePwaForRequest({ home: true });
+}
+
+export async function generateMetadata(): Promise<Metadata> {
+  const pwa = await resolveHomePwa();
+  if (!pwa?.settings.enabled) return {};
+  const { manifestUrl, iconUrl } = pwaUrls(pwa.basePath);
+  return {
+    manifest: manifestUrl,
+    icons: [{ url: iconUrl, type: "image/svg+xml", sizes: "any" }],
+    appleWebApp: {
+      capable: true,
+      title: pwa.settings.short_name || pwa.settings.app_name,
+      statusBarStyle: "default",
+    },
+    other: { "apple-mobile-web-app-capable": "yes" },
+  };
+}
+
+export async function generateViewport(): Promise<Viewport> {
+  const pwa = await resolveHomePwa();
+  return { themeColor: pwa?.settings.theme_color || "#1d5c3a" };
+}
+
 export default async function HomePage() {
   const user = await getCurrentUser();
 
   const homeSlug = process.env.HOME_TENANT_SLUG || "usuarioteste";
   const tenant = (await getPublicTenantBySlug(homeSlug)) || DEMO_TENANT;
+  const pwa = await resolveHomePwa();
+  const pwaEnabled = Boolean(pwa?.settings.enabled);
+  const { manifestUrl, swUrl } = pwaUrls(pwa?.basePath || "/");
 
   const sections = await resolveHomeSections({ tenant, tenantDataOverridesGlobal: true });
   const siteData = (tenant.site_data || {}) as Record<string, unknown>;
@@ -61,6 +98,15 @@ export default async function HomePage() {
           text: (siteData.logoText as string) || undefined,
         }}
         extraNav={[{ label: "Painel", href: user ? "/painel" : "/login" }]}
+      />
+      <PwaRegister
+        enabled={pwaEnabled}
+        slug={homeSlug}
+        manifestUrl={manifestUrl}
+        swUrl={swUrl}
+        scope={pwa?.basePath || "/"}
+        appName={pwa?.settings.app_name || tenant.site_name || tenant.profile_name || "TopConsultores"}
+        themeColor={pwa?.settings.theme_color || "#1d5c3a"}
       />
     </>
   );

@@ -6,13 +6,14 @@ export const dynamic = "force-dynamic";
 
 /**
  * GET /manifest.webmanifest  (raiz)
- * Usado quando a PWA é acessada por DOMÍNIO PRÓPRIO:
- * o middleware reescreve "/" → /{slug}, mas este arquivo é pedido na raiz.
- * Resolve o usuário pelo hostname (RPC get_public_tenant_by_domain).
+ * Usado quando a PWA é acessada por DOMÍNIO PRÓPRIO ou pela HOME do
+ * domínio principal (oleos.topconsultores.com.br/):
+ *  - domínio próprio → resolve pelo hostname (RPC get_public_tenant_by_domain);
+ *  - domínio principal → resolve pelo tenant de HOME_TENANT_SLUG.
  */
 export async function GET() {
-  const resolved = await resolvePwaForRequest();
-  if (!resolved || !resolved.settings.enabled || !resolved.ref.isCustomDomain) {
+  const resolved = await resolvePwaForRequest({ home: true });
+  if (!resolved || !resolved.settings.enabled) {
     return new Response("Not Found", { status: 404 });
   }
 
