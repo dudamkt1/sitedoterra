@@ -91,13 +91,12 @@ export function buildManifest(
   const icons: Record<string, unknown>[] = [];
   if (s.icon_192_url) {
     icons.push({ src: abs(s.icon_192_url, ctx.origin), sizes: "192x192", type: guessType(s.icon_192_url), purpose: "any" });
-    icons.push({ src: abs(s.icon_192_url, ctx.origin), sizes: "192x192", type: guessType(s.icon_192_url), purpose: "maskable" });
   }
   if (s.icon_512_url) {
     icons.push({ src: abs(s.icon_512_url, ctx.origin), sizes: "512x512", type: guessType(s.icon_512_url), purpose: "any" });
-    icons.push({ src: abs(s.icon_512_url, ctx.origin), sizes: "512x512", type: guessType(s.icon_512_url), purpose: "maskable" });
   }
   // Fallback: ícone SVG gerado dinamicamente (monograma/logo) — aceito pelo Chrome.
+  // SVG tem zona de segurança, por isso pode usar "maskable".
   const svgIcon = joinOrigin(ctx.origin, `${scopeBase}pwa/icon.svg`);
   icons.push({ src: svgIcon, sizes: "any", type: "image/svg+xml", purpose: "any maskable" });
 
