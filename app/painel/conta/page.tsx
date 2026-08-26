@@ -1,9 +1,9 @@
 import { getPainelContext } from "@/lib/demo/painel-context";
-import { SectionTitle, StatusBadge } from "@/components/dashboard/ui";
-import { formatDate } from "@/lib/utils";
+import { SectionTitle } from "@/components/dashboard/ui";
+import ContaForm from "@/components/painel/ContaForm";
 
 export default async function ContaPage() {
-  const { ctx } = await getPainelContext();
+  const { isDemo, ctx } = await getPainelContext();
   if (!ctx) return null;
 
   const p = ctx.profile;
@@ -11,28 +11,22 @@ export default async function ContaPage() {
 
   return (
     <div>
-      <SectionTitle sub="Dados da sua conta.">Minha Conta</SectionTitle>
-      <div className="card max-w-xl">
-        <dl className="divide-y divide-gray-100 text-sm">
-          {[
-            ["Nome", p.name || "—"],
-            ["E-mail", p.email],
-            ["Telefone", p.phone || "—"],
-            ["Status da conta", <StatusBadge key="s" status={p.status} />],
-            ["Cadastro", formatDate(p.created_at)],
-            ["Ativação", formatDate(p.activated_at)],
-            ["Cancelamento", formatDate(p.cancelled_at)],
-          ].map(([label, value]) => (
-            <div key={String(label)} className="flex justify-between py-3">
-              <dt className="text-gray-500">{label}</dt>
-              <dd className="font-medium text-gray-800">{value}</dd>
-            </div>
-          ))}
-        </dl>
-        <p className="mt-4 text-xs text-gray-400">
-          Para alterar nome ou telefone, entre em contato com o suporte. Os dados da conta são preservados mesmo após cancelamento ou suspensão.
-        </p>
-      </div>
+      <SectionTitle sub="Edite seus dados e visualize informações gerais da conta.">Minha Conta</SectionTitle>
+      <ContaForm
+        profile={{
+          user_id: (p as any).user_id || (p as any).id || "",
+          name: (p as any).name || null,
+          email: (p as any).email || "",
+          phone: (p as any).phone || null,
+          status: (p as any).status || "active",
+          created_at: (p as any).created_at || new Date().toISOString(),
+          activated_at: (p as any).activated_at || null,
+          cancelled_at: (p as any).cancelled_at || null,
+          suspended_at: (p as any).suspended_at || null,
+          blocked_at: (p as any).blocked_at || null,
+        }}
+        isDemo={isDemo}
+      />
     </div>
   );
 }

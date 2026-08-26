@@ -1237,6 +1237,44 @@ function handlePwa(pathname: string, method: string, body: any): DemoApiResult |
   return null;
 }
 
+function handleConta(pathname: string, method: string, body: any): DemoApiResult | null {
+  if (pathname !== "/api/conta") return null;
+  const DEMO_CONTA_KEY = "demo:conta-profile";
+  function loadConta() {
+    try {
+      const raw = localStorage.getItem(DEMO_CONTA_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return null;
+  }
+  function saveConta(data: any) {
+    try { localStorage.setItem(DEMO_CONTA_KEY, JSON.stringify(data)); } catch {}
+  }
+  if (method === "GET") {
+    const saved = loadConta();
+    return { status: 200, json: { profile: saved || { name: "Acesso Rápido (Demo)", email: "acesso-rapido@demonstracao.local", phone: null } } };
+  }
+  if (method === "PATCH") {
+    if (body.action === "change_password" || body.password) {
+      const p = String(body.password || body.newPassword || "");
+      if (p.length < 6) return { status: 400, json: { error: "A senha precisa ter ao menos 6 caracteres." } };
+      return { status: 200, json: { success: true } };
+    }
+    // update_profile
+    const saved = loadConta() || {};
+    if (body.name !== undefined) saved.name = String(body.name || "").trim();
+    if (body.email !== undefined) {
+      const e = String(body.email || "").trim().toLowerCase();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) return { status: 400, json: { error: "E-mail inválido." } };
+      saved.email = e;
+    }
+    if (body.phone !== undefined) saved.phone = String(body.phone || "").trim() || null;
+    saveConta(saved);
+    return { status: 200, json: { success: true } };
+  }
+  return null;
+}
+
 // ------------------------------------------------------------- MAIN ----
 
 export async function handleDemoApi(
@@ -1253,6 +1291,7 @@ export async function handleDemoApi(
       handleAi(pathname, method, body) ||
       handleIaTraining(pathname, method, body) ||
       handlePwa(pathname, method, body) ||
+      handleConta(pathname, method, body) ||
       handleBilling(pathname) || { status: 404, json: { error: "Não encontrado (demonstração)." } }
     );
   } catch (e) {
