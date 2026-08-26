@@ -277,55 +277,44 @@ export function PwaManager() {
 
       {/* ---------- Logo & Ícones ---------- */}
       <div className="card">
-        <h2 className="card-title mb-1">Logo e ícones</h2>
+        <h2 className="card-title mb-1">Logo e ícone do aplicativo</h2>
         <p className="text-sm text-gray-500 mb-4">
-          Envie sua logo e gere os ícones do aplicativo (192×192 e 512×512). PNG com fundo transparente é o ideal.
+          <strong>Ícone do app (quadrado 1:1):</strong> será usado na tela inicial do celular. Aceita PNG/JPG/WebP com ou sem fundo transparente.
+          <br />
+          <span className="text-gray-400">Logo (opcional):</span> para uso em outras áreas do painel.
         </p>
 
         <div className="space-y-5">
+          {/* Ícone principal do App (1:1) */}
           <div>
-            <label className="label">Logo</label>
+            <label className="label">Ícone do aplicativo <span className="text-xs text-gray-400 font-normal">(quadrado 1:1, ex.: 512×512)</span></label>
+            <div className="flex items-center gap-2">
+              <input className="input flex-1" value={form.icon_192_url || ""} placeholder="URL ou escolha na biblioteca"
+                onChange={(e) => patch({ icon_192_url: e.target.value, icon_512_url: e.target.value })} />
+              <MediaPicker scope="tenant" value={form.icon_192_url || undefined}
+                onChange={(url) => patch({ icon_192_url: url, icon_512_url: url })} />
+            </div>
+            <p className="text-xs text-gray-400 mt-1">
+              Uma única imagem quadrada serve para todos os tamanhos (192×192, 512×512, máscaras adaptáveis).
+              Fundo transparente é recomendado, mas não obrigatório.
+            </p>
+          </div>
+
+          {/* Logo opcional */}
+          <div>
+            <label className="label">Logo (opcional)</label>
             <div className="flex items-center gap-2">
               <input className="input flex-1" value={form.logo_url || ""} placeholder="URL ou escolha na biblioteca"
                 onChange={(e) => patch({ logo_url: e.target.value })} />
               <MediaPicker scope="tenant" value={form.logo_url || undefined}
                 onChange={(url) => patch({ logo_url: url })} />
             </div>
+            <p className="text-xs text-gray-400 mt-1">Usado em outras áreas do painel. Não afeta o ícone do app no celular.</p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="label">Ícone 192×192</label>
-              <div className="flex items-center gap-2">
-                <input className="input flex-1" value={form.icon_192_url || ""} placeholder="URL do ícone"
-                  onChange={(e) => patch({ icon_192_url: e.target.value })} />
-                <MediaPicker scope="tenant" value={form.icon_192_url || undefined}
-                  onChange={(url) => patch({ icon_192_url: url })} />
-              </div>
-            </div>
-            <div>
-              <label className="label">Ícone 512×512</label>
-              <div className="flex items-center gap-2">
-                <input className="input flex-1" value={form.icon_512_url || ""} placeholder="URL do ícone"
-                  onChange={(e) => patch({ icon_512_url: e.target.value })} />
-                <MediaPicker scope="tenant" value={form.icon_512_url || undefined}
-                  onChange={(url) => patch({ icon_512_url: url })} />
-              </div>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            className="btn btn-outline !py-2 !px-4 text-xs"
-            onClick={() => patch({ icon_192_url: form.logo_url, icon_512_url: form.logo_url })}
-            disabled={!form.logo_url}
-          >
-            ✨ Gerar ícones a partir da logo
-          </button>
-
-          {!form.icon_192_url && !form.icon_512_url && (
+          {!form.icon_192_url && (
             <p className="text-xs text-gray-400">
-              Sem ícones enviados, o sistema gera automaticamente um ícone com as cores do app.
+              Sem ícone enviado, o sistema gera automaticamente um ícone com as cores do app.
             </p>
           )}
         </div>
