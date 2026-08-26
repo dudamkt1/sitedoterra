@@ -396,16 +396,17 @@ export function TenantSite({
               <div className="cal-days" id="calDays" ref={calDaysRef}></div>
             </div>
             <div className="cal-legend">
-              <div className="legend-item"><div className="legend-dot" style={{ background: "rgba(45,122,79,0.1)", border: "1px solid rgba(45,122,79,0.3)" }}></div>Disponível</div>
-              <div className="legend-item"><div className="legend-dot" style={{ background: "rgba(0,0,0,0.08)" }}></div>Ocupado</div>
-              <div className="legend-item"><div className="legend-dot" style={{ border: "2px solid var(--ouro)" }}></div>Hoje</div>
+              <div className="legend-item"><div className="legend-dot" style={{ background: "#dcfce7", border: "1.5px solid #22c55e" }}></div><b>Disponível</b></div>
+              <div className="legend-item"><div className="legend-dot" style={{ background: "#fee2e2", border: "1px solid #fecaca" }}></div><b>Ocupado</b></div>
+              <div className="legend-item"><div className="legend-dot" style={{ background: "#fffbeb", border: "2.5px solid #f59e0b" }}></div><b>Hoje</b></div>
             </div>
           </div>
           <div className="reveal" style={{ transitionDelay: "0.2s" }}>
             {!showSlots && (
-              <div id="selectPrompt" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 200, flexDirection: "column", gap: 12, border: "2px dashed rgba(29,92,58,0.15)", borderRadius: 12 }}>
+              <div id="selectPrompt" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 200, flexDirection: "column", gap: 12, border: "2px dashed rgba(22,101,52,0.18)", borderRadius: 12, background: "#f0fdf4" }}>
                 <span style={{ fontSize: "2rem" }}>📅</span>
-                <p style={{ fontSize: "0.85rem", color: "var(--cinza-claro)", textAlign: "center" }}>Selecione um dia disponível<br />no calendário</p>
+                <p style={{ fontSize: "0.85rem", color: "#166534", fontWeight: 600, textAlign: "center" }}>Selecione um dia <span style={{ background: "#dcfce7", padding: "1px 6px", borderRadius: 999, border: "1px solid #22c55e" }}>Disponível</span> no calendário</p>
+                <p style={{ fontSize: "0.72rem", color: "#6b7280" }}>Dias em verde estão livres para agendamento</p>
               </div>
             )}
             {showSlots && (
@@ -415,10 +416,11 @@ export function TenantSite({
               </div>
             )}
             {showConfirm && (
-              <div id="wppConfirm" style={{ marginTop: "1.5rem", padding: "1.5rem", background: "var(--creme)", borderRadius: 12, border: "1px solid rgba(29,92,58,0.1)" }}>
-                <p style={{ fontSize: "0.85rem", color: "var(--cinza)", marginBottom: "1rem" }}>Ótimo! Clique abaixo para confirmar pelo WhatsApp:</p>
-                <a href={confirmHref} target="_blank" className="ia-wpp-btn" style={{ fontSize: "0.82rem", padding: "0.8rem 1.5rem" }}>
-                  Confirmar pelo WhatsApp
+              <div id="wppConfirm" style={{ marginTop: "1.5rem", padding: "1.5rem", background: "#f0fdf4", borderRadius: 12, border: "1.5px solid #bbf7d0" }}>
+                <p style={{ fontSize: "0.85rem", color: "#166534", fontWeight: 600, marginBottom: "0.4rem" }}>✓ Horário selecionado</p>
+                <p style={{ fontSize: "0.78rem", color: "#6b7280", marginBottom: "1rem" }}>Você será direcionada ao WhatsApp da consultora. Ela confirma e o horário ficará como <b style={{ color: "#991b1b", background: "#fee2e2", padding: "0 6px", borderRadius: 999 }}>Ocupado</b> para os demais clientes.</p>
+                <a href={confirmHref} target="_blank" className="ia-wpp-btn" style={{ fontSize: "0.82rem", padding: "0.85rem 1.5rem", background: "#25D366", fontWeight: 700, borderRadius: 999, boxShadow: "0 6px 18px rgba(37,211,102,0.28)" }}>
+                  Confirmar no WhatsApp →
                 </a>
               </div>
             )}

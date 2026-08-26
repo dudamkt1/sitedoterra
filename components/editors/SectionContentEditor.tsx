@@ -5,6 +5,7 @@ import type { SectionType } from "@/types";
 import { SECTION_CONTENT_FIELDS, jsonToString, stringToJson, type ContentFieldDef } from "@/lib/section-fields";
 import { deepMerge } from "@/lib/home";
 import { MediaPicker } from "@/components/media/MediaPicker";
+import { BookingAgendaEditor } from "@/components/editors/BookingAgendaEditor";
 
 interface SectionContentEditorProps {
   sectionType: SectionType;
@@ -68,6 +69,10 @@ const AI_KIND_PROMPTS: Record<string, string> = {
 export function SectionContentEditor({ sectionType, value, onChange, mediaScope, disableLibrary }: SectionContentEditorProps) {
   const fields = useMemo(() => SECTION_CONTENT_FIELDS[sectionType] || [], [sectionType]);
   const [suggestions, setSuggestions] = useState<Record<string, Suggestion>>({});
+
+  if (sectionType === "booking") {
+    return <BookingAgendaEditor value={value} onChange={onChange} />;
+  }
 
   async function generate(field: ContentFieldDef, path: string[]) {
     const kind = field.aiKind || "default";

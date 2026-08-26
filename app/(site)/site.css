@@ -1425,36 +1425,46 @@
 
 
 #tenant-site .cal-day.available {
-  background: rgba(45,122,79,0.1);
-  color: var(--verde);
-  font-weight: 500;
+  background: #dcfce7;
+  border: 1.5px solid #22c55e;
+  color: #166534;
+  font-weight: 700;
+  box-shadow: 0 1px 6px rgba(22,101,52,0.12);
 }
 
 
 #tenant-site .cal-day.available:hover {
-  background: var(--verde);
+  background: #16a34a;
   color: var(--branco);
+  border-color: #15803d;
+  transform: scale(1.06);
 }
 
 
 #tenant-site .cal-day.occupied {
-  background: rgba(0,0,0,0.05);
-  color: var(--cinza-claro);
+  background: #fee2e2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
   cursor: not-allowed;
-  text-decoration: line-through;
+  font-weight: 600;
+  opacity: 0.95;
 }
 
 
 #tenant-site .cal-day.today {
-  border: 2px solid var(--ouro);
-  color: var(--ouro);
-  font-weight: 500;
+  border: 2.5px solid #f59e0b !important;
+  background: #fffbeb;
+  color: #92400e;
+  font-weight: 800;
+  box-shadow: 0 0 0 3px rgba(245,158,11,0.18);
 }
 
 
-#tenant-site .cal-day.empty { cursor: default; }
+#tenant-site .cal-day.empty { cursor: default; background: transparent; border: none; }
 
-#tenant-site .cal-day.selected { background: var(--verde) !important; color: var(--branco) !important; }
+#tenant-site .cal-day.selected { background: #15803d !important; color: var(--branco) !important; border-color: #166534 !important; transform: scale(1.08); box-shadow: 0 6px 18px rgba(22,101,52,0.32); }
+#tenant-site .cal-day.selected.today { border-color: #f59e0b !important; box-shadow: 0 0 0 3px rgba(245,158,11,0.25), 0 6px 18px rgba(22,101,52,0.32); }
+#tenant-site .cal-day.occupied.selected { background: #fee2e2 !important; color: #991b1b !important; }
 
 
 #tenant-site .cal-legend {
@@ -1520,9 +1530,10 @@
 }
 
 
-#tenant-site .slot:hover { background: var(--verde); color: white; border-color: var(--verde); }
+#tenant-site .slot:hover { background: #16a34a; color: white; border-color: #15803d; transform: translateY(-1px); box-shadow: 0 4px 10px rgba(22,101,52,0.18); }
+#tenant-site .slot.selected { background: #15803d !important; color: white !important; border-color: #166534 !important; box-shadow: 0 4px 12px rgba(22,101,52,0.25); }
 
-#tenant-site .slot.taken { background: rgba(0,0,0,0.04); color: var(--cinza-claro); border-color: transparent; cursor: not-allowed; text-decoration: line-through; }
+#tenant-site .slot.taken { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; cursor: not-allowed; font-weight: 600; }
 
 
 
