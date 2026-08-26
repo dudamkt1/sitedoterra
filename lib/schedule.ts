@@ -54,7 +54,7 @@ export function normalizeSchedule(raw: Record<string, unknown> | undefined): Sch
     available = [...s.available];
     occupied = [...s.occupied];
     // aplica bloqueios
-    for (const bd of blockedDays) {
+    for (const bd of Array.from(blockedDays)) {
       if (!occupied.includes(bd)) occupied.push(bd);
       available = available.filter((d) => d !== bd);
     }
