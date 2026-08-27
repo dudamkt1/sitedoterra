@@ -23,6 +23,11 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [showAdminArea, setShowAdminArea] = useState(false);
   const [demoStarting, setDemoStarting] = useState(false);
+  const [forgotMode, setForgotMode] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotError, setForgotError] = useState<string | null>(null);
+  const [forgotSuccess, setForgotSuccess] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -85,6 +90,35 @@ function LoginForm() {
     }
   }
 
+  async function handleForgot(e: React.FormEvent) {
+    e.preventDefault();
+    setForgotError(null);
+    setForgotSuccess(null);
+    const targetEmail = (forgotEmail || email).trim().toLowerCase();
+    if (!targetEmail || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(targetEmail)) {
+      setForgotError("Informe um e-mail válido.");
+      return;
+    }
+    setForgotLoading(true);
+    try {
+      const res = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: targetEmail }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setForgotError(json.error || "Não foi possível enviar o e-mail.");
+        setForgotLoading(false);
+        return;
+      }
+      setForgotSuccess(json.message || "Enviamos um e-mail com instruções para criar uma nova senha.");
+    } catch {
+      setForgotError("Falha de conexão. Tente novamente.");
+    }
+    setForgotLoading(false);
+  }
+
   return (
     <div>
       <h1 className="text-2xl font-semibold mb-1" style={{ fontFamily: "var(--font-display)" }}>
@@ -92,44 +126,100 @@ function LoginForm() {
       </h1>
       <p className="text-sm text-gray-500 mb-6">Acesse sua conta para gerenciar seu site e assinatura.</p>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      {!forgotMode ? (
+        <>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="label" htmlFor="email">E-mail</label>
+              <input
+                id="email"
+                type="email"
+                required
+                className="input"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="voce@email.com"
+              />
+            </div>
+            <div>
+              <div className="flex items-center justify-between">
+                <label className="label mb-0" htmlFor="password">Senha</label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setForgotEmail(email);
+                    setForgotError(null);
+                    setForgotSuccess(null);
+                    setForgotMode(true);
+                  }}
+                  className="text-xs font-medium hover:underline"
+                  style={{ color: "var(--verde)" }}
+                >
+                  Esqueceu a senha?
+                </button>
+              </div>
+              <PasswordField
+                id="password"
+                required
+                value={password}
+                onChange={setPassword}
+                placeholder="••••••••"
+                autoComplete="current-password"
+              />
+            </div>
+
+            {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
+
+            <button type="submit" className="btn btn-primary w-full" disabled={loading}>
+              {loading ? "Entrando..." : "Entrar"}
+            </button>
+          </form>
+
+          <p className="mt-6 text-sm text-gray-500 text-center">
+            Ainda não tem conta?{" "}
+            <Link href="/cadastro" className="font-semibold" style={{ color: "var(--verde)" }}>
+              Criar conta
+            </Link>
+          </p>
+        </>
+      ) : (
         <div>
-          <label className="label" htmlFor="email">E-mail</label>
-          <input
-            id="email"
-            type="email"
-            required
-            className="input"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="voce@email.com"
-          />
+          <h2 className="text-lg font-semibold mb-1" style={{ fontFamily: "var(--font-display)" }}>
+            Recuperar senha
+          </h2>
+          <p className="text-sm text-gray-500 mb-4">Informe seu e-mail cadastrado. Enviaremos um link para criar uma nova senha.</p>
+          <form onSubmit={handleForgot} className="space-y-4">
+            <div>
+              <label className="label" htmlFor="forgot-email">E-mail cadastrado</label>
+              <input
+                id="forgot-email"
+                type="email"
+                required
+                className="input"
+                value={forgotEmail}
+                onChange={(e) => setForgotEmail(e.target.value)}
+                placeholder="voce@email.com"
+              />
+            </div>
+            {forgotError && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{forgotError}</p>}
+            {forgotSuccess && <p className="text-sm text-green-700 bg-green-50 rounded-lg px-3 py-2">{forgotSuccess}</p>}
+            <button type="submit" className="btn btn-primary w-full" disabled={forgotLoading}>
+              {forgotLoading ? "Enviando..." : "Enviar link de recuperação"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setForgotMode(false);
+                setForgotError(null);
+                setForgotSuccess(null);
+              }}
+              className="btn btn-outline w-full"
+            >
+              Voltar ao login
+            </button>
+          </form>
         </div>
-        <div>
-          <label className="label" htmlFor="password">Senha</label>
-          <PasswordField
-            id="password"
-            required
-            value={password}
-            onChange={setPassword}
-            placeholder="••••••••"
-            autoComplete="current-password"
-          />
-        </div>
-
-        {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
-
-        <button type="submit" className="btn btn-primary w-full" disabled={loading}>
-          {loading ? "Entrando..." : "Entrar"}
-        </button>
-      </form>
-
-      <p className="mt-6 text-sm text-gray-500 text-center">
-        Ainda não tem conta?{" "}
-        <Link href="/cadastro" className="font-semibold" style={{ color: "var(--verde)" }}>
-          Criar conta
-        </Link>
-      </p>
+      )}
 
       <div className="mt-8 relative rounded-xl border-2 border-[#1d5c3a] bg-gradient-to-br from-[#e5f4ea] via-[#faf8f2] to-[#fdf6e9] p-5 shadow-md overflow-hidden">
         <span
