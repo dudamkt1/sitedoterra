@@ -26,7 +26,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
   }
 
-  const { planId } = await request.json();
+  const body = await request.json().catch(() => ({}));
+  const planId = body.planId as string | undefined;
+  const embedded = Boolean(body.embedded);
 
   const admin = createAdminClient();
   const profile = await getProfile(user.id);
@@ -67,7 +69,8 @@ export async function POST(request: Request) {
       activationAmountCents: plan.activation_price_cents,
       planName: plan.name,
     });
-    return NextResponse.json({ url: preference.initPoint, gateway: "mercadopago" });
+    // Transparente: devolve initPoint para iframe; fluxo normal devolve url para redirect.
+    return NextResponse.json({ url: preference.initPoint, gateway: "mercadopago", preferenceId: preference.id, embedded });
   }
 
   if (!gateways.stripe.secretKey) {
@@ -89,6 +92,23 @@ export async function POST(request: Request) {
 
   const metadata: Record<string, string> = { tenant_id: tenant.id, type: "activation", plan_id: plan.id };
 
+  if (embedded) {
+    // Checkout Transparente — Embedded Checkout (sem sair do site)
+    const session = await stripe.checkout.sessions.create({
+      // @ts-ignore — ui_mode embedded é suportado na API 2024-06-20
+      ui_mode: "embedded",
+      mode: "payment",
+      line_items: [{ price: await resolveActivationPriceId(plan.id), quantity: 1 }],
+      customer: customer.id,
+      metadata,
+      payment_intent_data: {
+        setup_future_usage: "off_session",
+      },
+      return_url: `${appUrl}/painel/assinatura?sucesso=1`,
+    } as any);
+    return NextResponse.json({ gateway: "stripe", clientSecret: (session as any).client_secret, url: session.url, embedded: true });
+  }
+
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
     line_items: [{ price: await resolveActivationPriceId(plan.id), quantity: 1 }],
@@ -104,5 +124,5 @@ export async function POST(request: Request) {
     cancel_url: `${appUrl}/painel/assinatura`,
   });
 
-  return NextResponse.json({ url: session.url });
+  return NextResponse.json({ url: session.url, gateway: "stripe" });
 }

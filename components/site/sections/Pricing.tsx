@@ -1,4 +1,8 @@
+"use client";
+
+import { useState } from "react";
 import { INCLUDED_CATALOG } from "@/lib/platform-includes";
+import { CheckoutModal } from "@/components/checkout/CheckoutModal";
 
 interface PricingPlan {
   name?: string;
@@ -52,6 +56,7 @@ function titleParts(title: string): { main: string; emphasis?: string } {
 }
 
 export function Pricing({ content }: { content: PricingContent }) {
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
   const offer = content.offer;
 
   // Fallback: estrutura antiga (listas manuais) quando não há oferta comercial.
@@ -59,33 +64,36 @@ export function Pricing({ content }: { content: PricingContent }) {
     const plans = content.plans || [];
     if (plans.length === 0) return null;
     return (
-      <section id="planos">
-        <div className="planos-inner">
-          <div className="planos-eyebrow">
-            <span className="eyebrow-line"></span>
-            <span className="eyebrow-text">{content.eyebrow || "Chamada final"}</span>
-            <span className="eyebrow-line"></span>
+      <>
+        <section id="planos">
+          <div className="planos-inner">
+            <div className="planos-eyebrow">
+              <span className="eyebrow-line"></span>
+              <span className="eyebrow-text">{content.eyebrow || "Chamada final"}</span>
+              <span className="eyebrow-line"></span>
+            </div>
+            <h2 className="planos-title">{content.title || "Planos"}</h2>
+            {content.subtitle && <p className="planos-sub">{content.subtitle}</p>}
+            <div className="planos-cards">
+              {plans.map((plan, i) => (
+                <div key={i} className={"plano-card" + (plan.popular ? " destaque" : "")}>
+                  {plan.badge && <div className="plano-badge">{plan.badge}</div>}
+                  <div className="plano-tipo">{plan.name}</div>
+                  <div className="plano-preco"><sup>R$</sup>{plan.price}</div>
+                  {plan.period && <div className="plano-period">{plan.period}</div>}
+                  {plan.economy && <div className="plano-economia">{plan.economy}</div>}
+                  <hr className="plano-divider" />
+                  <ul className="plano-features">
+                    {(plan.features || []).map((f, j) => <li key={j}>{f}</li>)}
+                  </ul>
+                  <button type="button" onClick={() => setCheckoutOpen(true)} className="btn-plano">{plan.buttonText || "Começar agora"}</button>
+                </div>
+              ))}
+            </div>
           </div>
-          <h2 className="planos-title">{content.title || "Planos"}</h2>
-          {content.subtitle && <p className="planos-sub">{content.subtitle}</p>}
-          <div className="planos-cards">
-            {plans.map((plan, i) => (
-              <div key={i} className={"plano-card" + (plan.popular ? " destaque" : "")}>
-                {plan.badge && <div className="plano-badge">{plan.badge}</div>}
-                <div className="plano-tipo">{plan.name}</div>
-                <div className="plano-preco"><sup>R$</sup>{plan.price}</div>
-                {plan.period && <div className="plano-period">{plan.period}</div>}
-                {plan.economy && <div className="plano-economia">{plan.economy}</div>}
-                <hr className="plano-divider" />
-                <ul className="plano-features">
-                  {(plan.features || []).map((f, j) => <li key={j}>{f}</li>)}
-                </ul>
-                <a href={plan.buttonUrl || "/cadastro"} className="btn-plano">{plan.buttonText || "Começar agora"}</a>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+        </section>
+        <CheckoutModal open={checkoutOpen} onClose={() => setCheckoutOpen(false)} />
+      </>
     );
   }
 
@@ -153,10 +161,10 @@ export function Pricing({ content }: { content: PricingContent }) {
           </div>
 
           {offer.ctaText && (
-            <a href={offer.ctaUrl || "/cadastro"} className="oferta-cta">
+            <button type="button" onClick={() => setCheckoutOpen(true)} className="oferta-cta">
               {offer.ctaText}
               <span className="oferta-cta-arrow">→</span>
-            </a>
+            </button>
           )}
 
           {offer.transparencyText && (
@@ -189,6 +197,7 @@ export function Pricing({ content }: { content: PricingContent }) {
           </p>
         </div>
       </div>
+      <CheckoutModal open={checkoutOpen} onClose={() => setCheckoutOpen(false)} />
     </section>
   );
 }
