@@ -6,6 +6,22 @@ import { WHATSAPP_PROVIDERS, MESSAGE_TEMPLATE_PRESETS } from "@/lib/crm-shared";
 import type { CrmWhatsAppConfig, CrmMessageTemplate, CrmClient } from "@/types";
 
 const PROVIDER_HELP: Record<string, { badge: string; badgeColor: string; title: string; where: string; steps: string[]; fields: string; linkLabel: string; link: string; tip: string }> = {
+  simples: {
+    badge: "Gratuito — sem API",
+    badgeColor: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    title: "Modo simples — link direto para seu WhatsApp",
+    where: "Seu WhatsApp pessoal ou comercial já instalado no celular",
+    steps: [
+      "Cadastre seu número de WhatsApp no campo abaixo (ex.: 5521999999999).",
+      "Cadastre seus clientes com o WhatsApp deles em Clientes.",
+      "Clique em Enviar — abriremos o WhatsApp Web/App com a mensagem pronta (wa.me), é só confirmar o envio.",
+      "Nenhum token, QR Code ou servidor é necessário. Funciona na hora, 100% gratuito.",
+    ],
+    fields: "Apenas seu número (Phone ID)",
+    linkLabel: "Entenda o wa.me",
+    link: "https://faq.whatsapp.com/5913398998672930/",
+    tip: "Recomendado para começar agora sem burocracia. Quando quiser envios automáticos em massa, migre para Meta/Evolution.",
+  },
   meta: {
     badge: "Gratuito até ~1.000 conversas/mês",
     badgeColor: "bg-emerald-50 text-emerald-700 border-emerald-200",
@@ -121,7 +137,7 @@ export default function CrmWhatsApp() {
       setClients(c.clients || []);
       setForm({
         enabled: w.config.enabled ? "1" : "0",
-        provider: w.config.provider || "meta",
+        provider: w.config.provider || "simples",
         api_url: w.config.api_url || "",
         phone_id: w.config.phone_id || "",
         webhook_url: w.config.webhook_url || "",
@@ -170,8 +186,28 @@ export default function CrmWhatsApp() {
     setSending(true);
     setToast(null);
     try {
-      const phone = client.whatsapp || client.phone;
-      if (!phone) throw new Error("Este cliente não possui WhatsApp cadastrado.");
+      const rawPhone = client.whatsapp || client.phone;
+      if (!rawPhone) throw new Error("Este cliente não possui WhatsApp cadastrado.");
+      const phone = rawPhone.replace(/\D/g, "");
+
+      // Modo simples (sem API) — abre wa.me direto, gratuito
+      const isSimples = form.provider === "simples" || config?.provider === "simples";
+      if (isSimples) {
+        const personalized = sendForm.message.replace(/{nome}/g, client.name.split(" ")[0]);
+        const url = `https://wa.me/${phone}?text=${encodeURIComponent(personalized)}`;
+        window.open(url, "_blank");
+        // registra no histórico mesmo sem API (server libera quando provider=simples)
+        try {
+          await fetch("/api/crm/whatsapp/send", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ client_id: client.id, phone, message: sendForm.message, mode: "simples" }),
+          });
+        } catch {}
+        setToast({ ok: true, text: "WhatsApp aberto! Confirme o envio no seu WhatsApp — sem custo e sem API." });
+        return;
+      }
+
       const res = await fetch("/api/crm/whatsapp/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -242,9 +278,7 @@ export default function CrmWhatsApp() {
       {!config.enabled && (
         <div className="card mb-6 bg-amber-50 border-amber-100">
           <p className="text-sm text-amber-700">
-            🔒 <strong>WhatsApp não configurado.</strong> Para enviar mensagens pelo sistema, ative e preencha as
-            credenciais abaixo. O token fica criptografado e nunca é exposto. Suporta a API oficial do WhatsApp/Meta ou
-            provedores compatíveis (Z-API, Evolution API).
+            🔒 <strong>WhatsApp não configurado.</strong> Você pode usar o <b>Modo simples (sem API, gratuito)</b> — basta ativar, escolher <b>Modo simples</b> e informar seu número. Para envios automáticos, ative e preencha as credenciais de API (Meta, Evolution ou Z-API). O token fica criptografado e nunca é exposto.
           </p>
         </div>
       )}
@@ -252,9 +286,9 @@ export default function CrmWhatsApp() {
       <div className="rounded-xl border border-emerald-100 bg-emerald-50/70 px-4 py-3 mb-4 flex gap-3">
         <span className="text-xl">💡</span>
         <div className="text-sm leading-relaxed">
-          <p className="font-semibold text-emerald-900">Recomendamos começar sem custo</p>
+          <p className="font-semibold text-emerald-900">Use sem API, 100% gratuito — ou evolua quando quiser</p>
           <p className="text-emerald-800/80 mt-1">
-            <b>Evolution API</b> é 100% gratuita e open-source (você hospeda) — ideal para testar sem cartão. <b>Meta WhatsApp Cloud API</b> também tem uso gratuito generoso (cerca de 1.000 conversas/mês) e é a opção oficial da Meta. Deixe <b>Z-API</b> (paga) apenas se precisar de suporte pronto.
+            <b>Modo simples</b> (link direto <code className="bg-white/60 px-1 rounded">wa.me</code>) funciona só cadastrando seu WhatsApp — sem token, sem QR Code, sem servidor. Para envios automáticos, use <b>Evolution API</b> (open-source, gratuita) ou <b>Meta Cloud API</b> (~1.000 conversas/mês grátis). <b>Z-API</b> só se precisar de suporte pago.
           </p>
         </div>
       </div>
@@ -269,18 +303,32 @@ export default function CrmWhatsApp() {
               </select>
             </Field>
             <ProviderHelp provider={form.provider} />
-            <Field label="API URL / endpoint">
-              <input className="input" placeholder="https://graph.facebook.com/v21.0/PHONE_ID/messages" value={form.api_url} onChange={(e) => setForm((f) => ({ ...f, api_url: e.target.value }))} />
-            </Field>
-            <Field label="Access Token (fica criptografado no servidor)">
-              <input type="password" className="input" placeholder={config.has_token ? `•••• (token já cadastrado ${config.key_hint || ""})` : "Cole o token"} value={form.access_token || ""} onChange={(e) => setForm((f) => ({ ...f, access_token: e.target.value }))} />
-            </Field>
-            <Field label="Phone ID / Número (opcional)">
-              <input className="input" placeholder="Ex.: 5521999999999" value={form.phone_id} onChange={(e) => setForm((f) => ({ ...f, phone_id: e.target.value }))} />
-            </Field>
-            <Field label="Webhook URL (opcional)">
-              <input className="input" value={form.webhook_url} onChange={(e) => setForm((f) => ({ ...f, webhook_url: e.target.value }))} />
-            </Field>
+            {form.provider === "simples" ? (
+              <>
+                <Field label="Seu WhatsApp (com DDD) *">
+                  <input className="input" placeholder="Ex.: 5521999999999 — seu número que aparecerá como remetente" value={form.phone_id} onChange={(e) => setForm((f) => ({ ...f, phone_id: e.target.value }))} />
+                </Field>
+                <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
+                  ✅ Sem API, sem token, sem complicação. Ao clicar em <b>Enviar</b>, abriremos o <b>WhatsApp Web/App</b> com a mensagem pronta para você confirmar. Gratuito e funciona na hora.
+                </p>
+                <p className="text-xs text-gray-400">Dica: deixe API URL / Token / Webhook vazios. Eles só são usados no modo API avançado.</p>
+              </>
+            ) : (
+              <>
+                <Field label="API URL / endpoint">
+                  <input className="input" placeholder="https://graph.facebook.com/v21.0/PHONE_ID/messages" value={form.api_url} onChange={(e) => setForm((f) => ({ ...f, api_url: e.target.value }))} />
+                </Field>
+                <Field label="Access Token (fica criptografado no servidor)">
+                  <input type="password" className="input" placeholder={config.has_token ? `•••• (token já cadastrado ${config.key_hint || ""})` : "Cole o token"} value={form.access_token || ""} onChange={(e) => setForm((f) => ({ ...f, access_token: e.target.value }))} />
+                </Field>
+                <Field label="Phone ID / Número (opcional)">
+                  <input className="input" placeholder="Ex.: 5521999999999" value={form.phone_id} onChange={(e) => setForm((f) => ({ ...f, phone_id: e.target.value }))} />
+                </Field>
+                <Field label="Webhook URL (opcional)">
+                  <input className="input" value={form.webhook_url} onChange={(e) => setForm((f) => ({ ...f, webhook_url: e.target.value }))} />
+                </Field>
+              </>
+            )}
             <p className="text-xs text-gray-400">
               Status da conexão: <strong>{config.connection_status}</strong>. O envio é feito pelo servidor
               (autenticado), respeitando as regras da plataforma e nunca enviando automaticamente sem sua ação.
@@ -308,8 +356,13 @@ export default function CrmWhatsApp() {
               pelo primeiro nome do cliente.
             </p>
             <button className="btn btn-gold w-full" disabled={sending || !selectedClient || !sendForm.message.trim() || !config.enabled} onClick={sendMessage}>
-              {sending ? "Enviando..." : `💬 Enviar para ${selectedClient ? selectedClient.name.split(" ")[0] : "cliente"}`}
+              {sending ? "Enviando..." : (form.provider === "simples" || config.provider === "simples") ? `💬 Abrir WhatsApp (grátis) para ${selectedClient ? selectedClient.name.split(" ")[0] : "cliente"}` : `💬 Enviar para ${selectedClient ? selectedClient.name.split(" ")[0] : "cliente"}`}
             </button>
+            {(form.provider === "simples" || config.provider === "simples") && (
+              <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
+                Modo simples: ao clicar, abriremos <b>wa.me</b> no seu WhatsApp Web/App com a mensagem pronta — confirme o envio lá. Sem API, sem custo.
+              </p>
+            )}
           </div>
 
           <h3 className="text-sm font-semibold text-gray-700 mt-6 mb-2">Mensagens prontas</h3>

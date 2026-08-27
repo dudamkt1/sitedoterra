@@ -19,6 +19,37 @@ export async function POST(request: Request) {
   if (!config.enabled) {
     return NextResponse.json({ error: "WhatsApp não configurado." }, { status: 400 });
   }
+
+  // Modo simples (sem API) — apenas registra histórico e retorna sucesso (link wa.me é aberto no cliente, gratuito)
+  const isSimples = config.provider === "simples" || body.mode === "simples";
+  if (isSimples) {
+    const phoneSimple = typeof body.phone === "string" ? body.phone.replace(/\D/g, "") : "";
+    const messageSimple = typeof body.message === "string" ? body.message.trim() : "";
+    const clientIdSimple = typeof body.client_id === "string" ? body.client_id : null;
+    if (!phoneSimple || !messageSimple) {
+      return NextResponse.json({ error: "Número e mensagem são obrigatórios." }, { status: 400 });
+    }
+    if (clientIdSimple) {
+      await admin.from("crm_client_timeline").insert({
+        tenant_id: tenant!.id,
+        client_id: clientIdSimple,
+        event_type: "mensagem",
+        title: "Mensagem via WhatsApp (modo simples — link direto)",
+        description: messageSimple.slice(0, 120),
+        event_at: new Date().toISOString(),
+      });
+    }
+    await admin.from("audit_logs").insert({
+      actor_id: user!.id,
+      actor_role: "user",
+      action: "crm_whatsapp_send_simples",
+      entity_type: "crm_whatsapp_config",
+      entity_id: tenant!.id,
+      metadata: { mode: "simples", phone: phoneSimple },
+    });
+    return NextResponse.json({ success: true, mode: "simples" });
+  }
+
   const token = decryptSecret((await admin.from("crm_whatsapp_config").select("access_token_enc").eq("tenant_id", tenant!.id).maybeSingle()).data?.access_token_enc);
   if (!token || !config.api_url) {
     return NextResponse.json({ error: "WhatsApp não configurado." }, { status: 400 });

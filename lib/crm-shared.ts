@@ -124,6 +124,7 @@ export const MESSAGE_TEMPLATE_PRESETS: { code: string; label: string; message: s
 ];
 
 export const WHATSAPP_PROVIDERS = [
+  { code: "simples", label: "Modo simples — link direto (sem API) ✨ Gratuito" },
   { code: "meta", label: "Meta WhatsApp Cloud API" },
   { code: "zapi", label: "Z-API" },
   { code: "evolution", label: "Evolution API" },
