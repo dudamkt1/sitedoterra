@@ -55,9 +55,18 @@ function titleParts(title: string): { main: string; emphasis?: string } {
   return { main: words.join(" "), emphasis };
 }
 
+const INTENT_KEY = "checkout_intent_v1";
+
 export function Pricing({ content }: { content: PricingContent }) {
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const offer = content.offer;
+
+  function handleOpen() {
+    try {
+      if (offer) localStorage.setItem(INTENT_KEY, JSON.stringify({ offer, ts: Date.now() }));
+    } catch {}
+    setCheckoutOpen(true);
+  }
 
   // Fallback: estrutura antiga (listas manuais) quando não há oferta comercial.
   if (!offer) {
@@ -86,7 +95,7 @@ export function Pricing({ content }: { content: PricingContent }) {
                   <ul className="plano-features">
                     {(plan.features || []).map((f, j) => <li key={j}>{f}</li>)}
                   </ul>
-                  <button type="button" onClick={() => setCheckoutOpen(true)} className="btn-plano">{plan.buttonText || "Começar agora"}</button>
+                  <button type="button" onClick={handleOpen} className="btn-plano">{plan.buttonText || "Começar agora"}</button>
                 </div>
               ))}
             </div>
@@ -161,7 +170,7 @@ export function Pricing({ content }: { content: PricingContent }) {
           </div>
 
           {offer.ctaText && (
-            <button type="button" onClick={() => setCheckoutOpen(true)} className="oferta-cta">
+            <button type="button" onClick={handleOpen} className="oferta-cta">
               {offer.ctaText}
               <span className="oferta-cta-arrow">→</span>
             </button>
