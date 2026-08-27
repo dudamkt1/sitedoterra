@@ -1304,7 +1304,7 @@ export const DEMO_AI_TEMPLATES: DemoAiTemplateRow[] = [
           "key": "image",
           "label": "Imagem (URL)",
           "type": "image",
-          "default": "https://images.unsplash.com/photo-1617897903246-719242758050?w=800&auto=format&fit=crop&q=80"
+          "default": "https://images.unsplash.com/photo-1446071103084-c257b5f70672?w=800&auto=format&fit=crop&q=80"
         },
         {
           "key": "logo",

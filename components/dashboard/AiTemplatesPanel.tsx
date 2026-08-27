@@ -5,6 +5,7 @@ import type { AiTemplate, AiUserTemplate, AiTemplateField } from "@/types";
 
 // Pool de imagens profissionais doTERRA / óleos essenciais — 100% gratuitas (Unsplash, licença livre)
 // Todas já vêm como default nos templates, mas servem também como fallback e para novas sugestões.
+// URLs validadas (Unsplash, com fallback silencioso se falhar).
 const DOTERRA_IMAGES = [
   "https://images.unsplash.com/photo-1608571423902-eed4a94d8108?w=800&auto=format&fit=crop&q=80", // frascos âmbar
   "https://images.unsplash.com/photo-1501004318641-b39e6451bec6?w=800&auto=format&fit=crop&q=80", // lavanda campo
@@ -12,6 +13,7 @@ const DOTERRA_IMAGES = [
   "https://images.unsplash.com/photo-1598440947619-cc6db50d67f9?w=800&auto=format&fit=crop&q=80", // citrus
   "https://images.unsplash.com/photo-1515378791036-0648a3ef77b2?w=800&auto=format&fit=crop&q=80", // eucalipto/folhas
   "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=800&auto=format&fit=crop&q=80", // spa / bem-estar
+  "https://images.unsplash.com/photo-1446071103084-c257b5f70672?w=800&auto=format&fit=crop&q=80", // gota de óleo macro (fallback extra)
 ];
 
 const DOTERRA_SUGGESTIONS: Array<{ title: string; subtitle: string; body: string; cta: string; hashtags: string; emoji: string; name: string }> = [
@@ -62,7 +64,10 @@ function TemplatePreview({
 
   const isCarrossel = layout === "carrossel";
   // Usa imagem profissional do template ou fallback doTERRA — nunca fica só cor chapada
-  const effectiveImage = values.image?.trim() ? values.image : getFallbackImage(template.code);
+  const rawImage = values.image?.trim() ? values.image : getFallbackImage(template.code);
+  // fallback silencioso se imagem quebrar (ex.: URL inválida) — troca para imagem doTERRA válida
+  const [imgSrc, setImgSrc] = useState(rawImage);
+  useEffect(() => { setImgSrc(rawImage); }, [rawImage]);
 
   return (
     <div
@@ -71,7 +76,14 @@ function TemplatePreview({
     >
       {/* Fundo profissional doTERRA */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={effectiveImage} alt="" className="absolute inset-0 w-full h-full object-cover" referrerPolicy="no-referrer" />
+      <img
+        src={imgSrc}
+        alt=""
+        className="absolute inset-0 w-full h-full object-cover"
+        referrerPolicy="no-referrer"
+        loading="lazy"
+        onError={() => setImgSrc(getFallbackImage(template.code + "-fallback"))}
+      />
       {/* Overlay gradiente profissional para legibilidade + identidade */}
       <div className="absolute inset-0" style={{ background: `linear-gradient(to bottom, ${bg}00 10%, ${bg}CC 55%, ${bg} 92%)` }} />
       <div className="absolute inset-0 bg-black/15" />
@@ -229,53 +241,60 @@ function TemplateEditor({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 overflow-y-auto">
-      <div className="card w-full max-w-4xl my-8">
-        <div className="flex items-start justify-between mb-3">
-          <div>
-            <h3 className="card-title">{template.emoji} {template.name}</h3>
-            <p className="text-xs text-gray-500 mt-0.5">Edite texto, cores, imagem, logo e posição. A prévia já vem com fundo profissional doTERRA — troque se quiser.</p>
+    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-start justify-center p-3 sm:p-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl my-4 sm:my-8 flex flex-col max-h-[92vh] sm:max-h-[85vh] overflow-hidden">
+        <div className="sticky top-0 z-10 bg-white border-b border-slate-100 px-4 sm:px-6 py-4 flex items-start justify-between gap-4 shrink-0">
+          <div className="min-w-0">
+            <h3 className="card-title text-base sm:text-lg truncate">{template.emoji} {template.name}</h3>
+            <p className="text-xs text-gray-500 mt-0.5 hidden sm:block">Edite texto, cores, imagem, logo e posição. A prévia já vem com fundo profissional doTERRA — troque se quiser.</p>
           </div>
-          <button className="text-gray-400 text-xl" onClick={onClose}>✕</button>
+          <button className="shrink-0 w-9 h-9 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-600 flex items-center justify-center transition" onClick={onClose} aria-label="Fechar">✕</button>
         </div>
 
         {msg && (
-          <p className={`mb-3 rounded-lg px-3 py-2 text-sm ${msg.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"}`}>{msg.text}</p>
+          <div className="px-4 sm:px-6 pt-4 shrink-0">
+            <p className={`rounded-lg px-3 py-2 text-sm ${msg.ok ? "bg-green-50 text-green-700 border border-green-100" : "bg-red-50 text-red-600 border border-red-100"}`}>{msg.text}</p>
+          </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="max-w-xs mx-auto w-full">
-            <TemplatePreview template={template} values={values} />
-          </div>
-
-          <div className="space-y-3">
-            {fields.map(renderField)}
-
-            <div>
-              <label className="label">Nome para salvar (opcional)</label>
-              <input className="input" placeholder={`Ex.: ${template.name} — minha versão`} value={savedName} onChange={(e) => setSavedName(e.target.value)} />
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="max-w-[320px] mx-auto w-full md:sticky md:top-2 self-start">
+              <TemplatePreview template={template} values={values} />
+              <p className="text-[11px] text-center text-slate-400 mt-2">Prévia real com foto doTERRA gratuita</p>
             </div>
 
-            <div className="flex flex-wrap gap-2 pt-1">
-              <button className="btn btn-primary !py-2 !px-4 text-xs" onClick={copyText}>
-                {copied ? "✓ Copiado!" : "📋 Copiar conteúdo"}
-              </button>
-              <button className="btn btn-gold !py-2 !px-4 text-xs" onClick={saveToMine} disabled={saving}>
-                {saving ? "Salvando..." : "💾 Salvar como meu template"}
-              </button>
-              <button className="btn btn-outline !py-2 !px-4 text-xs" onClick={() => setValues(defaultValues(template.structure))}>
-                ↺ Resetar
-              </button>
-            </div>
+            <div className="space-y-3 min-w-0">
+              {fields.map(renderField)}
 
-            <p className="text-[0.7rem] text-gray-400 leading-relaxed">
-              Todos os fundos são <b>profissionais e gratuitos</b>, inspirados em óleos essenciais doTERRA. Use a prévia como referência e copie o texto para seu app favorito (Canva, Instagram, CapCut) — sem pagar por banco de imagens.
-            </p>
+              <div>
+                <label className="label">Nome para salvar (opcional)</label>
+                <input className="input" placeholder={`Ex.: ${template.name} — minha versão`} value={savedName} onChange={(e) => setSavedName(e.target.value)} />
+              </div>
+
+              <div className="flex flex-wrap gap-2 pt-1">
+                <button className="btn btn-primary !py-2 !px-4 text-xs" onClick={copyText}>
+                  {copied ? "✓ Copiado!" : "📋 Copiar conteúdo"}
+                </button>
+                <button className="btn btn-gold !py-2 !px-4 text-xs" onClick={saveToMine} disabled={saving}>
+                  {saving ? "Salvando..." : "💾 Salvar como meu template"}
+                </button>
+                <button className="btn btn-outline !py-2 !px-4 text-xs" onClick={() => setValues(defaultValues(template.structure))}>
+                  ↺ Resetar
+                </button>
+              </div>
+
+              <p className="text-[0.7rem] text-gray-400 leading-relaxed">
+                Todos os fundos são <b>profissionais e gratuitos</b>, inspirados em óleos essenciais doTERRA. Use a prévia como referência e copie o texto para seu app favorito (Canva, Instagram, CapCut) — sem pagar por banco de imagens.
+              </p>
+            </div>
           </div>
         </div>
 
-        <div className="flex justify-end mt-5">
-          <button className="btn btn-outline" onClick={onClose}>Concluir</button>
+        <div className="sticky bottom-0 bg-white border-t border-slate-100 px-4 sm:px-6 py-3 flex justify-between sm:justify-end gap-2 shrink-0">
+          <button className="btn btn-outline sm:hidden flex-1" onClick={onClose}>Fechar</button>
+          <button className="btn btn-primary hidden sm:inline-flex" onClick={onClose}>Concluir</button>
+          <button className="btn btn-primary sm:hidden flex-1" onClick={onClose}>Concluir</button>
         </div>
       </div>
     </div>
