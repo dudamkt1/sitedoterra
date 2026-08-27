@@ -655,6 +655,27 @@ export interface CrmWhatsAppConfig {
   key_hint: string | null;
 }
 
+// ============================ AGENDAMENTOS ============================
+
+export type BookingStatus = "pendente" | "confirmado" | "realizado" | "cancelado" | "faltou" | "reagendado";
+
+export interface TenantBooking {
+  id: string;
+  tenant_id: string;
+  user_id: string;
+  client_name: string;
+  client_whatsapp: string | null;
+  client_email: string | null;
+  client_phone: string | null;
+  booking_date: string; // YYYY-MM-DD
+  booking_time: string; // HH:mm
+  notes: string | null;
+  status: BookingStatus;
+  source: "painel" | "site" | "whatsapp" | "importado";
+  created_at: string;
+  updated_at: string;
+}
+
 export interface CrmDashboardStats {
   activeClients: number;
   vipClients: number;

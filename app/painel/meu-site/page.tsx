@@ -12,6 +12,7 @@ export default async function MeuSitePage() {
   // Lazy-load dos componentes reais
   const { SiteManager } = await import("@/components/dashboard/SiteManager");
   const { SiteSectionsManager } = await import("@/components/dashboard/SiteSectionsManager");
+  const { BookingAppointmentsManager } = await import("@/components/dashboard/BookingAppointmentsManager");
 
   return (
     <div className="space-y-8">
@@ -38,6 +39,12 @@ export default async function MeuSitePage() {
           slug={ctx.tenant?.slug || ""}
           appUrl={appUrl}
         />
+      </div>
+      <div>
+        <BookingAppointmentsManager />
+        <p className="text-xs text-gray-400 mt-3 px-1">
+          <b>Melhor forma sugerida:</b> este controle vive dentro de <b>Meu Site → Agendamento</b> e também respeita seu calendário público. Cadastre cada consulta assim que fechar no WhatsApp; use os filtros <b>Hoje</b> e <b>Próximos</b> como lembrete diário. Status <b>Realizada / Cancelada / Faltou</b> viram histórico para relatórios e para bloquear horários automaticamente (em breve: sugerimos vincular agendamentos realizados aos <b>Horários ocupados</b> da agenda).
+        </p>
       </div>
     </div>
   );

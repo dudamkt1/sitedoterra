@@ -1277,6 +1277,106 @@ function handleConta(pathname: string, method: string, body: any): DemoApiResult
 
 // ------------------------------------------------------------- MAIN ----
 
+function handleBookings(pathname: string, method: string, body: any, sp: URLSearchParams): DemoApiResult | null {
+  if (!pathname.startsWith("/api/bookings")) return null;
+  const KEY = "sitedoterra_demo_bookings_v1";
+  function load(): any[] {
+    try {
+      const raw = typeof localStorage !== "undefined" ? localStorage.getItem(KEY) : null;
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return [];
+  }
+  function save(arr: any[]) {
+    try { if (typeof localStorage !== "undefined") localStorage.setItem(KEY, JSON.stringify(arr)); } catch {}
+  }
+  // ensure seed if empty
+  function ensureSeed(): any[] {
+    let arr = load();
+    if (arr.length === 0) {
+      const today = new Date();
+      const fmt = (d: Date) => d.toISOString().slice(0, 10);
+      const plus = (n: number) => { const x = new Date(today); x.setDate(today.getDate() + n); return fmt(x); };
+      arr = [
+        { id: "demo_b1", tenant_id: "demo", user_id: "demo", client_name: "Juliana Lima", client_whatsapp: "5511987654321", client_email: "juliana@exemplo.com", client_phone: null, booking_date: plus(1), booking_time: "14:30", notes: "Primeira consulta — interesse em Lavanda para sono", status: "pendente", source: "painel", created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+        { id: "demo_b2", tenant_id: "demo", user_id: "demo", client_name: "Mariana Costa", client_whatsapp: "5521987654321", client_email: null, client_phone: null, booking_date: plus(2), booking_time: "09:00", notes: "Retorno — avaliar blend foco", status: "confirmado", source: "site", created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+        { id: "demo_b3", tenant_id: "demo", user_id: "demo", client_name: "Patrícia Rocha", client_whatsapp: "5511999887766", client_email: "patricia@exemplo.com", client_phone: null, booking_date: plus(-2), booking_time: "16:00", notes: "Reunião realizada com sucesso", status: "realizado", source: "painel", created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+      ];
+      save(arr);
+    }
+    return arr;
+  }
+
+  if (pathname === "/api/bookings" && method === "GET") {
+    const arr = ensureSeed();
+    let list = [...arr];
+    const status = sp.get("status");
+    if (status) list = list.filter((b) => b.status === status);
+    const from = sp.get("from");
+    if (from) list = list.filter((b) => b.booking_date >= from);
+    const to = sp.get("to");
+    if (to) list = list.filter((b) => b.booking_date <= to);
+    list.sort((a, b) => `${a.booking_date}T${a.booking_time}`.localeCompare(`${b.booking_date}T${b.booking_time}`));
+    return { status: 200, json: { bookings: list } };
+  }
+  if (pathname === "/api/bookings" && method === "POST") {
+    const arr = ensureSeed();
+    const client_name = String(body.client_name || "").trim();
+    const booking_date = String(body.booking_date || "").trim();
+    const booking_time = String(body.booking_time || "").trim();
+    if (!client_name) return { status: 400, json: { error: "Nome do cliente é obrigatório." } };
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(booking_date)) return { status: 400, json: { error: "Data inválida." } };
+    if (!/^\d{2}:\d{2}$/.test(booking_time)) return { status: 400, json: { error: "Horário inválido." } };
+    const nb = {
+      id: `demo_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      tenant_id: "demo",
+      user_id: "demo",
+      client_name,
+      client_whatsapp: String(body.client_whatsapp || "").replace(/\D/g, "") || null,
+      client_email: String(body.client_email || "").trim() || null,
+      client_phone: String(body.client_phone || "").trim() || null,
+      booking_date,
+      booking_time,
+      notes: String(body.notes || "").trim() || null,
+      status: ["pendente","confirmado","realizado","cancelado","faltou","reagendado"].includes(body.status) ? body.status : "pendente",
+      source: "painel",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    arr.unshift(nb);
+    save(arr);
+    return { status: 200, json: { booking: nb } };
+  }
+  const m = pathname.match(/^\/api\/bookings\/([^/]+)$/);
+  if (m) {
+    const id = m[1];
+    let arr = ensureSeed();
+    const idx = arr.findIndex((b) => b.id === id);
+    if (idx === -1) return { status: 404, json: { error: "Agendamento não encontrado." } };
+    if (method === "PUT") {
+      const b = arr[idx];
+      if (typeof body.client_name === "string" && body.client_name.trim()) b.client_name = body.client_name.trim();
+      if (typeof body.client_whatsapp === "string") b.client_whatsapp = body.client_whatsapp.replace(/\D/g, "") || null;
+      if (typeof body.client_email === "string") b.client_email = body.client_email.trim() || null;
+      if (typeof body.client_phone === "string") b.client_phone = body.client_phone.trim() || null;
+      if (typeof body.booking_date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.booking_date)) b.booking_date = body.booking_date;
+      if (typeof body.booking_time === "string" && /^\d{2}:\d{2}$/.test(body.booking_time)) b.booking_time = body.booking_time;
+      if (typeof body.notes === "string") b.notes = body.notes.trim() || null;
+      if (typeof body.status === "string" && ["pendente","confirmado","realizado","cancelado","faltou","reagendado"].includes(body.status)) b.status = body.status;
+      b.updated_at = new Date().toISOString();
+      arr[idx] = b;
+      save(arr);
+      return { status: 200, json: { booking: b } };
+    }
+    if (method === "DELETE") {
+      arr = arr.filter((b) => b.id !== id);
+      save(arr);
+      return { status: 200, json: { success: true } };
+    }
+  }
+  return null;
+}
+
 export async function handleDemoApi(
   pathname: string,
   searchParams: URLSearchParams,
@@ -1292,6 +1392,7 @@ export async function handleDemoApi(
       handleIaTraining(pathname, method, body) ||
       handlePwa(pathname, method, body) ||
       handleConta(pathname, method, body) ||
+      handleBookings(pathname, method, body, searchParams) ||
       handleBilling(pathname) || { status: 404, json: { error: "Não encontrado (demonstração)." } }
     );
   } catch (e) {
