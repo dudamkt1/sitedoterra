@@ -294,7 +294,7 @@ export function AiTemplatesPanel({ templates, userTemplates, onSavedTemplate }: 
     const baseTemplates = templates.length ? templates : [];
     const next = picked.map((s, i) => {
       const base = baseTemplates[i % baseTemplates.length] || baseTemplates[0];
-      const tpl: AiTemplate = base ? { ...base, id: `sug-${Date.now()}-${i}`, code: `sug-${s.code || i}`, name: s.name, emoji: s.emoji, description: s.body.slice(0, 60) + "…" } : ({ id: `sug-${i}`, code: `sug-${i}`, name: s.name, emoji: s.emoji, category: "redes", description: s.body, structure: { layout: "story", fields: [] }, enabled: true, sort_order: i } as unknown as AiTemplate);
+      const tpl: AiTemplate = base ? { ...base, id: `sug-${Date.now()}-${i}`, code: `sug-${Date.now()}-${i}`, name: s.name, emoji: s.emoji, description: s.body.slice(0, 60) + "…" } : ({ id: `sug-${i}`, code: `sug-${i}`, name: s.name, emoji: s.emoji, category: "redes", description: s.body, structure: { layout: "story", fields: [] }, enabled: true, sort_order: i } as unknown as AiTemplate);
       const values: Record<string, string> = {
         title: s.title,
         subtitle: s.subtitle,
