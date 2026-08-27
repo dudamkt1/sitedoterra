@@ -272,7 +272,7 @@ export const DEMO_AI_TEMPLATES: DemoAiTemplateRow[] = [
           "key": "image",
           "label": "Imagem (URL)",
           "type": "image",
-          "default": ""
+          "default": "https://images.unsplash.com/photo-1608571423902-eed4a94d8108?w=800&auto=format&fit=crop&q=80"
         },
         {
           "key": "logo",
@@ -358,7 +358,7 @@ export const DEMO_AI_TEMPLATES: DemoAiTemplateRow[] = [
           "key": "image",
           "label": "Imagem (URL)",
           "type": "image",
-          "default": ""
+          "default": "https://images.unsplash.com/photo-1501004318641-b39e6451bec6?w=800&auto=format&fit=crop&q=80"
         },
         {
           "key": "logo",
@@ -444,7 +444,7 @@ export const DEMO_AI_TEMPLATES: DemoAiTemplateRow[] = [
           "key": "image",
           "label": "Imagem (URL)",
           "type": "image",
-          "default": ""
+          "default": "https://images.unsplash.com/photo-1470259078422-06e8c24ebf84?w=800&auto=format&fit=crop&q=80"
         },
         {
           "key": "logo",
@@ -530,7 +530,7 @@ export const DEMO_AI_TEMPLATES: DemoAiTemplateRow[] = [
           "key": "image",
           "label": "Imagem (URL)",
           "type": "image",
-          "default": ""
+          "default": "https://images.unsplash.com/photo-1598440947619-cc6db50d67f9?w=800&auto=format&fit=crop&q=80"
         },
         {
           "key": "logo",
@@ -616,7 +616,7 @@ export const DEMO_AI_TEMPLATES: DemoAiTemplateRow[] = [
           "key": "image",
           "label": "Imagem (URL)",
           "type": "image",
-          "default": ""
+          "default": "https://images.unsplash.com/photo-1515378791036-0648a3ef77b2?w=800&auto=format&fit=crop&q=80"
         },
         {
           "key": "logo",
@@ -702,7 +702,7 @@ export const DEMO_AI_TEMPLATES: DemoAiTemplateRow[] = [
           "key": "image",
           "label": "Imagem (URL)",
           "type": "image",
-          "default": ""
+          "default": "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=800&auto=format&fit=crop&q=80"
         },
         {
           "key": "logo",
@@ -788,7 +788,7 @@ export const DEMO_AI_TEMPLATES: DemoAiTemplateRow[] = [
           "key": "image",
           "label": "Imagem (URL)",
           "type": "image",
-          "default": ""
+          "default": "https://images.unsplash.com/photo-1470259078422-06e8c24ebf84?w=800&auto=format&fit=crop&q=80"
         },
         {
           "key": "logo",
@@ -874,7 +874,7 @@ export const DEMO_AI_TEMPLATES: DemoAiTemplateRow[] = [
           "key": "image",
           "label": "Imagem (URL)",
           "type": "image",
-          "default": ""
+          "default": "https://images.unsplash.com/photo-1608571423902-eed4a94d8108?w=800&auto=format&fit=crop&q=80"
         },
         {
           "key": "logo",
@@ -960,7 +960,7 @@ export const DEMO_AI_TEMPLATES: DemoAiTemplateRow[] = [
           "key": "image",
           "label": "Imagem (URL)",
           "type": "image",
-          "default": ""
+          "default": "https://images.unsplash.com/photo-1598440947619-cc6db50d67f9?w=800&auto=format&fit=crop&q=80"
         },
         {
           "key": "logo",
@@ -1046,7 +1046,7 @@ export const DEMO_AI_TEMPLATES: DemoAiTemplateRow[] = [
           "key": "image",
           "label": "Imagem (URL)",
           "type": "image",
-          "default": ""
+          "default": "https://images.unsplash.com/photo-1515378791036-0648a3ef77b2?w=800&auto=format&fit=crop&q=80"
         },
         {
           "key": "logo",
@@ -1132,7 +1132,7 @@ export const DEMO_AI_TEMPLATES: DemoAiTemplateRow[] = [
           "key": "image",
           "label": "Imagem (URL)",
           "type": "image",
-          "default": ""
+          "default": "https://images.unsplash.com/photo-1501004318641-b39e6451bec6?w=800&auto=format&fit=crop&q=80"
         },
         {
           "key": "logo",
@@ -1218,7 +1218,7 @@ export const DEMO_AI_TEMPLATES: DemoAiTemplateRow[] = [
           "key": "image",
           "label": "Imagem (URL)",
           "type": "image",
-          "default": ""
+          "default": "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=800&auto=format&fit=crop&q=80"
         },
         {
           "key": "logo",
@@ -1304,7 +1304,7 @@ export const DEMO_AI_TEMPLATES: DemoAiTemplateRow[] = [
           "key": "image",
           "label": "Imagem (URL)",
           "type": "image",
-          "default": ""
+          "default": "https://images.unsplash.com/photo-1617897903246-719242758050?w=800&auto=format&fit=crop&q=80"
         },
         {
           "key": "logo",

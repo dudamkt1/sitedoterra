@@ -1,7 +1,35 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { AiTemplate, AiUserTemplate, AiTemplateField } from "@/types";
+
+// Pool de imagens profissionais doTERRA / óleos essenciais — 100% gratuitas (Unsplash, licença livre)
+// Todas já vêm como default nos templates, mas servem também como fallback e para novas sugestões.
+const DOTERRA_IMAGES = [
+  "https://images.unsplash.com/photo-1608571423902-eed4a94d8108?w=800&auto=format&fit=crop&q=80", // frascos âmbar
+  "https://images.unsplash.com/photo-1501004318641-b39e6451bec6?w=800&auto=format&fit=crop&q=80", // lavanda campo
+  "https://images.unsplash.com/photo-1470259078422-06e8c24ebf84?w=800&auto=format&fit=crop&q=80", // ervas
+  "https://images.unsplash.com/photo-1598440947619-cc6db50d67f9?w=800&auto=format&fit=crop&q=80", // citrus
+  "https://images.unsplash.com/photo-1515378791036-0648a3ef77b2?w=800&auto=format&fit=crop&q=80", // eucalipto/folhas
+  "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=800&auto=format&fit=crop&q=80", // spa / bem-estar
+];
+
+const DOTERRA_SUGGESTIONS: Array<{ title: string; subtitle: string; body: string; cta: string; hashtags: string; emoji: string; name: string }> = [
+  { name: "Ritual da manhã", emoji: "🌅", title: "Ritual da manhã", subtitle: "Peppermint", body: "Comece o dia com frescor e foco — uma gota faz toda diferença na sua manhã.", cta: "Quero sentir", hashtags: "#peppermint #bomdia #doterra #oleosessenciais" },
+  { name: "Noite tranquila", emoji: "🌙", title: "Noite tranquila", subtitle: "Lavender", body: "Desacelere à noite com um aroma que convida ao descanso e ao aconchego.", cta: "Quero relaxar", hashtags: "#lavender #noitetranquila #doterra" },
+  { name: "Casa que acolhe", emoji: "🏡", title: "Casa que acolhe", subtitle: "On Guard®", body: "Aroma que traz sensação de cuidado e proteção para toda a família.", cta: "Conhecer", hashtags: "#onguard #familia #doterra" },
+  { name: "Respira fundo", emoji: "🌿", title: "Respire fundo", subtitle: "Breathe", body: "Inspire calma, expire leveza — para momentos que pedem respiro.", cta: "Quero respirar", hashtags: "#breathe #bemestar #doterra" },
+  { name: "Foco total", emoji: "🎯", title: "Foco total", subtitle: "Focus Blend", body: "Para aqueles momentos que pedem concentração e clareza.", cta: "Manter o foco", hashtags: "#foco #produtividade #doterra" },
+  { name: "Bem-estar diário", emoji: "✨", title: "Bem-estar diário", subtitle: "Frankincense", body: "O toque ancestral que acompanha seu ritual de autocuidado.", cta: "Descobrir", hashtags: "#frankincense #autocuidado #doterra" },
+  { name: "Energia cítrica", emoji: "🍋", title: "Energia cítrica", subtitle: "Wild Orange", body: "Um toque cítrico que desperta alegria e energia para o dia.", cta: "Quero energia", hashtags: "#wildorange #citrico #doterra" },
+  { name: "Momento spa", emoji: "💆", title: "Momento spa em casa", subtitle: "AromaTerapi", body: "Transforme seu banho em um ritual de bem-estar.", cta: "Criar meu ritual", hashtags: "#spaemcasa #doterra #oleosessenciais" },
+];
+
+function getFallbackImage(templateCode: string): string {
+  let hash = 0;
+  for (let i = 0; i < templateCode.length; i++) hash = (hash * 31 + templateCode.charCodeAt(i)) % DOTERRA_IMAGES.length;
+  return DOTERRA_IMAGES[hash];
+}
 
 interface Props {
   templates: AiTemplate[];
@@ -17,7 +45,7 @@ function defaultValues(structure: AiTemplate["structure"]): Record<string, strin
   return out;
 }
 
-/** Renderiza a prévia visual do template com os valores atuais. */
+/** Renderiza a prévia visual do template com fundos profissionais doTERRA. */
 function TemplatePreview({
   template,
   values,
@@ -33,47 +61,48 @@ function TemplatePreview({
   const align = position === "top" ? "flex-start" : position === "bottom" ? "flex-end" : "center";
 
   const isCarrossel = layout === "carrossel";
+  // Usa imagem profissional do template ou fallback doTERRA — nunca fica só cor chapada
+  const effectiveImage = values.image?.trim() ? values.image : getFallbackImage(template.code);
 
   return (
     <div
       className={`relative overflow-hidden rounded-2xl border border-gray-200 shadow-sm ${isCarrossel ? "aspect-[4/5]" : "aspect-[9/16]"} w-full`}
       style={{ background: bg, color: text }}
     >
-      {values.image && (
-        /* eslint-disable-next-line @next/next/no-img-element */
-        <img
-          src={values.image}
-          alt=""
-          className="absolute inset-0 w-full h-full object-cover opacity-40"
-          referrerPolicy="no-referrer"
-        />
-      )}
-      <div className="absolute inset-0 flex flex-col items-center justify-center px-5 text-center gap-2" style={{ justifyContent: align, paddingTop: align === "flex-start" ? 24 : undefined, paddingBottom: align === "flex-end" ? 24 : undefined }}>
+      {/* Fundo profissional doTERRA */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={effectiveImage} alt="" className="absolute inset-0 w-full h-full object-cover" referrerPolicy="no-referrer" />
+      {/* Overlay gradiente profissional para legibilidade + identidade */}
+      <div className="absolute inset-0" style={{ background: `linear-gradient(to bottom, ${bg}00 10%, ${bg}CC 55%, ${bg} 92%)` }} />
+      <div className="absolute inset-0 bg-black/15" />
+      {/* Conteúdo */}
+      <div className="absolute inset-0 flex flex-col items-center justify-center px-5 text-center gap-2" style={{ justifyContent: align, paddingTop: align === "flex-start" ? 28 : undefined, paddingBottom: align === "flex-end" ? 28 : undefined }}>
         {values.logo && (
           /* eslint-disable-next-line @next/next/no-img-element */
-          <img src={values.logo} alt="Logo" className="h-8 w-auto object-contain max-w-[70%]" referrerPolicy="no-referrer" />
+          <img src={values.logo} alt="Logo" className="h-8 w-auto object-contain max-w-[70%] drop-shadow-md" referrerPolicy="no-referrer" />
         )}
         {values.title && (
-          <p className="text-[0.65rem] uppercase tracking-[0.2em] font-semibold" style={{ color: accent }}>
+          <p className="text-[0.65rem] uppercase tracking-[0.2em] font-semibold drop-shadow" style={{ color: accent }}>
             {values.title}
           </p>
         )}
         {values.subtitle && (
-          <h3 className="text-xl font-bold leading-tight" style={{ fontFamily: "var(--font-display)" }}>{values.subtitle}</h3>
+          <h3 className="text-xl font-bold leading-tight drop-shadow" style={{ fontFamily: "var(--font-display)" }}>{values.subtitle}</h3>
         )}
-        {values.body && <p className="text-[0.7rem] leading-relaxed max-w-[90%] opacity-90 whitespace-pre-line">{values.body}</p>}
+        {values.body && <p className="text-[0.72rem] leading-relaxed max-w-[92%] whitespace-pre-line drop-shadow-sm bg-black/10 backdrop-blur-[1px] rounded-lg px-2 py-1">{values.body}</p>}
         {values.cta && (
-          <span className="mt-1 rounded-full px-4 py-1.5 text-[0.65rem] font-bold" style={{ background: accent, color: bg }}>
+          <span className="mt-1 rounded-full px-4 py-1.5 text-[0.65rem] font-bold shadow" style={{ background: accent, color: bg }}>
             {values.cta}
           </span>
         )}
         {values.hashtags && (
-          <p className="text-[0.55rem] opacity-70 mt-1">{values.hashtags}</p>
+          <p className="text-[0.55rem] mt-1 drop-shadow bg-black/20 rounded-full px-2 py-0.5">{values.hashtags}</p>
         )}
       </div>
-      <div className="absolute top-3 left-3 text-[0.6rem] px-2 py-0.5 rounded-full bg-black/30 text-white/90">
+      <div className="absolute top-3 left-3 text-[0.6rem] px-2 py-0.5 rounded-full bg-black/35 backdrop-blur text-white/90 border border-white/10">
         {template.emoji} {template.name}
       </div>
+      <div className="absolute bottom-2 right-2 text-[0.5rem] px-1.5 py-0.5 rounded bg-white/85 text-slate-700 font-medium">foto doTERRA grátis</div>
     </div>
   );
 }
@@ -152,13 +181,22 @@ function TemplateEditor({
     if (f.type === "image") {
       return (
         <div key={f.key}>
-          <label className="label">{f.label}</label>
+          <label className="label">{f.label} — <span className="text-emerald-600 font-normal">fundo profissional doTERRA já incluso (troque se quiser)</span></label>
           <input
             className="input"
-            placeholder="Cole a URL da imagem (ou deixe vazio)"
+            placeholder="Cole outra URL ou mantenha o fundo doTERRA gratuito"
             value={value}
             onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
           />
+          <div className="mt-1.5 flex gap-1.5 flex-wrap">
+            {DOTERRA_IMAGES.slice(0, 4).map((url) => (
+              <button key={url} type="button" onClick={() => setValues((v) => ({ ...v, [f.key]: url }))} className={`h-10 w-14 rounded-lg overflow-hidden border-2 ${value === url ? "border-[#1d5c3a]" : "border-gray-200"}`}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={url} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              </button>
+            ))}
+            <button type="button" onClick={() => setValues((v) => ({ ...v, [f.key]: "" }))} className="h-10 px-2 rounded-lg border border-gray-200 text-xs text-gray-600 bg-white">Usar padrão</button>
+          </div>
         </div>
       );
     }
@@ -196,7 +234,7 @@ function TemplateEditor({
         <div className="flex items-start justify-between mb-3">
           <div>
             <h3 className="card-title">{template.emoji} {template.name}</h3>
-            <p className="text-xs text-gray-500 mt-0.5">Edite texto, cores, imagem, logo e posição. A prévia atualiza em tempo real.</p>
+            <p className="text-xs text-gray-500 mt-0.5">Edite texto, cores, imagem, logo e posição. A prévia já vem com fundo profissional doTERRA — troque se quiser.</p>
           </div>
           <button className="text-gray-400 text-xl" onClick={onClose}>✕</button>
         </div>
@@ -231,8 +269,7 @@ function TemplateEditor({
             </div>
 
             <p className="text-[0.7rem] text-gray-400 leading-relaxed">
-              💡 Dica: para exportar, você pode usar a prévia como referência de layout e o botão <strong>Copiar
-              conteúdo</strong> para colar o texto no seu aplicativo de design favorito (Canva, Instagram, CapCut).
+              Todos os fundos são <b>profissionais e gratuitos</b>, inspirados em óleos essenciais doTERRA. Use a prévia como referência e copie o texto para seu app favorito (Canva, Instagram, CapCut) — sem pagar por banco de imagens.
             </p>
           </div>
         </div>
@@ -249,6 +286,37 @@ export function AiTemplatesPanel({ templates, userTemplates, onSavedTemplate }: 
   const [editing, setEditing] = useState<{ template: AiTemplate; initial: Record<string, string> } | null>(null);
   const [category, setCategory] = useState<string>("all");
   const [showMine, setShowMine] = useState(false);
+  const [suggestions, setSuggestions] = useState<Array<{ key: string; tpl: AiTemplate; values: Record<string, string> }>>([]);
+
+  const genSuggestions = () => {
+    const shuffled = [...DOTERRA_SUGGESTIONS].sort(() => 0.5 - Math.random());
+    const picked = shuffled.slice(0, 3);
+    const baseTemplates = templates.length ? templates : [];
+    const next = picked.map((s, i) => {
+      const base = baseTemplates[i % baseTemplates.length] || baseTemplates[0];
+      const tpl: AiTemplate = base ? { ...base, id: `sug-${Date.now()}-${i}`, code: `sug-${s.code || i}`, name: s.name, emoji: s.emoji, description: s.body.slice(0, 60) + "…" } : ({ id: `sug-${i}`, code: `sug-${i}`, name: s.name, emoji: s.emoji, category: "redes", description: s.body, structure: { layout: "story", fields: [] }, enabled: true, sort_order: i } as unknown as AiTemplate);
+      const values: Record<string, string> = {
+        title: s.title,
+        subtitle: s.subtitle,
+        body: s.body,
+        cta: s.cta,
+        hashtags: s.hashtags,
+        bgColor: ["#1d5c3a", "#2d7a4f", "#8b6b45"][i % 3],
+        textColor: "#ffffff",
+        accentColor: ["#c4963a", "#e8c87a", "#f7f2ea"][i % 3],
+        image: DOTERRA_IMAGES[(Math.floor(Math.random() * DOTERRA_IMAGES.length))],
+        logo: "",
+        position: "center",
+      };
+      return { key: `${s.name}-${Date.now()}-${i}`, tpl, values };
+    });
+    setSuggestions(next);
+  };
+
+  useEffect(() => {
+    genSuggestions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [templates.length]);
 
   if (!templates || templates.length === 0) {
     return (
@@ -277,6 +345,9 @@ export function AiTemplatesPanel({ templates, userTemplates, onSavedTemplate }: 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-1">
         <h2 className="card-title mb-1">Templates prontos para redes sociais</h2>
         <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={genSuggestions} className="btn btn-gold !py-2 !px-3 !text-xs">
+            🔄 Renovar sugestões (grátis)
+          </button>
           <button
             className={`badge !px-3 !py-1.5 cursor-pointer ${showMine ? "bg-[#1d5c3a] text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
             onClick={() => setShowMine((v) => !v)}
@@ -285,11 +356,33 @@ export function AiTemplatesPanel({ templates, userTemplates, onSavedTemplate }: 
           </button>
         </div>
       </div>
-      <p className="text-sm text-gray-500 mb-4">
-        Escolha um modelo visual, personalize o texto, as cores, a imagem, o logo e a posição dos elementos. A prévia
-        atualiza em tempo real — depois é só copiar o conteúdo e montar no seu app de design favorito. <strong>Sem
-        serviços pagos obrigatórios.</strong>
+      <p className="text-sm text-gray-500 mb-1">
+        Todos os modelos já vêm com <b>fundos profissionais inspirados em óleos essenciais doTERRA</b> (frascos âmbar, lavanda, spa, ervas) — nada de cor chapada. Personalize texto, cores, logo e imagem; a prévia atualiza na hora. <strong className="text-emerald-700">100% gratuito, sem banco de imagens pago.</strong>
       </p>
+      <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2 mb-4">
+        💡 Clique em <b>Renovar sugestões</b> quando quiser — sempre surgem <b>3 novas ideias gratuitas</b> com fundos doTERRA diferentes, prontas para Instagram, Stories e WhatsApp.
+      </p>
+
+      {suggestions.length > 0 && (
+        <div className="mb-6 rounded-2xl border border-amber-100 bg-amber-50/40 p-4">
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <h3 className="text-sm font-bold text-amber-900">✨ Sugestões do dia — gratuitas e prontas para postar</h3>
+            <span className="text-[11px] font-semibold text-amber-700 bg-white border border-amber-200 rounded-full px-2 py-0.5">fundo doTERRA</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {suggestions.map(({ key, tpl, values }) => (
+              <div key={key} className="rounded-xl border border-white bg-white p-3 shadow-sm">
+                <TemplatePreview template={tpl} values={values} />
+                <p className="font-semibold text-sm mt-2">{tpl.emoji} {tpl.name}</p>
+                <p className="text-xs text-gray-500 mt-1 line-clamp-2">{values.body}</p>
+                <button className="btn btn-primary w-full !py-2 !text-xs mt-3" onClick={() => setEditing({ template: tpl, initial: values })}>
+                  Usar esta sugestão
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-2 mb-5">
         <button
