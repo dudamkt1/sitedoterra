@@ -16,6 +16,7 @@ const LINKS = [
   { href: "/admin/dominios", label: "Domínios", icon: "🔗" },
   { href: "/admin/planos", label: "Planos e Preços", icon: "💰" },
   { href: "/admin/pagamentos", label: "Pagamentos (Gateway)", icon: "💱" },
+  { href: "/admin/emails", label: "E-mails (SMTP)", icon: "📧" },
 ];
 
 export default function AdminSidebar({ email }: { email: string }) {
