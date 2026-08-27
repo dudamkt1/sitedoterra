@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getPainelContext } from "@/lib/demo/painel-context";
 import { SectionTitle } from "@/components/dashboard/ui";
 import { getPublicBaseUrl } from "@/lib/public-url";
@@ -12,7 +13,6 @@ export default async function MeuSitePage() {
   // Lazy-load dos componentes reais
   const { SiteManager } = await import("@/components/dashboard/SiteManager");
   const { SiteSectionsManager } = await import("@/components/dashboard/SiteSectionsManager");
-  const { BookingAppointmentsManager } = await import("@/components/dashboard/BookingAppointmentsManager");
 
   return (
     <div className="space-y-8">
@@ -39,11 +39,16 @@ export default async function MeuSitePage() {
           slug={ctx.tenant?.slug || ""}
           appUrl={appUrl}
         />
-      </div>
-      <div>
-        <BookingAppointmentsManager />
-        <p className="text-xs text-gray-400 mt-3 px-1">
-          <b>Melhor forma sugerida:</b> este controle vive dentro de <b>Meu Site → Agendamento</b> e também respeita seu calendário público. Cadastre cada consulta assim que fechar no WhatsApp; use os filtros <b>Hoje</b> e <b>Próximos</b> como lembrete diário. Status <b>Realizada / Cancelada / Faltou</b> viram histórico para relatórios e para bloquear horários automaticamente (em breve: sugerimos vincular agendamentos realizados aos <b>Horários ocupados</b> da agenda).
+        <div className="mt-4 rounded-xl border border-[#bbf7d0] bg-[#f0fdf4] px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <p className="text-sm text-[#166534]">
+            <b>📅 Agendamento</b> agora tem área própria — edite dias/horários livres, bloqueios e veja todos os compromissos em um só lugar.
+          </p>
+          <Link href="/painel/agendamentos" className="btn btn-primary !py-2 !px-4 text-xs shrink-0">
+            Ir para Agendamentos →
+          </Link>
+        </div>
+        <p className="text-xs text-gray-400 mt-2">
+          Em <b>Meu Site</b> a seção “Agendamento” fica apenas com <b>ativar/desativar</b>. Toda edição rápida está em <b>Agendamentos</b>.
         </p>
       </div>
     </div>

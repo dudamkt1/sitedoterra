@@ -7,6 +7,7 @@ import { useState } from "react";
 const USER_LINKS = [
   { href: "/painel", label: "Visão geral", icon: "📊" },
   { href: "/painel/meu-site", label: "Meu Site", icon: "🌐" },
+  { href: "/painel/agendamentos", label: "Agendamentos", icon: "📅" },
   { href: "/painel/midias", label: "Biblioteca de Mídia", icon: "📁" },
   { href: "/painel/crm", label: "CRM", icon: "📇" },
   { href: "/painel/ia", label: "IA para seu site", icon: "🤖" },

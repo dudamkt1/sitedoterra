@@ -110,6 +110,7 @@ export function SiteSectionsManager({ slug, appUrl }: { slug: string; appUrl: st
       <div className="space-y-2">
         {data?.sections.filter((s) => s.type !== "header" && s.type !== "footer").map((section) => {
           const isOn = section.enabled;
+          const isBooking = section.type === "booking";
           return (
             <div key={section.id} className="card !p-4 flex items-center gap-3">
               <span className="text-2xl">{SECTION_TYPE_ICONS[section.type] || "📄"}</span>
@@ -120,9 +121,11 @@ export function SiteSectionsManager({ slug, appUrl }: { slug: string; appUrl: st
                   {section.has_override && <span className="badge badge-blue">Personalizada</span>}
                   {!section.can_edit && <span className="badge badge-gray">Somente leitura</span>}
                   {!section.can_toggle && <span className="badge badge-gray">Ativação fixa</span>}
+                  {isBooking && <span className="badge bg-[#e5f4ea] text-[#1d5c3a] border border-[#bbf7d0]">Gerencie em Agendamentos →</span>}
                 </div>
                 <p className="text-xs text-gray-400 mt-0.5">
                   {isOn ? "Ativa" : "Desativada"} · {section.anchor}
+                  {isBooking && " · edição movida para /painel/agendamentos"}
                 </p>
               </div>
               {section.can_toggle ? (
@@ -138,7 +141,11 @@ export function SiteSectionsManager({ slug, appUrl }: { slug: string; appUrl: st
               ) : (
                 <span className="text-xs text-gray-400">—</span>
               )}
-              {section.can_edit ? (
+              {isBooking ? (
+                <a href="/painel/agendamentos" className="btn btn-primary !py-1.5 !px-3 !text-xs">
+                  Gerenciar
+                </a>
+              ) : section.can_edit ? (
                 <button type="button" className="btn btn-outline !py-1.5 !px-3 !text-xs" onClick={() => openEdit(section)} disabled={saving}>
                   Editar
                 </button>
