@@ -5,6 +5,95 @@ import { EmptyState, LoadingState, ErrorState, Toast, Field, apiPost, apiPut, ap
 import { WHATSAPP_PROVIDERS, MESSAGE_TEMPLATE_PRESETS } from "@/lib/crm-shared";
 import type { CrmWhatsAppConfig, CrmMessageTemplate, CrmClient } from "@/types";
 
+const PROVIDER_HELP: Record<string, { badge: string; badgeColor: string; title: string; where: string; steps: string[]; fields: string; linkLabel: string; link: string; tip: string }> = {
+  meta: {
+    badge: "Gratuito até ~1.000 conversas/mês",
+    badgeColor: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    title: "Meta WhatsApp Cloud API — oficial da Meta",
+    where: "developers.facebook.com → Meu App → Produtos → WhatsApp → API Setup",
+    steps: [
+      "Crie um App em developers.facebook.com e adicione o produto WhatsApp.",
+      "Em WhatsApp > API Setup, copie o Token temporário (ou gere um permanente em Configurações do Negócio > Tokens).",
+      "Copie o Phone Number ID e o ID do número exibidos na mesma tela.",
+      "Cole aqui: API URL = https://graph.facebook.com/v21.0/SEU_PHONE_ID/messages, Phone ID e Token.",
+    ],
+    fields: "API URL + Phone ID + Token",
+    linkLabel: "Abrir Meta for Developers",
+    link: "https://developers.facebook.com/docs/whatsapp/cloud-api/get-started",
+    tip: "Dica gratuita: a Cloud API é a forma oficial e mais barata a longo prazo — ótima para começar sem mensalidade de provedor.",
+  },
+  "zapi": {
+    badge: "Pago — teste grátis 7 dias",
+    badgeColor: "bg-amber-50 text-amber-700 border-amber-200",
+    title: "Z-API — provedor não-oficial com suporte BR",
+    where: "painel.z-api.io → Instância → QR Code",
+    steps: [
+      "Crie conta em z-api.io e crie uma instância.",
+      "Leia o QR Code com seu WhatsApp para conectar.",
+      "Em Dados da Instância copie: Instance ID, Token e URL base (https://api.z-api.io/instances/SEU_ID/token/SEU_TOKEN/send-text).",
+      "Cole aqui: API URL completa, Phone ID pode ficar vazio, Token = seu token da instância.",
+    ],
+    fields: "API URL + Token (Phone ID opcional)",
+    linkLabel: "Abrir Z-API",
+    link: "https://www.z-api.io/",
+    tip: "Pago após trial. Só vale se quiser suporte humano rápido; para economizar, prefira Evolution API gratuita.",
+  },
+  evolution: {
+    badge: "100% Gratuito (open-source)",
+    badgeColor: "bg-sky-50 text-sky-700 border-sky-200",
+    title: "Evolution API — gratuita e open-source",
+    where: "Seu servidor (Docker/VPS) ou hospedagem Evolution",
+    steps: [
+      "Suba a Evolution API no seu servidor: docker run -p 8080:8080 atendai/evolution-api (ou use um host que já ofereça).",
+      "Crie uma instância via painel da Evolution e escaneie o QR Code com seu WhatsApp.",
+      "Em Conexão copie: Server URL (ex.: https://sua-evolution.com), API Key (definida no .env AUTHENTICATION_API_KEY) e Instance Name.",
+      "Cole aqui: API URL = https://sua-evolution.com/message/sendText/SEU_INSTANCE, Phone ID = Instance Name, Token = API Key.",
+    ],
+    fields: "API URL + Instance Name (Phone ID) + API Key (Token)",
+    linkLabel: "Ver Evolution API (GitHub)",
+    link: "https://github.com/EvolutionAPI/evolution-api",
+    tip: "Totalmente gratuita se você hospedar. Melhor custo-benefício para quem quer escalar sem mensalidade por número.",
+  },
+  outros: {
+    badge: "Compatível",
+    badgeColor: "bg-gray-50 text-gray-600 border-gray-200",
+    title: "Outro provedor compatível",
+    where: "Documentação do seu provedor",
+    steps: [
+      "Abra a documentação do provedor e localize a seção de envio de mensagens de texto.",
+      "Copie a URL base de envio, o identificador do número/instância e o token/chave de autenticação.",
+      "Teste o endpoint com curl/Postman antes de colar aqui para garantir que retorna 200.",
+      "Se o provedor usa header Authorization: Bearer TOKEN, cole o token em Access Token.",
+    ],
+    fields: "API URL + Phone ID + Token (conforme docs)",
+    linkLabel: "Exemplo: consultar docs do provedor",
+    link: "https://developers.facebook.com/docs/whatsapp/cloud-api",
+    tip: "Se seu provedor não estiver listado, escolha o que mais se aproxima e ajuste os campos. Prefira Evolution/Meta gratuitos quando possível.",
+  },
+};
+
+function ProviderHelp({ provider }: { provider: string }) {
+  const h = PROVIDER_HELP[provider] || PROVIDER_HELP.outros;
+  return (
+    <div className="rounded-xl border bg-slate-50 border-slate-200 p-3">
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-sm font-semibold text-slate-900">{h.title}</p>
+        <span className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${h.badgeColor}`}>{h.badge}</span>
+      </div>
+      <p className="text-xs text-slate-500 mt-1">Onde pegar: {h.where}</p>
+      <ol className="mt-2 space-y-1 text-xs text-slate-700 list-decimal pl-4">
+        {h.steps.map((s, i) => <li key={i}>{s}</li>)}
+      </ol>
+      <p className="text-xs text-slate-600 mt-2"><b>Preencha aqui:</b> {h.fields}</p>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <a href={h.link} target="_blank" rel="noopener noreferrer" className="text-xs font-medium text-[#1d5c3a] underline hover:text-[#164a2e]">{h.linkLabel} ↗</a>
+        <span className="text-xs text-slate-300">•</span>
+        <span className="text-xs text-slate-500">{h.tip}</span>
+      </div>
+    </div>
+  );
+}
+
 export default function CrmWhatsApp() {
   const [config, setConfig] = useState<CrmWhatsAppConfig | null>(null);
   const [messages, setMessages] = useState<CrmMessageTemplate[]>([]);
@@ -160,6 +249,16 @@ export default function CrmWhatsApp() {
         </div>
       )}
 
+      <div className="rounded-xl border border-emerald-100 bg-emerald-50/70 px-4 py-3 mb-4 flex gap-3">
+        <span className="text-xl">💡</span>
+        <div className="text-sm leading-relaxed">
+          <p className="font-semibold text-emerald-900">Recomendamos começar sem custo</p>
+          <p className="text-emerald-800/80 mt-1">
+            <b>Evolution API</b> é 100% gratuita e open-source (você hospeda) — ideal para testar sem cartão. <b>Meta WhatsApp Cloud API</b> também tem uso gratuito generoso (cerca de 1.000 conversas/mês) e é a opção oficial da Meta. Deixe <b>Z-API</b> (paga) apenas se precisar de suporte pronto.
+          </p>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="card">
           <h2 className="card-title mb-4">Configuração da API</h2>
@@ -169,6 +268,7 @@ export default function CrmWhatsApp() {
                 {WHATSAPP_PROVIDERS.map((p) => <option key={p.code} value={p.code}>{p.label}</option>)}
               </select>
             </Field>
+            <ProviderHelp provider={form.provider} />
             <Field label="API URL / endpoint">
               <input className="input" placeholder="https://graph.facebook.com/v21.0/PHONE_ID/messages" value={form.api_url} onChange={(e) => setForm((f) => ({ ...f, api_url: e.target.value }))} />
             </Field>
