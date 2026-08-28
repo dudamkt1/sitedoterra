@@ -88,8 +88,8 @@ export default async function CheckoutPage({
       />
       <Header logoText={logoText} logoUrl={logoUrl} logoLightUrl={logoLightUrl} navItems={navItems} extraNav={[{ label: "Painel", href: user ? "/painel" : "/login" }]} />
 
-      <main className="min-h-[70vh] bg-[#f6f4ef] pt-[96px] sm:pt-[108px] pb-12 sm:pb-16 lg:pb-20">
-        <div className="max-w-[1080px] mx-auto px-4 sm:px-6 lg:px-8">
+      <main className="min-h-[70vh] bg-[#fdfcfa] sm:bg-[#f8f7f5] pt-[88px] sm:pt-[104px] pb-12 sm:pb-16 lg:pb-20">
+        <div className="max-w-[1140px] mx-auto px-4 sm:px-6 lg:px-8">
           <Suspense fallback={<div className="max-w-[640px] mx-auto py-12 text-center text-sm text-slate-500">Carregando checkout...</div>}>
             <CheckoutPageClient planIdParam={planId} />
           </Suspense>
