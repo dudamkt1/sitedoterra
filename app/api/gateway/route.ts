@@ -22,6 +22,8 @@ export async function GET() {
     mercadopago: {
       sandbox: gateways.mercadopago.sandbox,
       hasToken: Boolean(gateways.mercadopago.accessToken),
+      publicKey: gateways.mercadopago.publicKey || null,
+      hasPublicKey: Boolean(gateways.mercadopago.publicKey),
     },
     offer: offer
       ? {

@@ -19,6 +19,7 @@ export interface GatewayRow {
   mercadopago_access_token: string | null;
   mercadopago_webhook_secret: string | null;
   mercadopago_sandbox: boolean;
+  mercadopago_public_key?: string | null;
 }
 
 async function getRow(): Promise<GatewayRow | null> {
@@ -46,6 +47,7 @@ export interface ResolvedGateways {
     accessToken: string | null;
     webhookSecret: string | null;
     sandbox: boolean;
+    publicKey: string | null;
   };
 }
 
@@ -59,13 +61,20 @@ export async function resolveGateways(): Promise<ResolvedGateways> {
   const stripePublishable =
     row?.stripe_publishable_key || process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || null;
 
-  const mpToken = row?.mercadopago_access_token || process.env.MERCADOPAGO_ACCESS_TOKEN || null;
+  const mpToken = row?.mercadopago_access_token || process.env.MERCADOPAGO_ACCESS_TOKEN || process.env.MP_ACCESS_TOKEN || null;
   const mpWebhook =
     row?.mercadopago_webhook_secret || process.env.MERCADOPAGO_WEBHOOK_SECRET || null;
   const mpSandbox =
     typeof row?.mercadopago_sandbox === "boolean"
       ? row.mercadopago_sandbox
       : process.env.MERCADOPAGO_SANDBOX === "true";
+  // Public Key pode ser exposta no frontend (arquitetura oficial MP). Suporta nomes legados e novos.
+  const mpPublicKey =
+    (row as unknown as Record<string, unknown>)?.mercadopago_public_key as string | null ||
+    process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY ||
+    process.env.MP_PUBLIC_KEY ||
+    process.env.MERCADOPAGO_PUBLIC_KEY ||
+    null;
 
   let gateway: Gateway = row?.gateway === "mercadopago" ? "mercadopago" : "stripe";
   // Segurança: se o gateway escolhido não tem chave nenhuma configurada,
@@ -76,7 +85,7 @@ export async function resolveGateways(): Promise<ResolvedGateways> {
   return {
     gateway,
     stripe: { secretKey: stripeSecret, webhookSecret: stripeWebhook, publishableKey: stripePublishable },
-    mercadopago: { accessToken: mpToken, webhookSecret: mpWebhook, sandbox: mpSandbox },
+    mercadopago: { accessToken: mpToken, webhookSecret: mpWebhook, sandbox: mpSandbox, publicKey: mpPublicKey },
   };
 }
 
@@ -100,4 +109,8 @@ export async function getMercadoPagoTokenResolved(): Promise<string | null> {
 
 export async function isMercadoPagoSandboxResolved(): Promise<boolean> {
   return (await resolveGateways()).mercadopago.sandbox;
+}
+
+export async function getMercadoPagoPublicKeyResolved(): Promise<string | null> {
+  return (await resolveGateways()).mercadopago.publicKey;
 }
