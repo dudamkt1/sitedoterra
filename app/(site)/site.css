@@ -197,6 +197,57 @@
   background: var(--ouro);
 }
 
+/* Selinho "Teste grátis" ao lado do link Painel — discreto, chama atenção sem poluir */
+#tenant-site .nav-extra-link--painel {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#tenant-site .nav-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-body);
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: var(--ouro);
+  color: var(--branco);
+  padding: 3px 8px;
+  border-radius: 999px;
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow: 0 2px 10px rgba(196, 150, 58, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  transform: translateY(-0.5px);
+}
+
+#tenant-site nav.scrolled .nav-badge {
+  background: var(--verde);
+  border-color: rgba(29, 92, 58, 0.15);
+  box-shadow: 0 2px 8px rgba(29, 92, 58, 0.16);
+}
+
+#tenant-site .nav-mobile-link--painel {
+  gap: 0.75rem;
+}
+
+#tenant-site .nav-mobile-link--painel .nav-mobile-link-label {
+  flex: 1;
+}
+
+#tenant-site .nav-badge--mobile {
+  font-size: 0.6rem;
+  padding: 3px 8px;
+  background: var(--verde);
+  color: #fff;
+  border: none;
+  box-shadow: none;
+  transform: none;
+}
+
 
 #tenant-site .hamburger {
   display: none;
@@ -2399,8 +2450,93 @@
   margin-top: 2rem;
 }
 
+/* Callout "Quer testar antes de decidir?" — banner dedicado após a grade de inclusos */
+#tenant-site .oferta-demo-callout {
+  margin-top: 2rem;
+  background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(196, 150, 58, 0.12) 100%);
+  border: 1px solid rgba(196, 150, 58, 0.28);
+  border-radius: 14px;
+  padding: 1.5rem 1.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  backdrop-filter: blur(10px);
+  text-align: left;
+}
+
+#tenant-site .oferta-demo-callout-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex: 1;
+  min-width: 0;
+}
+
+#tenant-site .oferta-demo-callout-text strong {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--ouro-claro);
+  line-height: 1.3;
+}
+
+#tenant-site .oferta-demo-callout-text span {
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  color: rgba(255,255,255,0.78);
+  line-height: 1.55;
+}
+
+#tenant-site .oferta-demo-callout-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  background: var(--branco);
+  color: var(--verde);
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.9rem 1.4rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.9);
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  flex-shrink: 0;
+}
+
+#tenant-site .oferta-demo-callout-btn:hover {
+  background: var(--ouro);
+  color: var(--branco);
+  border-color: var(--ouro);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(196, 150, 58, 0.3);
+}
+
+#tenant-site .oferta-demo-callout-btn:disabled {
+  opacity: 0.7;
+  cursor: wait;
+  transform: none;
+}
+
 @media (max-width: 720px) {
   #tenant-site .oferta-incluidos-grid { grid-template-columns: 1fr; }
+  #tenant-site .oferta-demo-callout {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+    padding: 1.4rem 1.2rem;
+  }
+  #tenant-site .oferta-demo-callout-text {
+    align-items: center;
+  }
+  #tenant-site .oferta-demo-callout-btn {
+    width: 100%;
+  }
 }
 
 

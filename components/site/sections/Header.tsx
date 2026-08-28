@@ -78,8 +78,22 @@ export function Header({ logoText = "Logo", logoUrl, logoLightUrl, navItems, ext
       <ul className="nav-links">
         {allItems.map((item) => (
           <li key={item.href}>
-            <a href={item.href} className={!item.extra ? undefined : "nav-extra-link"}>
+            <a
+              href={item.href}
+              className={
+                !item.extra
+                  ? undefined
+                  : item.label === "Painel"
+                    ? "nav-extra-link nav-extra-link--painel"
+                    : "nav-extra-link"
+              }
+            >
               {item.label}
+              {item.extra && item.label === "Painel" && (
+                <span className="nav-badge" title="Teste grátis — explore o painel sem cadastro">
+                  Teste grátis
+                </span>
+              )}
             </a>
           </li>
         ))}
@@ -93,10 +107,15 @@ export function Header({ logoText = "Logo", logoUrl, logoLightUrl, navItems, ext
             <li key={item.href} style={{ transitionDelay: `${40 + i * 35}ms` }}>
               <a
                 href={item.href}
-                className={`nav-mobile-link ${item.extra ? "nav-mobile-extra" : ""}`}
+                className={`nav-mobile-link ${item.extra ? "nav-mobile-extra" : ""} ${item.extra && item.label === "Painel" ? "nav-mobile-link--painel" : ""}`}
                 onClick={() => setOpen(false)}
               >
-                {item.label}
+                <span className="nav-mobile-link-label">{item.label}</span>
+                {item.extra && item.label === "Painel" && (
+                  <span className="nav-badge nav-badge--mobile" title="Teste grátis — explore o painel sem cadastro">
+                    Teste grátis
+                  </span>
+                )}
                 {!item.extra && <span className="nav-mobile-arrow">→</span>}
               </a>
             </li>

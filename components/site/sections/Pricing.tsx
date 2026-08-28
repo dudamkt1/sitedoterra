@@ -59,6 +59,7 @@ const INTENT_KEY = "checkout_intent_v1";
 
 export function Pricing({ content }: { content: PricingContent }) {
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
   const offer = content.offer;
 
   function handleOpen() {
@@ -66,6 +67,23 @@ export function Pricing({ content }: { content: PricingContent }) {
       if (offer) localStorage.setItem(INTENT_KEY, JSON.stringify({ offer, ts: Date.now() }));
     } catch {}
     setCheckoutOpen(true);
+  }
+
+  async function handleDemo() {
+    if (demoLoading) return;
+    setDemoLoading(true);
+    try {
+      const res = await fetch("/api/demo/start", { method: "POST" });
+      if (res.ok) {
+        window.location.href = "/painel";
+        return;
+      }
+      window.location.href = "/login";
+    } catch {
+      window.location.href = "/login";
+    } finally {
+      setTimeout(() => setDemoLoading(false), 2000);
+    }
   }
 
   // Fallback: estrutura antiga (listas manuais) quando não há oferta comercial.
@@ -204,6 +222,24 @@ export function Pricing({ content }: { content: PricingContent }) {
           <p className="oferta-incluidos-nota">
             Tudo o que está nesta página e mais — pronto para você usar no seu painel.
           </p>
+
+          <div className="oferta-demo-callout" role="region" aria-label="Demonstração do painel">
+            <div className="oferta-demo-callout-text">
+              <strong>Quer testar antes de decidir?</strong>
+              <span>
+                Acesse nosso painel de demonstração e explore todas as ferramentas — Central de IA, CRM,
+                agendamento — sem compromisso.
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={handleDemo}
+              disabled={demoLoading}
+              className="oferta-demo-callout-btn"
+            >
+              {demoLoading ? "Preparando..." : "Explorar o painel agora →"}
+            </button>
+          </div>
         </div>
       </div>
       <CheckoutModal open={checkoutOpen} onClose={() => setCheckoutOpen(false)} />
