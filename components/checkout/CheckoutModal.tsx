@@ -39,10 +39,8 @@ function clearIntent() {
 
 type Step = "identify" | "checkout" | "payment" | "processing" | "success" | "error" | "pending";
 
-/** Mensagens amigáveis para erros do Mercado Pago / gerais — nunca expõe detalhes técnicos. */
 function friendlyError(raw: string): string {
   const m = (raw || "").toLowerCase();
-  // Erros técnicos / config → mensagem genérica
   if (
     m.includes("access token") ||
     m.includes("secret key") ||
@@ -53,7 +51,6 @@ function friendlyError(raw: string): string {
   ) {
     return "Pagamento temporariamente indisponível. Tente novamente em instantes ou fale com nosso suporte.";
   }
-  // Mapeamento de status_detail comuns do MP (card)
   if (m.includes("cc_rejected_bad_filled_card_number") || m.includes("invalid card number") || m.includes("invalid_card_token") || m.includes("bad_filled_card_number")) {
     return "Não foi possível processar este cartão. Verifique o número e tente novamente.";
   }
@@ -90,7 +87,6 @@ function friendlyError(raw: string): string {
   if (m.includes("network") || m.includes("fetch failed")) {
     return "Falha de conexão. Verifique sua internet e tente novamente.";
   }
-  // Fallback: remove prefixos técnicos e limita tamanho
   const cleaned = raw.replace(/Mercado Pago API[^\:]*:\s*/i, "").replace(/\(.*\)/, "").trim();
   if (cleaned.length > 160) return `${cleaned.slice(0, 157)}...`;
   return cleaned || "Não foi possível processar o pagamento. Tente novamente.";
@@ -102,7 +98,6 @@ export function CheckoutModal({ open, onClose, planId }: { open: boolean; onClos
   const [isAuthed, setIsAuthed] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
 
-  // identify
   const [authMode, setAuthMode] = useState<"signup" | "login">("signup");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -111,7 +106,6 @@ export function CheckoutModal({ open, onClose, planId }: { open: boolean; onClos
   const [authError, setAuthError] = useState<string | null>(null);
   const [authMsg, setAuthMsg] = useState<string | null>(null);
 
-  // checkout/payment
   const [step, setStep] = useState<Step>("identify");
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
@@ -123,7 +117,6 @@ export function CheckoutModal({ open, onClose, planId }: { open: boolean; onClos
   const pollRef = useRef<NodeJS.Timeout | null>(null);
   const checkoutGuardRef = useRef(false);
 
-  // load gateway + auth + intent
   useEffect(() => {
     if (!open) return;
     setCheckingAuth(true);
@@ -137,7 +130,6 @@ export function CheckoutModal({ open, onClose, planId }: { open: boolean; onClos
     checkoutGuardRef.current = false;
     if (pollRef.current) clearInterval(pollRef.current);
 
-    // gateway
     fetch("/api/gateway")
       .then((r) => r.json())
       .then((j) => {
@@ -171,7 +163,6 @@ export function CheckoutModal({ open, onClose, planId }: { open: boolean; onClos
     return () => sub.subscription.unsubscribe();
   }, [open]);
 
-  // cleanup poll on close
   useEffect(() => {
     if (!open && pollRef.current) {
       clearInterval(pollRef.current);
@@ -267,7 +258,6 @@ export function CheckoutModal({ open, onClose, planId }: { open: boolean; onClos
       setStep("error");
     } finally {
       setCheckoutLoading(false);
-      // libera guard após 1.5s para evitar spam, mas ainda protege duplo clique imediato
       setTimeout(() => (checkoutGuardRef.current = false), 1500);
     }
   }
@@ -296,7 +286,6 @@ export function CheckoutModal({ open, onClose, planId }: { open: boolean; onClos
     }, 3000);
   }
 
-  // Stripe embedded mount — inicializado somente quando necessário
   useEffect(() => {
     if (!stripeClientSecret || !gatewayInfo?.stripe.publishableKey) return;
     let destroyed = false;
@@ -342,19 +331,22 @@ export function CheckoutModal({ open, onClose, planId }: { open: boolean; onClos
   const monthlyCents = offer?.monthly_price_cents ?? 4700;
   const trialMonths = offer?.trial_months ?? 3;
   const planName = offer?.name || "Site Profissional";
+  const isCheckout = step === "checkout";
+  const isPayment = step === "payment";
+  const isWide = isCheckout || isPayment;
 
   return (
-    <div className="fixed inset-0 z-50 flex overflow-y-auto bg-[#fcfaf7] sm:bg-black/45 sm:backdrop-blur-sm sm:p-4 sm:items-center sm:justify-center">
-      <div className="relative w-full max-w-[640px] bg-white sm:rounded-[24px] sm:shadow-[0_24px_64px_rgba(0,0,0,0.16)] min-h-screen sm:min-h-0 sm:max-h-[92vh] flex flex-col overflow-hidden">
-        {/* header */}
-        <div className="sticky top-0 z-10 bg-white border-b border-slate-100 px-6 sm:px-8 py-5 flex items-start justify-between gap-4">
+    <div className="fixed inset-0 z-50 flex overflow-y-auto overflow-x-hidden bg-[#f6f4ef] sm:bg-black/45 sm:backdrop-blur-sm p-0 sm:p-6 sm:items-start sm:justify-center sm:pt-8">
+      <div className={`relative w-full bg-white min-h-screen sm:min-h-0 sm:rounded-[20px] sm:shadow-[0_20px_60px_rgba(0,0,0,0.18)] flex flex-col overflow-hidden max-w-full mx-auto ${isWide ? "sm:max-w-[880px]" : "sm:max-w-[640px]"} sm:my-4`}>
+        {/* Cabeçalho — Ative seu site */}
+        <div className="sticky top-0 z-10 bg-white border-b border-slate-100 px-5 sm:px-8 py-5 sm:py-6 flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <h2 className="text-[22px] font-semibold tracking-tight text-slate-900" style={{ fontFamily: "var(--font-display)" }}>
-              {step === "identify" ? "Vamos criar seu acesso" : step === "success" ? "Tudo pronto!" : step === "processing" || step === "pending" ? "Quase lá" : "Ativar meu site"}
+            <h2 className="text-[18px] sm:text-[20px] font-semibold tracking-tight text-slate-900" style={{ fontFamily: "var(--font-display)" }}>
+              {step === "identify" ? "Vamos criar seu acesso" : step === "success" ? "Tudo pronto!" : step === "processing" || step === "pending" ? "Quase lá" : "Ative seu site"}
             </h2>
-            <p className="text-[13px] leading-5 text-slate-500 mt-1">
+            <p className="text-[13px] leading-5 text-slate-500 mt-1 pr-2">
               {step === "identify"
-                ? "Crie sua conta em segundos para continuar. Depois você configura seu site no painel."
+                ? "Crie sua conta em segundos para continuar."
                 : step === "success"
                   ? "Seu pagamento foi confirmado."
                   : step === "processing"
@@ -367,30 +359,27 @@ export function CheckoutModal({ open, onClose, planId }: { open: boolean; onClos
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto overflow-x-hidden px-6 sm:px-8 py-6 space-y-6">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden px-5 sm:px-8 py-6 sm:py-7">
           {/* IDENTIFY */}
           {step === "identify" && (
-            <>
+            <div className="max-w-[520px] mx-auto w-full space-y-5">
               {checkingAuth ? (
                 <p className="text-sm text-slate-400 py-8 text-center">Carregando...</p>
               ) : (
                 <>
-                  <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4 flex items-center justify-between gap-4">
+                  <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3.5 flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-xs font-semibold tracking-widest uppercase text-slate-400">Plano escolhido</p>
-                      <p className="text-sm font-semibold text-slate-900 mt-0.5 truncate">{planName}</p>
+                      <p className="text-xs font-semibold tracking-widest uppercase text-slate-400">Plano</p>
+                      <p className="text-sm font-semibold text-slate-900 truncate">{planName}</p>
                     </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-sm font-bold text-[#1d5c3a]">{brl(activationCents)}</p>
-                      <p className="text-xs text-slate-500">{brl(monthlyCents)}/mês após {trialMonths} meses</p>
-                    </div>
+                    <p className="text-sm font-bold text-[#1d5c3a] shrink-0">{brl(activationCents)}</p>
                   </div>
 
                   {authMode === "signup" ? (
                     <form onSubmit={handleSignup} className="space-y-4">
                       <div>
-                        <h3 className="text-[15px] font-semibold text-slate-900">Crie sua conta para continuar</h3>
-                        <p className="text-sm text-slate-500 mt-1">Apenas 3 campos. O restante você completa depois no painel.</p>
+                        <h3 className="text-[15px] font-semibold text-slate-900">Crie sua conta</h3>
+                        <p className="text-sm text-slate-500 mt-1">Apenas 3 campos. O resto você completa no painel.</p>
                       </div>
                       <div className="space-y-3">
                         <div>
@@ -408,12 +397,12 @@ export function CheckoutModal({ open, onClose, planId }: { open: boolean; onClos
                       </div>
                       {authError && <p className="rounded-xl bg-red-50 border border-red-100 px-4 py-3 text-sm text-red-700">{authError}</p>}
                       {authMsg && <p className="rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-3 text-sm text-emerald-800">{authMsg}</p>}
-                      <button type="submit" disabled={authLoading} className="w-full rounded-full bg-[#1d5c3a] px-6 py-4 text-[15px] font-semibold text-white shadow-[0_8px_24px_rgba(29,92,58,0.18)] hover:bg-[#164a2e] transition disabled:opacity-60 disabled:cursor-not-allowed">
+                      <button type="submit" disabled={authLoading} className="w-full rounded-full bg-[#1d5c3a] px-6 py-4 text-[15px] font-semibold text-white shadow-[0_8px_24px_rgba(29,92,58,0.18)] hover:bg-[#164a2e] transition disabled:opacity-60">
                         {authLoading ? "Criando..." : "Continuar para pagamento →"}
                       </button>
                       <p className="text-center text-sm">
                         <button type="button" onClick={() => setAuthMode("login")} className="font-medium text-slate-600 hover:text-slate-900">
-                          Já tenho uma conta → <span className="underline">Entrar</span>
+                          Já tenho conta → <span className="underline">Entrar</span>
                         </button>
                       </p>
                     </form>
@@ -421,7 +410,7 @@ export function CheckoutModal({ open, onClose, planId }: { open: boolean; onClos
                     <form onSubmit={handleLogin} className="space-y-4">
                       <div>
                         <h3 className="text-[15px] font-semibold text-slate-900">Entrar</h3>
-                        <p className="text-sm text-slate-500 mt-1">Acesse e voltaremos ao checkout do plano que você escolheu.</p>
+                        <p className="text-sm text-slate-500 mt-1">Voltaremos ao checkout do plano escolhido.</p>
                       </div>
                       <div className="space-y-3">
                         <div>
@@ -435,7 +424,7 @@ export function CheckoutModal({ open, onClose, planId }: { open: boolean; onClos
                       </div>
                       {authError && <p className="rounded-xl bg-red-50 border border-red-100 px-4 py-3 text-sm text-red-700">{authError}</p>}
                       {authMsg && <p className="rounded-xl bg-emerald-50 border border-emerald-100 px-4 py-3 text-sm text-emerald-800">{authMsg}</p>}
-                      <button type="submit" disabled={authLoading} className="w-full rounded-full bg-[#1d5c3a] px-6 py-4 text-[15px] font-semibold text-white shadow-[0_8px_24px_rgba(29,92,58,0.18)] hover:bg-[#164a2e] transition disabled:opacity-60 disabled:cursor-not-allowed">
+                      <button type="submit" disabled={authLoading} className="w-full rounded-full bg-[#1d5c3a] px-6 py-4 text-[15px] font-semibold text-white shadow-[0_8px_24px_rgba(29,92,58,0.18)] hover:bg-[#164a2e] transition disabled:opacity-60">
                         {authLoading ? "Entrando..." : "Entrar e continuar →"}
                       </button>
                       <p className="text-center text-sm">
@@ -447,204 +436,205 @@ export function CheckoutModal({ open, onClose, planId }: { open: boolean; onClos
                   )}
                 </>
               )}
-            </>
+            </div>
           )}
 
-          {/* CHECKOUT PROFISSIONAL — Resumo + Pagamento */}
+          {/* CHECKOUT — estrutura 2 colunas desktop, 1 coluna mobile sem repetições */}
           {step === "checkout" && (
-            <>
-              {/* Resumo do Plano */}
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_4px_24px_rgba(0,0,0,0.04)]">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs font-semibold tracking-widest uppercase text-slate-400">Resumo do plano</p>
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-100 px-2.5 py-1 text-[11px] font-semibold tracking-wide uppercase text-emerald-700">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Ativação imediata
-                  </span>
-                </div>
-                <p className="text-[17px] font-semibold text-slate-900 mt-2">{planName}</p>
-                <div className="mt-4 grid grid-cols-2 gap-3">
-                  <div className="rounded-xl bg-slate-50 border border-slate-100 p-4">
-                    <p className="text-xs font-medium tracking-wide uppercase text-slate-500">Valor da ativação</p>
-                    <p className="text-[19px] font-bold text-slate-900 mt-1.5">{brl(activationCents)}</p>
-                    <p className="text-xs text-slate-500 mt-1">pagamento único hoje</p>
-                  </div>
-                  <div className="rounded-xl bg-slate-50 border border-slate-100 p-4">
-                    <p className="text-xs font-medium tracking-wide uppercase text-slate-500">Mensalidade</p>
-                    <p className="text-[19px] font-bold text-slate-900 mt-1.5">
-                      {brl(monthlyCents)}
-                      <span className="text-sm font-medium text-slate-500">/mês</span>
-                    </p>
-                    <p className="text-xs text-slate-500 mt-1">após {trialMonths} {trialMonths === 1 ? "mês" : "meses"}</p>
-                  </div>
-                </div>
-                <div className="mt-4 rounded-xl bg-[#1d5c3a] px-4 py-3.5 flex items-center justify-between gap-3">
-                  <span className="text-sm font-semibold text-white">Total de hoje</span>
-                  <span className="text-[20px] font-bold text-white">{brl(activationCents)}</span>
-                </div>
-                <p className="text-xs text-slate-400 text-center mt-3">Sem taxas escondidas • Cancele quando quiser</p>
-              </div>
-
-              {/* Pagamento seguro */}
-              <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4 flex gap-3">
-                <span className="w-9 h-9 rounded-full bg-white border border-emerald-100 flex items-center justify-center text-emerald-700 shrink-0 text-[16px]">🔒</span>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-emerald-900">Pagamento seguro</p>
-                  <p className="text-sm text-emerald-800/80 mt-1 leading-5">
-                    Processado por <b>{gateway === "mercadopago" ? "Mercado Pago" : "Stripe"}</b> com criptografia de ponta a ponta. Você permanece no site durante todo o processo.
-                  </p>
-                </div>
-              </div>
-
-              {/* Card do pagamento — onde o Brick/iframe é renderizado */}
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-semibold text-slate-900">Pagamento</h3>
-                  {gateway === "mercadopago" && <span className="ml-auto inline-flex items-center rounded-full bg-[#009ee3]/10 border border-[#009ee3]/15 px-2.5 py-1 text-xs font-semibold text-[#009ee3]">Mercado Pago</span>}
-                </div>
-                <p className="text-sm text-slate-500 mt-1">
-                  {gateway === "mercadopago" ? "PIX e cartão — escolha na próxima etapa sem sair do site." : "Cartão salvo com segurança para a mensalidade futura."}
-                </p>
-                <div className="mt-4 space-y-2.5 text-sm">
-                  <div className="flex justify-between py-2 border-b border-slate-50"><span className="text-slate-500">Plano</span><span className="font-medium text-slate-900 text-right max-w-[60%] truncate">{planName}</span></div>
-                  <div className="flex justify-between py-2 border-b border-slate-50"><span className="text-slate-500">Ativação</span><span className="font-medium text-slate-900">{brl(activationCents)}</span></div>
-                  <div className="flex justify-between py-2"><span className="text-slate-500">Mensalidade</span><span className="font-medium text-slate-900">{brl(monthlyCents)}/mês</span></div>
-                  <div className="flex justify-between items-center pt-3 mt-1 border-t border-slate-100"><span className="font-semibold text-slate-900">Total de hoje</span><span className="font-bold text-[#1d5c3a] text-[20px]">{brl(activationCents)}</span></div>
-                </div>
-                {checkoutError && <p className="mt-4 rounded-xl bg-red-50 border border-red-100 px-4 py-3 text-sm text-red-700">{checkoutError}</p>}
-                <button
-                  type="button"
-                  onClick={startCheckout}
-                  disabled={checkoutLoading}
-                  className="mt-5 w-full rounded-full bg-[#1d5c3a] px-6 py-4 text-[15px] font-semibold text-white shadow-[0_8px_24px_rgba(29,92,58,0.18)] hover:bg-[#164a2e] transition disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  {checkoutLoading ? (
-                    <>
-                      <span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Preparando pagamento...
-                    </>
-                  ) : (
-                    "Pagar e ativar meu site →"
-                  )}
-                </button>
-                <p className="text-xs text-slate-400 text-center mt-3">Após a confirmação do pagamento, seu site será ativado automaticamente.</p>
-              </div>
-
-              <p className="text-xs text-slate-400 text-center">Logado como <b className="text-slate-600">{userEmail}</b> • <button type="button" onClick={() => setStep("identify")} className="underline hover:text-slate-600">trocar conta</button></p>
-            </>
-          )}
-
-          {/* PAYMENT RENDERING */}
-          {step === "payment" && (
-            <>
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-semibold text-slate-900">Pagamento</h3>
-                  <span className="ml-auto text-xs font-medium text-slate-400">Total: <b className="text-[#1d5c3a] text-sm">{brl(activationCents)}</b></span>
-                </div>
-                <p className="text-sm text-slate-500 mt-1">
-                  {gateway === "mercadopago" ? "Escolha PIX ou cartão. Tudo acontece aqui, sem sair do site." : "Preencha seu cartão com segurança. Ele ficará salvo para a mensalidade."}
-                </p>
-                {gateway === "mercadopago" && (
-                  <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#009ee3]/10 border border-[#009ee3]/15 px-3 py-1.5 text-xs font-semibold text-[#009ee3]">
-                    <span className="w-2 h-2 rounded-full bg-[#009ee3] animate-pulse" /> Mercado Pago • Ambiente seguro
-                  </div>
-                )}
-              </div>
-
-              {gateway === "stripe" && stripeClientSecret ? (
-                <div className="rounded-2xl border border-slate-200 bg-white p-2 sm:p-4 shadow-sm overflow-hidden">
-                  <div id="stripe-embedded-checkout" className="min-h-[380px] w-full max-w-full overflow-hidden" />
-                  <p className="text-xs text-slate-400 text-center mt-3 px-2">Pagamento criptografado • Você permanece no site durante todo o processo.</p>
-                </div>
-              ) : gateway === "mercadopago" && mpUrl ? (
-                <div className="space-y-4 w-full max-w-full overflow-hidden">
-                  {/* PIX helper */}
-                  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <div className="flex items-start gap-3">
-                      <span className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-lg shrink-0">⚡</span>
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-slate-900">Pague com PIX ou cartão</p>
-                        <p className="text-sm text-slate-600 mt-1 leading-5">Escolha o método dentro do quadro abaixo. Para PIX, use o QR Code ou o código copia e cola. Após a confirmação, seu site será ativado automaticamente.</p>
-                      </div>
+            <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-5 lg:gap-6 items-start w-full max-w-full">
+              {/* Esquerda: Resumo do pedido */}
+              <div className="space-y-4 min-w-0">
+                <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                  <p className="text-xs font-semibold tracking-widest uppercase text-slate-400">Seu plano</p>
+                  <p className="text-[16px] font-semibold text-slate-900 mt-1.5">{planName}</p>
+                  <div className="mt-4 space-y-3">
+                    <div className="flex items-baseline justify-between gap-3 py-2.5 border-b border-slate-50">
+                      <span className="text-sm text-slate-500">Ativação</span>
+                      <span className="text-[15px] font-semibold text-slate-900">{brl(activationCents)}</span>
                     </div>
-                    <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-                      <div className="rounded-xl bg-slate-50 border border-slate-100 py-2.5">
-                        <p className="text-xs font-semibold text-slate-700">PIX</p>
-                        <p className="text-[11px] text-slate-500">aprovação em segundos</p>
-                      </div>
-                      <div className="rounded-xl bg-slate-50 border border-slate-100 py-2.5">
-                        <p className="text-xs font-semibold text-slate-700">Cartão</p>
-                        <p className="text-[11px] text-slate-500">crédito / débito</p>
-                      </div>
-                      <div className="rounded-xl bg-slate-50 border border-slate-100 py-2.5">
-                        <p className="text-xs font-semibold text-slate-700">Seguro</p>
-                        <p className="text-[11px] text-slate-500">criptografado</p>
-                      </div>
+                    <div className="flex items-baseline justify-between gap-3 py-2.5">
+                      <span className="text-sm text-slate-500">Mensalidade</span>
+                      <span className="text-right">
+                        <span className="text-[15px] font-semibold text-slate-900">{brl(monthlyCents)}/mês</span>
+                        <span className="block text-xs text-slate-500 mt-0.5">após {trialMonths} {trialMonths === 1 ? "mês" : "meses"}</span>
+                      </span>
                     </div>
                   </div>
+                </div>
 
-                  {/* Iframe card — checkout transparente */}
-                  <div className="rounded-2xl overflow-hidden border border-slate-200 bg-white shadow-[0_8px_32px_rgba(0,0,0,0.06)] w-full max-w-full">
-                    {!mpLoaded && (
-                      <div className="w-full h-[420px] sm:h-[560px] flex flex-col items-center justify-center gap-3 bg-slate-50 p-6 text-center">
-                        <div className="w-10 h-10 rounded-full border-4 border-slate-200 border-t-[#1d5c3a] animate-spin" />
-                        <p className="text-sm font-medium text-slate-600">Carregando pagamento seguro...</p>
-                        <p className="text-xs text-slate-400">Mercado Pago • Não feche esta janela</p>
-                      </div>
+                <div className="rounded-2xl bg-[#1d5c3a] px-5 py-4 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold tracking-widest uppercase text-white/70">Total hoje</p>
+                    <p className="text-[22px] font-bold text-white leading-none mt-1">{brl(activationCents)}</p>
+                  </div>
+                  <span className="hidden sm:inline-flex text-[11px] font-semibold tracking-wide uppercase text-white/80 border border-white/20 rounded-full px-2.5 py-1">pagamento único</span>
+                </div>
+
+                <p className="text-xs text-slate-400 leading-4 px-1">Sem taxas escondidas. Cancele quando quiser. Ativação imediata após confirmação.</p>
+                <p className="text-xs text-slate-400 px-1 lg:hidden">Logado como <b className="text-slate-600">{userEmail}</b> • <button type="button" onClick={() => setStep("identify")} className="underline">trocar</button></p>
+              </div>
+
+              {/* Direita: Pagamento */}
+              <div className="space-y-4 min-w-0">
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-sm font-semibold text-slate-900">Pagamento</h3>
+                    <span className="inline-flex items-center rounded-full bg-[#009ee3]/10 border border-[#009ee3]/15 px-2.5 py-1 text-xs font-semibold text-[#009ee3]">Mercado Pago</span>
+                  </div>
+                  <p className="text-sm text-slate-500 mt-1.5">Escolha sua forma de pagamento abaixo.</p>
+
+                  <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50/60 px-4 py-3 flex items-center gap-2.5">
+                    <span className="w-7 h-7 rounded-full bg-white border border-slate-200 flex items-center justify-center text-xs">💳</span>
+                    <span className="text-sm text-slate-600">PIX e cartão — sem sair do site</span>
+                    <span className="ml-auto hidden sm:inline text-xs text-slate-400">100% seguro</span>
+                  </div>
+
+                  {checkoutError && <p className="mt-4 rounded-xl bg-red-50 border border-red-100 px-4 py-3 text-sm text-red-700">{checkoutError}</p>}
+
+                  <button
+                    type="button"
+                    onClick={startCheckout}
+                    disabled={checkoutLoading}
+                    className="mt-5 w-full rounded-full bg-[#1d5c3a] px-6 py-4 text-[15px] font-semibold text-white shadow-[0_8px_24px_rgba(29,92,58,0.18)] hover:bg-[#164a2e] transition disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {checkoutLoading ? (
+                      <>
+                        <span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Processando pagamento...
+                      </>
+                    ) : (
+                      "Pagar e ativar meu site"
                     )}
-                    <iframe
-                      src={mpUrl}
-                      title="Pagamento seguro — Mercado Pago"
-                      className={`w-full border-0 block max-w-full ${mpLoaded ? "h-[560px] sm:h-[580px]" : "h-0 overflow-hidden"}`}
-                      allow="payment *; clipboard-write; clipboard-read"
-                      loading="lazy"
-                      onLoad={() => setMpLoaded(true)}
-                    />
-                  </div>
-
-                  <p className="text-xs text-slate-400 text-center px-2">Você permanece em <b className="text-slate-600">oleos.topconsultores.com.br</b> • Pagamento 100% seguro.</p>
-
-                  <div className="flex gap-2">
-                    <button type="button" onClick={() => setStep("checkout")} className="flex-1 rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition">
-                      Voltar
-                    </button>
-                    <a href={mpUrl} target="_blank" rel="noopener noreferrer" className="flex-1 rounded-full bg-white border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 text-center hover:bg-slate-50 transition">
-                      Abrir em nova aba
-                    </a>
-                  </div>
-                  <button type="button" onClick={() => { setStep("processing"); startPolling(); }} className="w-full rounded-full bg-slate-900 px-6 py-3.5 text-sm font-semibold text-white hover:bg-black transition">
-                    Já paguei, verificar ativação
                   </button>
-                </div>
-              ) : (
-                <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-sm text-amber-800 flex items-center gap-3">
-                  <span className="w-8 h-8 rounded-full border-2 border-amber-200 border-t-amber-600 animate-spin shrink-0" /> Preparando pagamento seguro...
-                </div>
-              )}
 
-              {checkoutError && <p className="rounded-xl bg-red-50 border border-red-100 px-4 py-3 text-sm text-red-700">{checkoutError}</p>}
-            </>
-          )}
+                  <div className="mt-4 flex gap-2 items-start rounded-xl bg-emerald-50/60 border border-emerald-100 px-3.5 py-3">
+                    <span className="text-emerald-700 text-sm leading-none mt-0.5">🔒</span>
+                    <div>
+                      <p className="text-xs font-semibold text-emerald-900">Pagamento seguro</p>
+                      <p className="text-xs text-emerald-800/70 mt-0.5 leading-4">Processado pelo Mercado Pago. Seus dados de pagamento são protegidos.</p>
+                    </div>
+                  </div>
 
-          {step === "processing" && (
-            <div className="text-center py-8 px-2">
-              <div className="w-14 h-14 rounded-full border-4 border-slate-100 border-t-[#1d5c3a] animate-spin mx-auto" />
-              <h3 className="text-[18px] font-semibold text-slate-900 mt-5">Processando seu pagamento...</h3>
-              <p className="text-sm text-slate-500 mt-2 max-w-md mx-auto leading-6">Não feche esta janela. Assim que o Mercado Pago confirmar, seu site será ativado automaticamente. Isso pode levar alguns segundos.</p>
-              {processingMsg && <p className="text-sm text-emerald-700 mt-3 font-medium">{processingMsg}</p>}
-              <div className="mt-6 flex flex-col gap-2 max-w-sm mx-auto w-full">
-                <button type="button" onClick={() => startPolling()} className="w-full rounded-full border border-slate-200 bg-white px-6 py-3.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition">
-                  Verificar agora
-                </button>
+                  <p className="hidden lg:block text-xs text-slate-400 text-center mt-3">Logado como <b className="text-slate-600">{userEmail}</b> • <button type="button" onClick={() => setStep("identify")} className="underline hover:text-slate-600">trocar conta</button></p>
+                </div>
               </div>
             </div>
           )}
 
+          {/* PAYMENT — Brick/iframe dentro de card organizado */}
+          {step === "payment" && (
+            <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-5 lg:gap-6 items-start w-full max-w-full">
+              {/* Resumo compacto mantém contexto sem repetir total duas vezes */}
+              <div className="space-y-4 min-w-0">
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 hidden lg:block">
+                  <p className="text-xs font-semibold tracking-widest uppercase text-slate-400">Seu plano</p>
+                  <p className="text-[15px] font-semibold text-slate-900 mt-1">{planName}</p>
+                  <div className="mt-3 space-y-2 text-sm">
+                    <div className="flex justify-between"><span className="text-slate-500">Ativação</span><span className="font-semibold text-slate-900">{brl(activationCents)}</span></div>
+                    <div className="flex justify-between"><span className="text-slate-500">Mensalidade</span><span className="font-medium text-slate-900">{brl(monthlyCents)}/mês</span></div>
+                  </div>
+                  <div className="mt-4 rounded-xl bg-[#1d5c3a] px-4 py-3 flex items-center justify-between">
+                    <span className="text-xs font-semibold tracking-widest uppercase text-white/70">Total hoje</span>
+                    <span className="text-[18px] font-bold text-white">{brl(activationCents)}</span>
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 flex items-center justify-between lg:hidden">
+                  <div>
+                    <p className="text-xs font-semibold tracking-widest uppercase text-slate-400">Total hoje</p>
+                    <p className="text-[18px] font-bold text-[#1d5c3a] mt-0.5">{brl(activationCents)}</p>
+                  </div>
+                  <p className="text-xs text-slate-500 text-right leading-4">{planName}<br />{brl(monthlyCents)}/mês após {trialMonths}m</p>
+                </div>
+                <div className="hidden lg:flex gap-2 items-start rounded-xl bg-emerald-50/60 border border-emerald-100 px-3.5 py-3">
+                  <span className="text-emerald-700 text-sm">🔒</span>
+                  <p className="text-xs text-emerald-800/70 leading-4"><b className="text-emerald-900">Pagamento seguro.</b> Processado pelo Mercado Pago. Seus dados são protegidos.</p>
+                </div>
+              </div>
+
+              {/* Checkout transparente */}
+              <div className="space-y-4 min-w-0 max-w-full overflow-hidden">
+                {gateway === "stripe" && stripeClientSecret ? (
+                  <div className="rounded-2xl border border-slate-200 bg-white p-3 sm:p-5 shadow-sm overflow-hidden max-w-full">
+                    <div className="flex items-center gap-2 mb-3">
+                      <h3 className="text-sm font-semibold text-slate-900">Pagamento</h3>
+                      <span className="ml-auto text-xs text-slate-400">Stripe • Seguro</span>
+                    </div>
+                    <div id="stripe-embedded-checkout" className="min-h-[380px] w-full max-w-full overflow-hidden" />
+                    <p className="text-xs text-slate-400 text-center mt-3">Você permanece no site durante todo o processo.</p>
+                  </div>
+                ) : gateway === "mercadopago" && mpUrl ? (
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm overflow-hidden max-w-full">
+                    <div className="flex items-center justify-between gap-2">
+                      <h3 className="text-sm font-semibold text-slate-900">Pagamento</h3>
+                      <span className="inline-flex items-center rounded-full bg-[#009ee3]/10 border border-[#009ee3]/15 px-2.5 py-1 text-xs font-semibold text-[#009ee3]">Mercado Pago</span>
+                    </div>
+                    <p className="text-sm text-slate-500 mt-1">Escolha sua forma de pagamento abaixo.</p>
+
+                    <div className="mt-4 rounded-2xl overflow-hidden border border-slate-200 bg-white shadow-[0_8px_28px_rgba(0,0,0,0.06)] w-full max-w-full">
+                      {!mpLoaded && (
+                        <div className="w-full h-[420px] sm:h-[520px] flex flex-col items-center justify-center gap-3 bg-slate-50 p-6 text-center">
+                          <div className="w-10 h-10 rounded-full border-4 border-slate-200 border-t-[#1d5c3a] animate-spin" />
+                          <p className="text-sm font-medium text-slate-600">Carregando pagamento seguro...</p>
+                          <p className="text-xs text-slate-400">Mercado Pago • Não feche esta janela</p>
+                        </div>
+                      )}
+                      <iframe
+                        src={mpUrl}
+                        title="Pagamento seguro — Mercado Pago"
+                        className={`w-full border-0 block max-w-full ${mpLoaded ? "h-[520px] sm:h-[560px]" : "h-0 overflow-hidden"}`}
+                        allow="payment *; clipboard-write; clipboard-read"
+                        loading="lazy"
+                        onLoad={() => setMpLoaded(true)}
+                      />
+                    </div>
+
+                    <p className="text-xs text-slate-400 text-center mt-3 px-2">PIX copia e cola e cartão disponíveis no quadro acima. Após a confirmação, seu site será ativado automaticamente.</p>
+
+                    <div className="mt-4 flex gap-2">
+                      <button type="button" onClick={() => setStep("checkout")} className="flex-1 rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition">
+                        Voltar
+                      </button>
+                      <a href={mpUrl} target="_blank" rel="noopener noreferrer" className="flex-1 rounded-full bg-white border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 text-center hover:bg-slate-50 transition">
+                        Abrir em nova aba
+                      </a>
+                    </div>
+                    <button type="button" onClick={() => { setStep("processing"); startPolling(); }} className="mt-2 w-full rounded-full bg-slate-900 px-6 py-3.5 text-sm font-semibold text-white hover:bg-black transition">
+                      Já paguei, verificar ativação
+                    </button>
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-sm text-amber-800 flex items-center gap-3">
+                    <span className="w-8 h-8 rounded-full border-2 border-amber-200 border-t-amber-600 animate-spin shrink-0" /> Preparando pagamento seguro...
+                  </div>
+                )}
+
+                {checkoutError && <p className="rounded-xl bg-red-50 border border-red-100 px-4 py-3 text-sm text-red-700">{checkoutError}</p>}
+
+                <div className="lg:hidden flex gap-2 items-start rounded-xl bg-emerald-50/60 border border-emerald-100 px-3.5 py-3">
+                  <span className="text-emerald-700 text-sm">🔒</span>
+                  <p className="text-xs text-emerald-800/70 leading-4"><b className="text-emerald-900">Pagamento seguro.</b> Processado pelo Mercado Pago.</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {step === "processing" && (
+            <div className="max-w-[520px] mx-auto w-full text-center py-8 px-2">
+              <div className="w-14 h-14 rounded-full border-4 border-slate-100 border-t-[#1d5c3a] animate-spin mx-auto" />
+              <h3 className="text-[18px] font-semibold text-slate-900 mt-5">Processando pagamento...</h3>
+              <p className="text-sm text-slate-500 mt-2 leading-6">Não feche esta janela. Assim que o Mercado Pago confirmar, seu site será ativado automaticamente.</p>
+              {processingMsg && <p className="text-sm text-emerald-700 mt-3 font-medium">{processingMsg}</p>}
+              <button type="button" onClick={() => startPolling()} className="mt-6 w-full rounded-full border border-slate-200 bg-white px-6 py-3.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition">
+                Verificar agora
+              </button>
+            </div>
+          )}
+
           {step === "pending" && (
-            <div className="text-center py-8 px-2">
+            <div className="max-w-[520px] mx-auto w-full text-center py-8 px-2">
               <div className="w-14 h-14 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center mx-auto text-xl">⏳</div>
               <h3 className="text-[18px] font-semibold text-slate-900 mt-5">Pagamento pendente</h3>
-              <p className="text-sm text-slate-500 mt-2 max-w-md mx-auto leading-6">Assim que o Mercado Pago confirmar o pagamento, seu site será ativado automaticamente. Se pagou via PIX, a confirmação costuma ser em segundos.</p>
-              <div className="mt-6 flex flex-col gap-2 max-w-sm mx-auto w-full">
+              <p className="text-sm text-slate-500 mt-2 leading-6">Assim que o pagamento for confirmado, seu site será ativado automaticamente.</p>
+              <div className="mt-6 flex flex-col gap-2 w-full">
                 <button type="button" onClick={() => startPolling()} className="w-full rounded-full bg-[#1d5c3a] px-6 py-3.5 text-sm font-semibold text-white hover:bg-[#164a2e] transition">
                   Verificar novamente
                 </button>
@@ -656,12 +646,12 @@ export function CheckoutModal({ open, onClose, planId }: { open: boolean; onClos
           )}
 
           {step === "error" && (
-            <div className="text-center py-8 px-2">
+            <div className="max-w-[520px] mx-auto w-full text-center py-8 px-2">
               <div className="w-14 h-14 rounded-full bg-red-50 border border-red-200 flex items-center justify-center mx-auto text-xl">✕</div>
               <h3 className="text-[18px] font-semibold text-slate-900 mt-5">Não foi possível concluir o pagamento.</h3>
-              <p className="text-sm text-slate-500 mt-2 max-w-md mx-auto leading-6">Sua conta e o plano escolhido continuam salvos. Você pode tentar novamente sem perder nada.</p>
-              {checkoutError && <p className="mt-4 rounded-xl bg-red-50 border border-red-100 px-4 py-3 text-sm text-red-700 text-left max-w-sm mx-auto w-full">{checkoutError}</p>}
-              <div className="mt-6 flex flex-col gap-2 max-w-sm mx-auto w-full">
+              <p className="text-sm text-slate-500 mt-2 leading-6">Verifique os dados ou escolha outra forma de pagamento.</p>
+              {checkoutError && <p className="mt-4 rounded-xl bg-red-50 border border-red-100 px-4 py-3 text-sm text-red-700 text-left">{checkoutError}</p>}
+              <div className="mt-6 flex flex-col gap-2 w-full">
                 <button type="button" onClick={() => { setCheckoutError(null); setStep("checkout"); }} className="w-full rounded-full bg-[#1d5c3a] px-6 py-3.5 text-sm font-semibold text-white hover:bg-[#164a2e] transition">
                   Tentar novamente
                 </button>
@@ -673,17 +663,17 @@ export function CheckoutModal({ open, onClose, planId }: { open: boolean; onClos
           )}
 
           {step === "success" && (
-            <div className="text-center py-8 px-2">
+            <div className="max-w-[520px] mx-auto w-full text-center py-8 px-2">
               <div className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center mx-auto text-2xl">🎉</div>
-              <h3 className="text-[20px] font-semibold text-slate-900 mt-5">Pagamento aprovado! 🎉</h3>
+              <h3 className="text-[20px] font-semibold text-slate-900 mt-5">Pagamento aprovado!</h3>
               <p className="text-sm text-slate-600 mt-2">Seu site está sendo ativado.</p>
-              <div className="mt-6 rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-left max-w-sm mx-auto w-full">
+              <div className="mt-6 rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-left">
                 <p className="text-sm font-semibold text-emerald-900">Site ativado com sucesso!</p>
                 <p className="text-sm text-emerald-800/80 mt-1 leading-5">Você já pode acessar seu painel. A mensalidade de {brl(monthlyCents)}/mês só começará após {trialMonths} {trialMonths === 1 ? "mês" : "meses"}.</p>
               </div>
-              <div className="mt-6 flex flex-col gap-2 max-w-sm mx-auto w-full">
+              <div className="mt-6 flex flex-col gap-2 w-full">
                 <button type="button" onClick={() => (window.location.href = "/painel")} className="w-full rounded-full bg-[#1d5c3a] px-6 py-3.5 text-[15px] font-semibold text-white shadow-[0_8px_24px_rgba(29,92,58,0.18)] hover:bg-[#164a2e] transition">
-                  Ir para meu painel →
+                  Ir para meu painel
                 </button>
                 <p className="text-xs text-slate-400">Você também receberá a confirmação por e-mail.</p>
               </div>
@@ -691,7 +681,7 @@ export function CheckoutModal({ open, onClose, planId }: { open: boolean; onClos
           )}
         </div>
 
-        <div className="border-t border-slate-100 px-6 sm:px-8 py-4 bg-slate-50/60">
+        <div className="border-t border-slate-100 px-5 sm:px-8 py-4 bg-slate-50/50">
           <p className="text-xs text-slate-400 text-center leading-4">Pagamento seguro e criptografado • Seus dados ficam vinculados à sua conta • Ativação automática após confirmação</p>
         </div>
       </div>
