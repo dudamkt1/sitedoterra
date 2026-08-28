@@ -52,6 +52,28 @@ export function TenantSite({
   const [showSlots, setShowSlots] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [confirmHref, setConfirmHref] = useState("#");
+  const MONTH_LABELS_TS = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+  function monthLabelForTS(d: Date) { return `${MONTH_LABELS_TS[d.getMonth()]} ${d.getFullYear()}`; }
+  const [viewDate, setViewDate] = useState<Date>(() => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), 1); });
+  const currentSchedule = (() => {
+    const raw: any = (data.schedule as any) || {};
+    const year = viewDate.getFullYear();
+    const month = viewDate.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const firstWeekday = new Date(year, month, 1).getDay();
+    const monthLabel = monthLabelForTS(viewDate);
+    const now = new Date();
+    const today = now.getFullYear() === year && now.getMonth() === month ? now.getDate() : -1;
+    const slots: string[] = raw.slots && raw.slots.length ? raw.slots : ["09:00","09:30","10:00","10:30","14:00","14:30","15:00","15:30","16:00"];
+    const weekdays: number[] = raw.weekdays && raw.weekdays.length ? raw.weekdays : [1,2,3,4,5];
+    const blockedDates: string[] = Array.isArray(raw.blockedDates) ? raw.blockedDates : [];
+    const taken: Record<string,string[]> = raw.taken ? { ...raw.taken } : {};
+    const blockedSet = new Set<number>();
+    for (const bd of blockedDates) { const d = new Date(bd+"T12:00:00"); if (d.getFullYear()===year && d.getMonth()===month) blockedSet.add(d.getDate()); }
+    const available: number[] = []; const occupied: number[] = [];
+    for (let day=1; day<=daysInMonth; day++) { const t = taken[String(day)]||[]; if (blockedSet.has(day)) { occupied.push(day); continue; } if (t.length>=slots.length) { occupied.push(day); continue; } const wd = new Date(year, month, day).getDay(); if (weekdays.includes(wd)) available.push(day); }
+    return { year, month, daysInMonth, firstWeekday, monthLabel, today, slots, weekdays, blockedDates, taken, available, occupied };
+  })();
 
   useEffect(() => {
     const onScroll = () => navRef.current?.classList.toggle("scrolled", window.scrollY > 60);
@@ -70,7 +92,7 @@ export function TenantSite({
 
   useEffect(() => {
     if (!calDaysRef.current) return;
-    const s = data.schedule!;
+    const s: any = currentSchedule;
     const grid = calDaysRef.current;
     grid.innerHTML = "";
     for (let i = 0; i < s.firstWeekday; i++) {
@@ -90,8 +112,7 @@ export function TenantSite({
       }
       grid.appendChild(el);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [viewDate, currentSchedule]);
 
   function clearSelection() {
     document.querySelectorAll("#tenant-site .cal-day").forEach((d) => d.classList.remove("selected"));
@@ -106,13 +127,13 @@ export function TenantSite({
   function selectDay(day: number, el: HTMLDivElement) {
     document.querySelectorAll("#tenant-site .cal-day").forEach((d) => d.classList.remove("selected"));
     el.classList.add("selected");
-    setSelectedDate(`Horários — ${day} de ${data.schedule?.monthLabel.split(" ")[0]}`);
-    const s = data.schedule!;
+    setSelectedDate(`Horários — ${day} de ${currentSchedule.monthLabel.split(" ")[0]}`);
+    const s: any = currentSchedule;
     const grid = document.getElementById("slotsGrid");
     if (!grid) return;
     grid.innerHTML = "";
     const taken = s.taken?.[String(day)] || [];
-    s.slots.forEach((t) => {
+    s.slots.forEach((t: string) => {
       const slot = document.createElement("div");
       slot.className = "slot" + (taken.includes(t) ? " taken" : "");
       slot.textContent = t;
@@ -127,9 +148,12 @@ export function TenantSite({
 
   function selectSlot(time: string, day: number) {
     document.querySelectorAll<HTMLElement>("#tenant-site .slot").forEach((s) => (s.style.background = ""));
-    setConfirmHref(`${wppLink}?text=Olá ${firstName}! Gostaria de agendar uma consulta para o dia ${day} de ${data.schedule?.monthLabel.split(" ")[0]} às ${time}.`);
+    setConfirmHref(`${wppLink}?text=Olá ${firstName}! Gostaria de agendar uma consulta para o dia ${day} de ${currentSchedule.monthLabel.split(" ")[0]} às ${time}.`);
     setShowConfirm(true);
   }
+
+  function goPrevMonth() { clearSelection(); setViewDate((p) => new Date(p.getFullYear(), p.getMonth()-1,1)); }
+  function goNextMonth() { clearSelection(); setViewDate((p) => new Date(p.getFullYear(), p.getMonth()+1,1)); }
 
   function sendChat() {
     const input = chatInputRef.current;
@@ -396,8 +420,8 @@ export function TenantSite({
         <div className="agendamento-inner">
           <div className="calendar-widget reveal">
             <div className="cal-header">
-              <span className="cal-month">{data.schedule?.monthLabel}</span>
-              <div className="cal-nav"><button className="cal-nav-btn">‹</button><button className="cal-nav-btn">›</button></div>
+              <span className="cal-month">{currentSchedule.monthLabel}</span>
+              <div className="cal-nav"><button className="cal-nav-btn" onClick={goPrevMonth} aria-label="Mês anterior">‹</button><button className="cal-nav-btn" onClick={goNextMonth} aria-label="Próximo mês">›</button></div>
             </div>
             <div className="cal-body">
               <div className="cal-weekdays">

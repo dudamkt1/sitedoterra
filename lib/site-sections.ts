@@ -194,17 +194,32 @@ export const DEFAULT_SECTION_CONTENT: Record<SectionType, Record<string, unknown
     eyebrow: "Agenda da consultora",
     title: "Agende sua consulta gratuita",
     subtitle: "Escolha o melhor dia e horário. Após a seleção, você será direcionada ao WhatsApp para confirmar.",
-    schedule: {
-      monthLabel: "Abril 2026",
-      year: 2026,
-      firstWeekday: 3,
-      daysInMonth: 30,
-      available: [3, 7, 8, 10, 14, 15, 17, 21, 22, 24],
-      occupied: [2, 5, 9, 12, 16, 19, 23],
-      today: 3,
-      slots: ["09:00", "09:30", "10:00", "10:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30"],
-      taken: { "7": ["09:00", "14:00"], "10": ["10:00", "15:00"], "14": ["09:30", "16:00"], "17": ["14:30"] },
-    },
+    schedule: (() => {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth();
+      const MONTHS = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const firstWeekday = new Date(year, month, 1).getDay();
+      const monthLabel = `${MONTHS[month]} ${year}`;
+      const weekdays = [1,2,3,4,5];
+      const slots = ["09:00", "09:30", "10:00", "10:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30"];
+      const available: number[] = [];
+      for (let d=1; d<=daysInMonth; d++) { if (weekdays.includes(new Date(year, month, d).getDay())) available.push(d); }
+      const occupied = available.slice(2,5);
+      const availFiltered = available.filter(d => !occupied.includes(d)).slice(0,10);
+      return {
+        monthLabel,
+        year,
+        firstWeekday,
+        daysInMonth,
+        available: availFiltered,
+        occupied,
+        today: now.getDate(),
+        slots,
+        taken: {} as Record<string, string[]>,
+      };
+    })(),
   },
   tips: {
     eyebrow: "Acompanhe no Instagram",

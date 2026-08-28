@@ -25,22 +25,61 @@ export interface BookingContent {
   whatsappText?: string;
 }
 
-function normalizePublicSchedule(s: Schedule) {
-  // se já tem available/occupied, usa direto; caso tenha weekdays, já vem computado pelo editor
-  return s;
+const MONTH_LABELS = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+
+function monthLabelFor(date: Date): string {
+  return `${MONTH_LABELS[date.getMonth()]} ${date.getFullYear()}`;
+}
+
+function computeMonthSchedule(viewDate: Date, raw: Schedule) {
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstWeekday = new Date(year, month, 1).getDay();
+  const monthLabel = monthLabelFor(viewDate);
+  const now = new Date();
+  const today = now.getFullYear() === year && now.getMonth() === month ? now.getDate() : -1;
+  const slots = raw.slots && raw.slots.length ? raw.slots : ["09:00", "09:30", "10:00", "10:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30"];
+  const weekdays = raw.weekdays && raw.weekdays.length ? raw.weekdays : [1, 2, 3, 4, 5];
+  const blockedDates: string[] = Array.isArray(raw.blockedDates) ? raw.blockedDates : [];
+  const taken: Record<string, string[]> = raw.taken ? { ...raw.taken } : {};
+
+  const blockedSet = new Set<number>();
+  for (const bd of blockedDates) {
+    const d = new Date(bd + "T12:00:00");
+    if (d.getFullYear() === year && d.getMonth() === month) blockedSet.add(d.getDate());
+  }
+
+  const available: number[] = [];
+  const occupied: number[] = [];
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const t = taken[String(day)] || [];
+    if (blockedSet.has(day)) {
+      occupied.push(day);
+      continue;
+    }
+    if (t.length >= slots.length) {
+      occupied.push(day);
+      continue;
+    }
+    const wd = new Date(year, month, day).getDay();
+    if (weekdays.includes(wd)) available.push(day);
+  }
+
+  return { year, month, daysInMonth, firstWeekday, monthLabel, today, slots, weekdays, blockedDates, taken, available, occupied };
 }
 
 export function Booking({ content, contactWhatsapp, profileName }: { content: BookingContent; contactWhatsapp?: string; profileName?: string }) {
-  const rawSchedule = content.schedule || {};
-  const schedule = useMemo(() => normalizePublicSchedule(rawSchedule as Schedule), [rawSchedule]);
-  const daysInMonth = schedule.daysInMonth || 30;
-  const firstWeekday = schedule.firstWeekday ?? 0;
-  const available = schedule.available || [];
-  const occupied = schedule.occupied || [];
-  const today = schedule.today;
-  const slots = schedule.slots || [];
-  const taken = schedule.taken || {};
-  const monthLabel = schedule.monthLabel || "Mês";
+  const rawSchedule = (content.schedule || {}) as Schedule;
+
+  const [viewDate, setViewDate] = useState<Date>(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
+
+  const schedule = useMemo(() => computeMonthSchedule(viewDate, rawSchedule), [viewDate, rawSchedule]);
+  const { daysInMonth, firstWeekday, available, occupied, today, slots, taken, monthLabel } = schedule;
   const monthName = monthLabel.split(" ")[0];
 
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
@@ -57,6 +96,16 @@ export function Booking({ content, contactWhatsapp, profileName }: { content: Bo
     setShowSlots(false);
     setSelectedSlot(null);
     setConfirmHref("#");
+  }
+
+  function goPrev() {
+    clearSelection();
+    setViewDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  }
+
+  function goNext() {
+    clearSelection();
+    setViewDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
   }
 
   function selectDay(day: number) {
@@ -88,7 +137,6 @@ export function Booking({ content, contactWhatsapp, profileName }: { content: Bo
     const isToday = day === today;
     const isAvailable = available.includes(day);
     const isOccupied = occupied.includes(day);
-    // today tem destaque próprio; se for ocupado, mantém ocupado visual
     const cls =
       "cal-day" +
       (isToday ? " today" : "") +
@@ -123,7 +171,10 @@ export function Booking({ content, contactWhatsapp, profileName }: { content: Bo
         <div className="calendar-widget reveal">
           <div className="cal-header">
             <span className="cal-month">{monthLabel}</span>
-            <div className="cal-nav"><button className="cal-nav-btn" aria-label="Mês anterior">‹</button><button className="cal-nav-btn" aria-label="Próximo mês">›</button></div>
+            <div className="cal-nav">
+              <button className="cal-nav-btn" aria-label="Mês anterior" onClick={goPrev}>‹</button>
+              <button className="cal-nav-btn" aria-label="Próximo mês" onClick={goNext}>›</button>
+            </div>
           </div>
           <div className="cal-body">
             <div className="cal-weekdays">
@@ -136,7 +187,7 @@ export function Booking({ content, contactWhatsapp, profileName }: { content: Bo
           <div className="cal-legend">
             <div className="legend-item"><div className="legend-dot" style={{ background: "#dcfce7", border: "1.5px solid #22c55e" }}></div><b>Disponível</b></div>
             <div className="legend-item"><div className="legend-dot" style={{ background: "#fee2e2", border: "1px solid #fecaca" }}></div><b>Ocupado</b></div>
-            {today !== undefined && <div className="legend-item"><div className="legend-dot" style={{ background: "#fffbeb", border: "2.5px solid #f59e0b" }}></div><b>Hoje</b></div>}
+            {today !== -1 && <div className="legend-item"><div className="legend-dot" style={{ background: "#fffbeb", border: "2.5px solid #f59e0b" }}></div><b>Hoje</b></div>}
           </div>
         </div>
         <div className="reveal" style={{ transitionDelay: "0.2s" }}>
