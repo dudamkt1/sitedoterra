@@ -67,12 +67,29 @@ export default async function CheckoutPage({
   const planId = searchParams?.planId || searchParams?.plan || undefined;
 
   return (
-    <div id="tenant-site" data-slug={tenant.slug}>
+    <div id="tenant-site" data-slug={tenant.slug} className="checkout-page">
       <style dangerouslySetInnerHTML={{ __html: themeStyleTag(theme) }} />
+      {/* Checkout precisa de header sólido desde o topo — evita invasão e texto branco sobre fundo claro */}
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            #tenant-site.checkout-page nav { background: rgba(255,255,255,0.96) !important; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid #e5e7eb; box-shadow: 0 1px 12px rgba(0,0,0,0.04); }
+            #tenant-site.checkout-page nav .nav-logo { color: var(--verde) !important; }
+            #tenant-site.checkout-page nav .nav-links a { color: #6b7280 !important; }
+            #tenant-site.checkout-page nav .nav-links a:hover { color: var(--verde) !important; }
+            #tenant-site.checkout-page nav .nav-links a::after { background: var(--verde); }
+            #tenant-site.checkout-page nav .hamburger { background: #f3f4f6; }
+            #tenant-site.checkout-page nav .hamburger span { background: var(--verde) !important; }
+            #tenant-site.checkout-page nav .nav-extra-link { color: var(--verde) !important; border-color: rgba(29,92,58,0.18) !important; background: #f9fafb !important; }
+            #tenant-site.checkout-page nav .nav-extra-link:hover { background: var(--verde) !important; color: #fff !important; }
+            #tenant-site.checkout-page nav .nav-badge { background: var(--verde) !important; }
+          `,
+        }}
+      />
       <Header logoText={logoText} logoUrl={logoUrl} logoLightUrl={logoLightUrl} navItems={navItems} extraNav={[{ label: "Painel", href: user ? "/painel" : "/login" }]} />
 
-      <main className="min-h-[70vh] bg-[#f6f4ef] pt-[86px] pb-12 sm:pb-16">
-        <div className="max-w-[1120px] mx-auto px-4 sm:px-6 lg:px-8">
+      <main className="min-h-[70vh] bg-[#f6f4ef] pt-[96px] sm:pt-[108px] pb-12 sm:pb-16 lg:pb-20">
+        <div className="max-w-[1080px] mx-auto px-4 sm:px-6 lg:px-8">
           <Suspense fallback={<div className="max-w-[640px] mx-auto py-12 text-center text-sm text-slate-500">Carregando checkout...</div>}>
             <CheckoutPageClient planIdParam={planId} />
           </Suspense>

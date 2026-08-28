@@ -424,29 +424,32 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
     );
   }
 
-  // CHECKOUT central — design premium
+  // CHECKOUT central — layout premium com respiro e hierarquia clara
   if (step === "checkout") {
     return (
       <div className="w-full max-w-full">
-        <div className="text-center mb-8 sm:mb-10">
-          <h1 className="text-[28px] sm:text-[34px] font-semibold tracking-tight text-slate-900" style={{ fontFamily: "var(--font-display)" }}>
+        <div className="text-center mb-7 sm:mb-9">
+          <div className="inline-flex items-center gap-2 rounded-full bg-white border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm mb-4">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Checkout seguro
+          </div>
+          <h1 className="text-[26px] sm:text-[32px] lg:text-[36px] font-semibold tracking-tight text-slate-900 leading-tight" style={{ fontFamily: "var(--font-display)" }}>
             Ative seu site
           </h1>
-          <p className="text-[14px] sm:text-[15px] leading-6 text-slate-500 mt-2 max-w-[520px] mx-auto">Comece seu site profissional. Pagamento seguro, ativação imediata após confirmação.</p>
+          <p className="text-[14px] sm:text-[15px] leading-6 text-slate-500 mt-3 max-w-[560px] mx-auto px-2">Comece seu site profissional agora. Pagamento seguro e ativação imediata após a confirmação.</p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-6 lg:gap-7 items-start">
-          {/* Esquerda: Resumo */}
-          <div className="space-y-4">
-            <div className="rounded-2xl border border-slate-200 bg-white p-6">
+        <div className="grid grid-cols-1 lg:grid-cols-[380px_minmax(0,1fr)] gap-6 lg:gap-7 items-start max-w-[980px] mx-auto">
+          {/* Esquerda: Resumo do pedido */}
+          <div className="space-y-4 lg:sticky lg:top-[104px]">
+            <div className="rounded-2xl border border-slate-200/70 bg-white p-6 sm:p-7 shadow-[0_6px_24px_rgba(0,0,0,0.04)]">
               <p className="text-xs font-semibold tracking-widest uppercase text-slate-400">Seu plano</p>
-              <p className="text-[18px] font-semibold text-slate-900 mt-2">{planName}</p>
-              <div className="mt-5 space-y-3">
-                <div className="flex items-baseline justify-between gap-3 py-3 border-b border-slate-50">
+              <p className="text-[18px] font-semibold text-slate-900 mt-2 leading-tight">{planName}</p>
+              <div className="mt-6 space-y-0 divide-y divide-slate-50">
+                <div className="flex items-center justify-between gap-3 py-3.5">
                   <span className="text-sm text-slate-500">Ativação</span>
                   <span className="text-[15px] font-semibold text-slate-900">{brl(activationCents)}</span>
                 </div>
-                <div className="flex items-baseline justify-between gap-3 py-3">
+                <div className="flex items-center justify-between gap-3 py-3.5">
                   <span className="text-sm text-slate-500">Mensalidade</span>
                   <span className="text-right">
                     <span className="text-[15px] font-semibold text-slate-900">{brl(monthlyCents)}/mês</span>
@@ -454,42 +457,53 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
                   </span>
                 </div>
               </div>
+              <p className="text-xs text-slate-400 mt-4 leading-4">Inclui domínio, hospedagem e suporte. Sem fidelidade.</p>
             </div>
 
-            <div className="rounded-2xl bg-[#1d5c3a] px-6 py-5 flex items-center justify-between gap-3">
+            <div className="rounded-2xl bg-[#1d5c3a] px-6 py-5 flex items-center justify-between gap-4 shadow-[0_8px_24px_rgba(29,92,58,0.18)]">
               <div>
                 <p className="text-xs font-semibold tracking-widest uppercase text-white/70">Total hoje</p>
-                <p className="text-[26px] font-bold text-white leading-none mt-1">{brl(activationCents)}</p>
+                <p className="text-[26px] sm:text-[28px] font-bold text-white leading-none mt-1.5">{brl(activationCents)}</p>
               </div>
-              <span className="hidden sm:inline-flex text-[11px] font-semibold tracking-wide uppercase text-white/80 border border-white/20 rounded-full px-3 py-1">pagamento único</span>
+              <span className="hidden sm:inline-flex shrink-0 text-[11px] font-semibold tracking-wide uppercase text-white/90 border border-white/25 rounded-full px-3 py-1.5 bg-white/10">pagamento único</span>
             </div>
 
-            <p className="text-xs text-slate-400 leading-4 px-1">Sem taxas escondidas. Cancele quando quiser.</p>
-            <p className="text-xs text-slate-400 px-1 lg:hidden">Logado como <b className="text-slate-600">{userEmail}</b> • <button type="button" onClick={() => setStep("identify")} className="underline">trocar</button></p>
+            <div className="rounded-xl bg-white border border-slate-200/70 px-4 py-3 flex items-center gap-2.5">
+              <span className="w-7 h-7 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-700 text-xs">✓</span>
+              <p className="text-xs text-slate-600 leading-4">Sem taxas escondidas. Cancele quando quiser. Ativação imediata.</p>
+            </div>
+            <p className="text-xs text-slate-400 px-1 lg:hidden text-center">Logado como <b className="text-slate-600">{userEmail}</b> • <button type="button" onClick={() => setStep("identify")} className="underline">trocar</button></p>
           </div>
 
-          {/* Direita: Pagamento */}
-          <div className="space-y-4">
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-7 shadow-[0_8px_32px_rgba(0,0,0,0.04)]">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-[16px] font-semibold text-slate-900">Pagamento</h2>
-                <span className="inline-flex items-center rounded-full bg-[#009ee3]/10 border border-[#009ee3]/15 px-3 py-1 text-xs font-semibold text-[#009ee3]">Mercado Pago</span>
-              </div>
-              <p className="text-sm text-slate-500 mt-1.5">Escolha sua forma de pagamento abaixo.</p>
-
-              <div className="mt-5 rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-3.5 flex items-center gap-3">
-                <span className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-sm">💳</span>
-                <span className="text-sm text-slate-700">PIX e cartão — sem sair do site</span>
-                <span className="ml-auto hidden sm:inline text-xs text-slate-400">100% seguro</span>
+          {/* Direita: Pagamento — maior destaque */}
+          <div className="space-y-4 min-w-0">
+            <div className="rounded-2xl border border-slate-200/70 bg-white p-6 sm:p-7 lg:p-8 shadow-[0_10px_40px_rgba(0,0,0,0.05)]">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-[17px] font-semibold text-slate-900">Pagamento</h2>
+                  <p className="text-sm text-slate-500 mt-1">Escolha sua forma de pagamento abaixo.</p>
+                </div>
+                <span className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-[#009ee3]/10 border border-[#009ee3]/15 px-3 py-1.5 text-xs font-semibold text-[#009ee3]">
+                  <span className="w-2 h-2 rounded-full bg-[#009ee3]" /> Mercado Pago
+                </span>
               </div>
 
-              {checkoutError && <p className="mt-4 rounded-xl bg-red-50 border border-red-100 px-4 py-3 text-sm text-red-700">{checkoutError}</p>}
+              <div className="mt-6 rounded-xl border border-slate-100 bg-slate-50/80 px-4 py-3.5 flex items-center gap-3">
+                <span className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-sm shadow-sm">💳</span>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-slate-800">PIX e cartão — sem sair do site</p>
+                  <p className="text-xs text-slate-500">Aprovação em segundos via PIX</p>
+                </div>
+                <span className="ml-auto hidden sm:inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-full px-2.5 py-1">100% seguro</span>
+              </div>
+
+              {checkoutError && <p className="mt-4 rounded-xl bg-red-50 border border-red-100 px-4 py-3 text-sm text-red-700 leading-5">{checkoutError}</p>}
 
               <button
                 type="button"
                 onClick={startCheckout}
                 disabled={checkoutLoading}
-                className="mt-6 w-full rounded-full bg-[#1d5c3a] px-6 py-4 text-[15px] font-semibold text-white shadow-[0_8px_24px_rgba(29,92,58,0.18)] hover:bg-[#164a2e] transition disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="mt-6 w-full rounded-full bg-[#1d5c3a] px-6 py-4 text-[15px] font-semibold text-white shadow-[0_10px_28px_rgba(29,92,58,0.20)] hover:bg-[#164a2e] hover:shadow-[0_12px_32px_rgba(29,92,58,0.24)] hover:-translate-y-[1px] active:translate-y-0 transition-all disabled:opacity-60 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-2"
               >
                 {checkoutLoading ? (
                   <>
@@ -499,19 +513,26 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
                   "Pagar e ativar meu site"
                 )}
               </button>
+              <p className="text-xs text-slate-400 text-center mt-3">Pagamento único de {brl(activationCents)} hoje</p>
 
-              <div className="mt-5 flex gap-2.5 items-start rounded-xl bg-emerald-50/60 border border-emerald-100 px-4 py-3.5">
-                <span className="text-emerald-700 text-sm leading-none mt-0.5">🔒</span>
+              <div className="mt-6 flex gap-3 items-start rounded-xl bg-emerald-50/70 border border-emerald-100 px-4 py-3.5">
+                <span className="w-8 h-8 rounded-full bg-white border border-emerald-100 flex items-center justify-center text-emerald-700 text-sm leading-none shrink-0">🔒</span>
                 <div>
-                  <p className="text-xs font-semibold text-emerald-900">Pagamento seguro</p>
-                  <p className="text-xs text-emerald-800/70 mt-0.5 leading-4">Seu pagamento é processado com segurança pelo Mercado Pago. Seus dados são protegidos.</p>
+                  <p className="text-sm font-semibold text-emerald-900">Pagamento seguro</p>
+                  <p className="text-xs text-emerald-800/70 mt-1 leading-4">Seu pagamento é processado com segurança pelo Mercado Pago. Seus dados são protegidos com criptografia.</p>
                 </div>
               </div>
 
-              <p className="hidden lg:block text-xs text-slate-400 text-center mt-4">Logado como <b className="text-slate-600">{userEmail}</b> • <button type="button" onClick={() => router.push("/")} className="underline hover:text-slate-600">voltar ao site</button></p>
+              <div className="mt-5 hidden lg:flex items-center justify-center gap-2 text-xs text-slate-400">
+                <span>Logado como <b className="text-slate-600">{userEmail}</b></span>
+                <span className="w-1 h-1 rounded-full bg-slate-300" />
+                <button type="button" onClick={() => router.push("/")} className="underline hover:text-slate-600">voltar ao site</button>
+                <span className="w-1 h-1 rounded-full bg-slate-300" />
+                <button type="button" onClick={() => setStep("identify")} className="underline hover:text-slate-600">trocar conta</button>
+              </div>
             </div>
 
-            <p className="text-xs text-slate-400 text-center leading-4 px-2">Ao continuar, você concorda com a contratação e ativação automática após a confirmação do pagamento.</p>
+            <p className="text-xs text-slate-400 text-center leading-4 px-2 max-w-[520px] mx-auto">Ao continuar, você concorda com a contratação e ativação automática após a confirmação do pagamento. Suporte via WhatsApp após a compra.</p>
           </div>
         </div>
       </div>
