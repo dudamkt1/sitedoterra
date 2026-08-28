@@ -429,61 +429,61 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
     const gatewayLabel = gateway === "mercadopago" ? "Mercado Pago" : "Stripe";
     return (
       <div className="w-full">
-        {/* Título principal — espaçado do header */}
-        <div className="text-center pt-2 sm:pt-4 pb-2 mb-6 sm:mb-8">
-          <h1 className="text-[24px] sm:text-[32px] lg:text-[36px] font-semibold tracking-tight text-slate-900 leading-tight" style={{ fontFamily: "var(--font-display)" }}>
+        {/* Título principal — centralizado com respiro generoso */}
+        <div className="text-center pt-3 sm:pt-6 pb-3 mb-8 sm:mb-10">
+          <h1 className="text-[26px] sm:text-[32px] lg:text-[36px] font-semibold tracking-tight text-slate-900 leading-tight" style={{ fontFamily: "var(--font-display)" }}>
             Ative seu site profissional
           </h1>
-          <p className="text-[13px] sm:text-[14px] leading-5 text-slate-500 mt-2.5 max-w-[560px] mx-auto">Pagamento seguro e ativação imediata após a confirmação.</p>
+          <p className="text-[13px] sm:text-[14px] leading-6 text-slate-500 mt-3 max-w-[560px] mx-auto px-2">Pagamento seguro e ativação imediata após a confirmação.</p>
         </div>
 
-        {/* Container principal 2 colunas */}
-        <div className="grid grid-cols-1 lg:grid-cols-[360px_minmax(0,560px)] gap-5 sm:gap-6 lg:gap-6 items-start justify-center max-w-[980px] mx-auto">
-          {/* ESQUERDA — Resumo do plano */}
+        {/* Container principal 2 colunas — centralizado na página */}
+        <div className="grid grid-cols-1 lg:grid-cols-[370px_minmax(0,560px)] gap-6 sm:gap-7 lg:gap-8 items-start justify-center max-w-[980px] mx-auto">
+          {/* ESQUERDA — Resumo do plano — com margem de segurança interna */}
           <div className="w-full">
             <div className="rounded-2xl bg-white border border-slate-100 shadow-[0_8px_28px_rgba(0,0,0,0.04)] overflow-hidden">
-              <div className="p-6 sm:p-7">
+              <div className="p-7 sm:p-8 lg:p-8">
                 <p className="text-xs font-semibold tracking-widest uppercase text-slate-400">Resumo do plano</p>
 
-                <div className="mt-5">
+                <div className="mt-6">
                   <p className="text-xs font-semibold tracking-widest uppercase text-slate-400">Seu plano</p>
-                  <p className="text-[17px] font-semibold text-slate-900 mt-1.5 leading-tight">{planName}</p>
-                  <p className="text-[13px] leading-5 text-slate-500 mt-2">Inclui domínio, hospedagem e suporte.<br />Sem fidelidade.</p>
+                  <p className="text-[17px] font-semibold text-slate-900 mt-2 leading-tight">{planName}</p>
+                  <p className="text-[13px] leading-6 text-slate-500 mt-3">Inclui domínio, hospedagem e suporte.<br />Sem fidelidade.</p>
                 </div>
 
-                <div className="mt-6 border-t border-slate-100" />
+                <div className="mt-7 border-t border-slate-100" />
 
-                <div className="mt-5 space-y-4">
+                <div className="mt-6 space-y-5">
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <p className="text-sm font-medium text-slate-700">Ativação</p>
-                      <p className="text-xs text-slate-400">pagamento único</p>
+                      <p className="text-sm font-medium text-slate-700 leading-5">Ativação</p>
+                      <p className="text-xs text-slate-400 leading-4">pagamento único</p>
                     </div>
                     <p className="text-[15px] font-semibold text-slate-900 shrink-0">{brl(activationCents)}</p>
                   </div>
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <p className="text-sm font-medium text-slate-700">Mensalidade</p>
-                      <p className="text-xs text-slate-400">após {trialMonths} {trialMonths === 1 ? "mês" : "meses"}</p>
+                      <p className="text-sm font-medium text-slate-700 leading-5">Mensalidade</p>
+                      <p className="text-xs text-slate-400 leading-4">após {trialMonths} {trialMonths === 1 ? "mês" : "meses"}</p>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="text-[15px] font-semibold text-slate-900">{brl(monthlyCents)}/mês</p>
+                      <p className="text-[15px] font-semibold text-slate-900 leading-5">{brl(monthlyCents)}/mês</p>
                     </div>
                   </div>
                 </div>
 
-                <div className="mt-6 rounded-xl bg-[#f8faf8] border border-slate-100 px-4 py-4 flex items-center justify-between gap-3">
+                <div className="mt-7 rounded-xl bg-[#f8faf8] border border-slate-100 px-5 py-5 flex items-center justify-between gap-4">
                   <div>
-                    <p className="text-xs font-semibold tracking-widest uppercase text-slate-500">Total hoje</p>
-                    <p className="text-[22px] font-bold text-slate-900 leading-none mt-1">{brl(activationCents)}</p>
+                    <p className="text-xs font-semibold tracking-widest uppercase text-slate-500 tracking-wider">Total hoje</p>
+                    <p className="text-[22px] font-bold text-slate-900 leading-none mt-1.5">{brl(activationCents)}</p>
                   </div>
-                  <span className="shrink-0 inline-flex items-center rounded-full bg-[#1d5c3a] px-3 py-1.5 text-[10px] font-bold tracking-widest uppercase text-white">Pagamento único</span>
+                  <span className="shrink-0 inline-flex items-center rounded-full bg-[#1d5c3a] px-3.5 py-1.5 text-[10px] font-bold tracking-widest uppercase text-white">Pagamento único</span>
                 </div>
 
-                <div className="mt-5 space-y-1.5">
-                  <p className="text-xs text-slate-500 leading-4 flex gap-1.5"><span className="text-emerald-600 mt-0.5">✓</span> Sem taxas escondidas.</p>
-                  <p className="text-xs text-slate-500 leading-4 flex gap-1.5"><span className="text-emerald-600 mt-0.5">✓</span> Cancele quando quiser.</p>
-                  <p className="text-xs text-slate-500 leading-4 flex gap-1.5"><span className="text-emerald-600 mt-0.5">✓</span> Ativação imediata após a confirmação.</p>
+                <div className="mt-6 space-y-2">
+                  <p className="text-xs text-slate-500 leading-5 flex gap-2"><span className="text-emerald-600 mt-0.5">✓</span> Sem taxas escondidas.</p>
+                  <p className="text-xs text-slate-500 leading-5 flex gap-2"><span className="text-emerald-600 mt-0.5">✓</span> Cancele quando quiser.</p>
+                  <p className="text-xs text-slate-500 leading-5 flex gap-2"><span className="text-emerald-600 mt-0.5">✓</span> Ativação imediata após a confirmação.</p>
                 </div>
               </div>
             </div>
@@ -491,39 +491,39 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
             <p className="lg:hidden text-xs text-slate-400 text-center mt-3 px-2">Logado como <b className="text-slate-600">{userEmail}</b> • <button type="button" onClick={() => setStep("identify")} className="underline">trocar</button></p>
           </div>
 
-          {/* DIREITA — Pagamento (maior destaque) */}
+          {/* DIREITA — Pagamento (maior destaque) — com margem de segurança */}
           <div className="w-full min-w-0">
-            <div className="rounded-2xl bg-white border border-slate-100 shadow-[0_8px_28px_rgba(0,0,0,0.04)] p-6 sm:p-7">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-[16px] font-semibold text-slate-900">Pagamento</h2>
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-white border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-sm">
+            <div className="rounded-2xl bg-white border border-slate-100 shadow-[0_8px_28px_rgba(0,0,0,0.04)] p-7 sm:p-8 lg:p-8">
+              <div className="flex items-center justify-between gap-4">
+                <h2 className="text-[16px] font-semibold text-slate-900 leading-5">Pagamento</h2>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-white border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm shrink-0">
                   <span className={`w-2 h-2 rounded-full ${gateway === "mercadopago" ? "bg-[#009ee3]" : "bg-[#635bff]"}`} /> {gatewayLabel}
                 </span>
               </div>
 
-              <div className="mt-6">
-                <p className="text-sm font-medium text-slate-800">Forma de pagamento</p>
-                <p className="text-xs text-slate-500 mt-1">Escolha abaixo como deseja pagar. Pagamento 100% seguro.</p>
+              <div className="mt-7">
+                <p className="text-sm font-medium text-slate-800 leading-5">Forma de pagamento</p>
+                <p className="text-xs text-slate-500 mt-1.5 leading-4">Escolha abaixo como deseja pagar. Pagamento 100% seguro.</p>
 
-                <div className="mt-4 rounded-xl border border-slate-200 bg-[#fcfcfc] p-3 sm:p-4">
+                <div className="mt-5 rounded-xl border border-slate-200 bg-[#fcfcfc] p-4 sm:p-4">
                   <div className="flex items-center gap-3 text-sm text-slate-600">
                     <span className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center shadow-sm">💳</span>
-                    <span className="font-medium">PIX e cartão</span>
+                    <span className="font-medium leading-5">PIX e cartão</span>
                     <span className="hidden sm:inline text-slate-300">•</span>
-                    <span className="hidden sm:inline text-xs text-slate-500">sem sair do site</span>
+                    <span className="hidden sm:inline text-xs text-slate-500 leading-4">sem sair do site</span>
                     <span className="ml-auto inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-full px-2.5 py-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Seguro</span>
                   </div>
-                  <p className="text-xs text-slate-400 mt-3 leading-4">O componente oficial do {gatewayLabel} será carregado no próximo passo. Seus dados são protegidos com criptografia.</p>
+                  <p className="text-xs text-slate-400 mt-3 leading-5">O componente oficial do {gatewayLabel} será carregado no próximo passo. Seus dados são protegidos com criptografia.</p>
                 </div>
               </div>
 
-              {checkoutError && <p className="mt-4 rounded-xl bg-red-50 border border-red-100 px-4 py-3 text-sm text-red-700 leading-5">{checkoutError}</p>}
+              {checkoutError && <p className="mt-5 rounded-xl bg-red-50 border border-red-100 px-4 py-3 text-sm text-red-700 leading-6">{checkoutError}</p>}
 
               <button
                 type="button"
                 onClick={startCheckout}
                 disabled={checkoutLoading}
-                className="mt-6 w-full rounded-full bg-[#1d5c3a] px-6 py-[15px] text-[14px] sm:text-[15px] font-semibold text-white shadow-[0_8px_20px_rgba(29,92,58,0.18)] hover:bg-[#164a2e] hover:shadow-[0_10px_28px_rgba(29,92,58,0.22)] active:translate-y-[1px] transition-all disabled:opacity-60 disabled:cursor-not-allowed disabled:shadow-none flex items-center justify-center gap-2"
+                className="mt-7 w-full rounded-full bg-[#1d5c3a] px-6 py-[15px] text-[14px] sm:text-[15px] font-semibold text-white shadow-[0_8px_20px_rgba(29,92,58,0.18)] hover:bg-[#164a2e] hover:shadow-[0_10px_28px_rgba(29,92,58,0.22)] active:translate-y-[1px] transition-all disabled:opacity-60 disabled:cursor-not-allowed disabled:shadow-none flex items-center justify-center gap-2 leading-5"
               >
                 {checkoutLoading ? (
                   <>
@@ -535,17 +535,17 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
                   </>
                 )}
               </button>
-              <p className="text-xs text-slate-400 text-center mt-2.5">Pagamento único • Ativação imediata</p>
+              <p className="text-xs text-slate-400 text-center mt-3 leading-4">Pagamento único • Ativação imediata</p>
 
-              <div className="mt-6 flex gap-3 items-start rounded-xl bg-[#f8faf8] border border-slate-100 px-4 py-3.5">
+              <div className="mt-7 flex gap-3 items-start rounded-xl bg-[#f8faf8] border border-slate-100 px-4 py-4">
                 <span className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-500 text-sm shrink-0">🔒</span>
                 <div className="min-w-0">
-                  <p className="text-xs font-semibold text-slate-800">Pagamento seguro</p>
-                  <p className="text-xs text-slate-500 mt-1 leading-4">Seu pagamento é processado com segurança pelo {gatewayLabel}. Seus dados são protegidos com criptografia.</p>
+                  <p className="text-xs font-semibold text-slate-800 leading-4">Pagamento seguro</p>
+                  <p className="text-xs text-slate-500 mt-1.5 leading-5">Seu pagamento é processado com segurança pelo {gatewayLabel}. Seus dados são protegidos com criptografia.</p>
                 </div>
               </div>
 
-              <div className="mt-4 hidden lg:flex items-center justify-center gap-2 text-xs text-slate-400">
+              <div className="mt-5 hidden lg:flex items-center justify-center gap-2 text-xs text-slate-400 leading-4">
                 <span>Logado como <b className="text-slate-600">{userEmail}</b></span>
                 <span className="w-1 h-1 rounded-full bg-slate-300" />
                 <button type="button" onClick={() => router.push("/")} className="underline hover:text-slate-600">voltar ao site</button>
@@ -554,7 +554,7 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
               </div>
             </div>
 
-            <p className="text-xs text-slate-400 text-center leading-4 mt-3 px-2 max-w-[520px] mx-auto">Ao continuar, você concorda com a contratação e ativação automática após a confirmação do pagamento.</p>
+            <p className="text-xs text-slate-400 text-center leading-5 mt-4 px-3 max-w-[520px] mx-auto">Ao continuar, você concorda com a contratação e ativação automática após a confirmação do pagamento.</p>
           </div>
         </div>
 
@@ -586,51 +586,52 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
     );
   }
 
-  // PAYMENT
+  // PAYMENT — checkout transparente centralizado com margens de segurança
   if (step === "payment") {
     return (
-      <div className="w-full max-w-[640px] mx-auto">
-        <div className="text-center mb-6">
-          <h1 className="text-[22px] font-semibold text-slate-900" style={{ fontFamily: "var(--font-display)" }}>Finalize seu pagamento</h1>
-          <p className="text-sm text-slate-500 mt-1">Escolha PIX ou cartão no quadro abaixo. Você permanece no site.</p>
+      <div className="w-full max-w-[680px] mx-auto">
+        <div className="text-center mb-6 sm:mb-8 pt-2">
+          <h1 className="text-[22px] sm:text-[26px] font-semibold text-slate-900 leading-tight" style={{ fontFamily: "var(--font-display)" }}>Finalize seu pagamento</h1>
+          <p className="text-sm text-slate-500 mt-2 leading-5">Escolha PIX ou cartão no quadro abaixo. Você permanece no site.</p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 flex items-center justify-between gap-3 mb-4">
+        <div className="rounded-2xl border border-slate-100 bg-white shadow-[0_6px_20px_rgba(0,0,0,0.04)] px-5 py-4 flex items-center justify-between gap-4 mb-5">
           <div>
             <p className="text-xs font-semibold tracking-widest uppercase text-slate-400">Total hoje</p>
-            <p className="text-[18px] font-bold text-[#1d5c3a] leading-none mt-1">{brl(activationCents)}</p>
+            <p className="text-[18px] font-bold text-[#1d5c3a] leading-none mt-1.5">{brl(activationCents)}</p>
           </div>
-          <p className="text-xs text-slate-500 text-right leading-4">{planName}<br />{brl(monthlyCents)}/mês após {trialMonths}m</p>
+          <p className="text-xs text-slate-500 text-right leading-5">{planName}<br />{brl(monthlyCents)}/mês após {trialMonths}m</p>
         </div>
 
         {gateway === "stripe" && stripeClientSecret ? (
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm">
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold text-slate-900">Pagamento</h3>
+          <div className="rounded-2xl border border-slate-100 bg-white p-6 sm:p-7 shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-sm font-semibold text-slate-900 leading-5">Pagamento</h3>
               <span className="text-xs text-slate-400">Stripe • Seguro</span>
             </div>
-            <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50/50 p-2 sm:p-3">
-              <div id="stripe-embedded-checkout" className="min-h-[380px] w-full overflow-hidden rounded-lg bg-white" />
+            <p className="text-xs text-slate-500 mt-1 leading-4">Preencha com segurança — seus dados são protegidos.</p>
+            <div className="mt-5 rounded-xl border border-slate-100 bg-slate-50/50 p-3 sm:p-4">
+              <div id="stripe-embedded-checkout" className="min-h-[380px] w-full overflow-hidden rounded-xl bg-white" />
             </div>
-            <p className="text-xs text-slate-400 text-center mt-3">Você permanece no site durante todo o processo.</p>
+            <p className="text-xs text-slate-400 text-center mt-4 leading-4">Você permanece no site durante todo o processo.</p>
           </div>
         ) : gateway === "mercadopago" && mpUrl ? (
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm">
-            <div className="flex items-center justify-between gap-3">
+          <div className="rounded-2xl border border-slate-100 bg-white p-6 sm:p-7 shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
+            <div className="flex items-center justify-between gap-4">
               <div>
-                <h3 className="text-sm font-semibold text-slate-900">Pagamento</h3>
-                <p className="text-sm text-slate-500 mt-0.5">Escolha sua forma de pagamento abaixo.</p>
+                <h3 className="text-sm font-semibold text-slate-900 leading-5">Pagamento</h3>
+                <p className="text-sm text-slate-500 mt-1 leading-5">Escolha sua forma de pagamento abaixo.</p>
               </div>
-              <span className="shrink-0 inline-flex items-center rounded-full bg-[#009ee3]/10 border border-[#009ee3]/15 px-2.5 py-1 text-xs font-semibold text-[#009ee3]">Mercado Pago</span>
+              <span className="shrink-0 inline-flex items-center rounded-full bg-[#009ee3]/10 border border-[#009ee3]/15 px-3 py-1.5 text-xs font-semibold text-[#009ee3]">Mercado Pago</span>
             </div>
 
-            <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-2 sm:p-3">
+            <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
               <div className="rounded-xl overflow-hidden border border-slate-200 bg-white shadow-[0_4px_20px_rgba(0,0,0,0.04)]">
                 {!mpLoaded && (
-                  <div className="w-full h-[420px] sm:h-[500px] flex flex-col items-center justify-center gap-3 bg-white p-6 text-center">
+                  <div className="w-full h-[420px] sm:h-[500px] flex flex-col items-center justify-center gap-4 bg-white p-6 text-center">
                     <div className="w-10 h-10 rounded-full border-4 border-slate-200 border-t-[#1d5c3a] animate-spin" />
-                    <p className="text-sm font-medium text-slate-600">Carregando pagamento seguro...</p>
-                    <p className="text-xs text-slate-400">Mercado Pago • Não feche esta janela</p>
+                    <p className="text-sm font-medium text-slate-600 leading-5">Carregando pagamento seguro...</p>
+                    <p className="text-xs text-slate-400 leading-4">Mercado Pago • Não feche esta janela</p>
                   </div>
                 )}
                 <iframe
@@ -644,27 +645,27 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
               </div>
             </div>
 
-            <p className="text-xs text-slate-400 text-center mt-3 leading-4 px-2">PIX copia e cola e cartão disponíveis no quadro acima. Após a confirmação, seu site será ativado automaticamente.</p>
+            <p className="text-xs text-slate-400 text-center mt-4 leading-5 px-2">PIX copia e cola e cartão disponíveis no quadro acima. Após a confirmação, seu site será ativado automaticamente.</p>
 
-            <div className="mt-5 grid grid-cols-2 gap-2">
-              <button type="button" onClick={() => setStep("checkout")} className="rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition">
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              <button type="button" onClick={() => setStep("checkout")} className="rounded-full border border-slate-200 bg-white px-4 py-3.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition leading-5">
                 Voltar
               </button>
-              <a href={mpUrl} target="_blank" rel="noopener noreferrer" className="rounded-full bg-white border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 text-center hover:bg-slate-50 transition">
+              <a href={mpUrl} target="_blank" rel="noopener noreferrer" className="rounded-full bg-white border border-slate-200 px-4 py-3.5 text-sm font-medium text-slate-700 text-center hover:bg-slate-50 transition leading-5">
                 Nova aba
               </a>
             </div>
-            <button type="button" onClick={() => { setStep("processing"); startPolling(); }} className="mt-2 w-full rounded-full bg-slate-900 px-6 py-3.5 text-sm font-semibold text-white hover:bg-black transition">
+            <button type="button" onClick={() => { setStep("processing"); startPolling(); }} className="mt-3 w-full rounded-full bg-slate-900 px-6 py-3.5 text-sm font-semibold text-white hover:bg-black transition leading-5">
               Já paguei, verificar ativação
             </button>
 
-            <div className="mt-4 flex gap-2 items-start rounded-xl bg-emerald-50/60 border border-emerald-100 px-3.5 py-3">
+            <div className="mt-5 flex gap-3 items-start rounded-xl bg-emerald-50/60 border border-emerald-100 px-4 py-4">
               <span className="text-emerald-700 text-sm leading-none mt-0.5">🔒</span>
-              <p className="text-xs text-emerald-800/70 leading-4"><b className="text-emerald-900">Pagamento seguro.</b> Processado pelo Mercado Pago. Seus dados de pagamento são protegidos.</p>
+              <p className="text-xs text-emerald-800/70 leading-5"><b className="text-emerald-900">Pagamento seguro.</b> Processado pelo Mercado Pago. Seus dados de pagamento são protegidos.</p>
             </div>
           </div>
         ) : (
-          <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-sm text-amber-800 flex items-center gap-3">
+          <div className="rounded-2xl border border-amber-100 bg-amber-50 p-6 text-sm text-amber-800 flex items-center gap-3 leading-5">
             <span className="w-8 h-8 rounded-full border-2 border-amber-200 border-t-amber-600 animate-spin shrink-0" /> Preparando pagamento seguro...
           </div>
         )}
