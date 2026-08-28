@@ -3,11 +3,12 @@ import { getCurrentUser } from "@/lib/auth";
 import { getPublicTenantBySlug } from "@/lib/tenant";
 import { resolveHomeSections } from "@/lib/home";
 import { DEFAULT_SITE_DATA } from "@/lib/site-data";
-import { themePrimaryColor, themeStyleTag, type SiteThemeConfig } from "@/lib/site-theme";
+import { themeStyleTag, type SiteThemeConfig } from "@/lib/site-theme";
 import { Suspense } from "react";
 import { Header } from "@/components/site/sections/Header";
 import { Footer } from "@/components/site/sections/Footer";
 import CheckoutPageClient from "./CheckoutPageClient";
+import type { PublicTenant } from "@/types";
 import "@/app/(site)/site.css";
 
 export const dynamic = "force-dynamic";
@@ -37,9 +38,10 @@ export default async function CheckoutPage({
 }) {
   const user = await getCurrentUser();
   const homeSlug = process.env.HOME_TENANT_SLUG || "usuarioteste";
-  const tenant = (await getPublicTenantBySlug(homeSlug)) || (DEMO_TENANT as unknown as typeof tenant & { tenant_id: string });
-  const sections = await resolveHomeSections({ tenant: tenant as unknown as Parameters<typeof resolveHomeSections>[0]["tenant"], tenantDataOverridesGlobal: true });
-  const siteData = ((tenant as unknown as { site_data?: Record<string, unknown> }).site_data || {}) as Record<string, unknown>;
+  const fetchedTenant: PublicTenant | null = await getPublicTenantBySlug(homeSlug);
+  const tenant: PublicTenant = (fetchedTenant as PublicTenant | null) || (DEMO_TENANT as unknown as PublicTenant);
+  const sections = await resolveHomeSections({ tenant, tenantDataOverridesGlobal: true });
+  const siteData = ((tenant.site_data || {}) as Record<string, unknown>);
   const theme = (siteData.theme as SiteThemeConfig | undefined) || null;
 
   const headerSection = sections.find((s) => s.type === "header");
@@ -58,9 +60,9 @@ export default async function CheckoutPage({
   const footerSection = sections.find((s) => s.type === "footer");
   const footerContent = (footerSection?.content || {}) as Record<string, unknown>;
   const whatsapp = (siteData.whatsapp as string) || (footerContent._contactWhatsapp as string) || undefined;
-  const email = (siteData.email as string) || ((tenant as unknown as { email?: string }).email as string) || undefined;
+  const email = (siteData.email as string) || (tenant.email as string) || undefined;
   const instagram = siteData.instagram ? `https://instagram.com/${String(siteData.instagram).replace(/^@/, "")}` : (footerContent._contactInstagram as string) || undefined;
-  const profileName = (siteData.logoText as string) || (footerContent._profileName as string) || undefined;
+  const profileName = (tenant.profile_name as string) || (footerContent._profileName as string) || undefined;
 
   const planId = searchParams?.planId || searchParams?.plan || undefined;
 
