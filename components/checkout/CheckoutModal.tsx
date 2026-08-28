@@ -333,11 +333,11 @@ export function CheckoutModal({ open, onClose, planId }: { open: boolean; onClos
   const planName = offer?.name || "Site Profissional";
   const isCheckout = step === "checkout";
   const isPayment = step === "payment";
-  const isWide = isCheckout || isPayment;
+  const isWide = isCheckout;
 
   return (
-    <div className="fixed inset-0 z-50 flex overflow-y-auto overflow-x-hidden bg-[#f6f4ef] sm:bg-black/45 sm:backdrop-blur-sm p-0 sm:p-6 sm:items-start sm:justify-center sm:pt-8">
-      <div className={`relative w-full bg-white min-h-screen sm:min-h-0 sm:rounded-[20px] sm:shadow-[0_20px_60px_rgba(0,0,0,0.18)] flex flex-col overflow-hidden max-w-full mx-auto ${isWide ? "sm:max-w-[880px]" : "sm:max-w-[640px]"} sm:my-4`}>
+    <div className="fixed inset-0 z-50 flex overflow-y-auto overflow-x-hidden bg-[#f6f4ef] sm:bg-black/45 sm:backdrop-blur-sm p-0 sm:p-4 lg:p-6 sm:items-start sm:justify-center sm:pt-6 lg:pt-8">
+      <div className={`relative w-full bg-white min-h-screen sm:min-h-0 sm:rounded-[20px] sm:shadow-[0_20px_60px_rgba(0,0,0,0.18)] flex flex-col overflow-hidden max-w-full mx-auto my-0 sm:my-4 ${isWide ? "sm:max-w-[860px] lg:max-w-[880px]" : isPayment ? "sm:max-w-[680px]" : "sm:max-w-[560px]"}`}>
         {/* Cabeçalho — Ative seu site */}
         <div className="sticky top-0 z-10 bg-white border-b border-slate-100 px-5 sm:px-8 py-5 sm:py-6 flex items-start justify-between gap-4">
           <div className="min-w-0">
@@ -359,7 +359,9 @@ export function CheckoutModal({ open, onClose, planId }: { open: boolean; onClos
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto overflow-x-hidden px-5 sm:px-8 py-6 sm:py-7">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 sm:px-6 lg:px-8 py-5 sm:py-6 lg:py-7">
+          {/* Wrapper central com respiro — garante margens internas em desktop e mobile */}
+          <div className="w-full max-w-full mx-auto">
           {/* IDENTIFY */}
           {step === "identify" && (
             <div className="max-w-[520px] mx-auto w-full space-y-5">
@@ -439,9 +441,9 @@ export function CheckoutModal({ open, onClose, planId }: { open: boolean; onClos
             </div>
           )}
 
-          {/* CHECKOUT — estrutura 2 colunas desktop, 1 coluna mobile sem repetições */}
+          {/* CHECKOUT — 2 colunas no desktop com respiro, 1 coluna no mobile */}
           {step === "checkout" && (
-            <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-5 lg:gap-6 items-start w-full max-w-full">
+            <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-5 lg:gap-6 items-start w-full max-w-full overflow-hidden">
               {/* Esquerda: Resumo do pedido */}
               <div className="space-y-4 min-w-0">
                 <div className="rounded-2xl border border-slate-200 bg-white p-5">
@@ -520,58 +522,49 @@ export function CheckoutModal({ open, onClose, planId }: { open: boolean; onClos
             </div>
           )}
 
-          {/* PAYMENT — Brick/iframe dentro de card organizado */}
+          {/* PAYMENT — layout clean: resumo compacto + card de pagamento centralizado */}
           {step === "payment" && (
-            <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-5 lg:gap-6 items-start w-full max-w-full">
-              {/* Resumo compacto mantém contexto sem repetir total duas vezes */}
-              <div className="space-y-4 min-w-0">
-                <div className="rounded-2xl border border-slate-200 bg-white p-5 hidden lg:block">
-                  <p className="text-xs font-semibold tracking-widest uppercase text-slate-400">Seu plano</p>
-                  <p className="text-[15px] font-semibold text-slate-900 mt-1">{planName}</p>
-                  <div className="mt-3 space-y-2 text-sm">
-                    <div className="flex justify-between"><span className="text-slate-500">Ativação</span><span className="font-semibold text-slate-900">{brl(activationCents)}</span></div>
-                    <div className="flex justify-between"><span className="text-slate-500">Mensalidade</span><span className="font-medium text-slate-900">{brl(monthlyCents)}/mês</span></div>
-                  </div>
-                  <div className="mt-4 rounded-xl bg-[#1d5c3a] px-4 py-3 flex items-center justify-between">
-                    <span className="text-xs font-semibold tracking-widest uppercase text-white/70">Total hoje</span>
-                    <span className="text-[18px] font-bold text-white">{brl(activationCents)}</span>
-                  </div>
+            <div className="w-full max-w-[640px] mx-auto space-y-4">
+              {/* Resumo compacto — sempre visível, sem ocupar lateral, evita desorganização no desktop */}
+              <div className="rounded-2xl border border-slate-200 bg-white px-4 sm:px-5 py-4 flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold tracking-widest uppercase text-slate-400">Total hoje</p>
+                  <p className="text-[20px] font-bold text-[#1d5c3a] leading-none mt-1">{brl(activationCents)}</p>
+                  <p className="text-xs text-slate-500 mt-1 truncate">{planName} • {brl(monthlyCents)}/mês após {trialMonths}m</p>
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 flex items-center justify-between lg:hidden">
-                  <div>
-                    <p className="text-xs font-semibold tracking-widest uppercase text-slate-400">Total hoje</p>
-                    <p className="text-[18px] font-bold text-[#1d5c3a] mt-0.5">{brl(activationCents)}</p>
-                  </div>
-                  <p className="text-xs text-slate-500 text-right leading-4">{planName}<br />{brl(monthlyCents)}/mês após {trialMonths}m</p>
-                </div>
-                <div className="hidden lg:flex gap-2 items-start rounded-xl bg-emerald-50/60 border border-emerald-100 px-3.5 py-3">
-                  <span className="text-emerald-700 text-sm">🔒</span>
-                  <p className="text-xs text-emerald-800/70 leading-4"><b className="text-emerald-900">Pagamento seguro.</b> Processado pelo Mercado Pago. Seus dados são protegidos.</p>
+                <div className="hidden sm:flex flex-col items-end gap-1 shrink-0">
+                  <span className="inline-flex items-center rounded-full bg-slate-50 border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600">PIX e cartão</span>
+                  <span className="text-xs text-slate-400">Pagamento único</span>
                 </div>
               </div>
 
-              {/* Checkout transparente */}
-              <div className="space-y-4 min-w-0 max-w-full overflow-hidden">
-                {gateway === "stripe" && stripeClientSecret ? (
-                  <div className="rounded-2xl border border-slate-200 bg-white p-3 sm:p-5 shadow-sm overflow-hidden max-w-full">
-                    <div className="flex items-center gap-2 mb-3">
-                      <h3 className="text-sm font-semibold text-slate-900">Pagamento</h3>
-                      <span className="ml-auto text-xs text-slate-400">Stripe • Seguro</span>
-                    </div>
-                    <div id="stripe-embedded-checkout" className="min-h-[380px] w-full max-w-full overflow-hidden" />
-                    <p className="text-xs text-slate-400 text-center mt-3">Você permanece no site durante todo o processo.</p>
+              {gateway === "stripe" && stripeClientSecret ? (
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm overflow-hidden">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-sm font-semibold text-slate-900">Pagamento</h3>
+                    <span className="text-xs text-slate-400">Stripe • Seguro</span>
                   </div>
-                ) : gateway === "mercadopago" && mpUrl ? (
-                  <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm overflow-hidden max-w-full">
-                    <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm text-slate-500 mt-1">Preencha seu cartão com segurança.</p>
+                  <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50/50 p-2 sm:p-3">
+                    <div id="stripe-embedded-checkout" className="min-h-[380px] w-full max-w-full overflow-hidden rounded-lg bg-white" />
+                  </div>
+                  <p className="text-xs text-slate-400 text-center mt-3">Você permanece no site durante todo o processo.</p>
+                </div>
+              ) : gateway === "mercadopago" && mpUrl ? (
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm overflow-hidden">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
                       <h3 className="text-sm font-semibold text-slate-900">Pagamento</h3>
-                      <span className="inline-flex items-center rounded-full bg-[#009ee3]/10 border border-[#009ee3]/15 px-2.5 py-1 text-xs font-semibold text-[#009ee3]">Mercado Pago</span>
+                      <p className="text-sm text-slate-500 mt-0.5">Escolha sua forma de pagamento abaixo.</p>
                     </div>
-                    <p className="text-sm text-slate-500 mt-1">Escolha sua forma de pagamento abaixo.</p>
+                    <span className="shrink-0 inline-flex items-center rounded-full bg-[#009ee3]/10 border border-[#009ee3]/15 px-2.5 py-1 text-xs font-semibold text-[#009ee3]">Mercado Pago</span>
+                  </div>
 
-                    <div className="mt-4 rounded-2xl overflow-hidden border border-slate-200 bg-white shadow-[0_8px_28px_rgba(0,0,0,0.06)] w-full max-w-full">
+                  {/* Área do Brick/iframe com respiro interno — não encosta nas bordas */}
+                  <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-2 sm:p-3">
+                    <div className="rounded-xl overflow-hidden border border-slate-200 bg-white shadow-[0_4px_20px_rgba(0,0,0,0.04)]">
                       {!mpLoaded && (
-                        <div className="w-full h-[420px] sm:h-[520px] flex flex-col items-center justify-center gap-3 bg-slate-50 p-6 text-center">
+                        <div className="w-full h-[420px] sm:h-[500px] flex flex-col items-center justify-center gap-3 bg-white p-6 text-center">
                           <div className="w-10 h-10 rounded-full border-4 border-slate-200 border-t-[#1d5c3a] animate-spin" />
                           <p className="text-sm font-medium text-slate-600">Carregando pagamento seguro...</p>
                           <p className="text-xs text-slate-400">Mercado Pago • Não feche esta janela</p>
@@ -580,40 +573,40 @@ export function CheckoutModal({ open, onClose, planId }: { open: boolean; onClos
                       <iframe
                         src={mpUrl}
                         title="Pagamento seguro — Mercado Pago"
-                        className={`w-full border-0 block max-w-full ${mpLoaded ? "h-[520px] sm:h-[560px]" : "h-0 overflow-hidden"}`}
+                        className={`w-full border-0 block ${mpLoaded ? "h-[520px] sm:h-[560px]" : "h-0 overflow-hidden"}`}
                         allow="payment *; clipboard-write; clipboard-read"
                         loading="lazy"
                         onLoad={() => setMpLoaded(true)}
                       />
                     </div>
+                  </div>
 
-                    <p className="text-xs text-slate-400 text-center mt-3 px-2">PIX copia e cola e cartão disponíveis no quadro acima. Após a confirmação, seu site será ativado automaticamente.</p>
+                  <p className="text-xs text-slate-400 text-center mt-3 leading-4 px-2">PIX copia e cola e cartão disponíveis no quadro acima. Após a confirmação, seu site será ativado automaticamente.</p>
 
-                    <div className="mt-4 flex gap-2">
-                      <button type="button" onClick={() => setStep("checkout")} className="flex-1 rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition">
-                        Voltar
-                      </button>
-                      <a href={mpUrl} target="_blank" rel="noopener noreferrer" className="flex-1 rounded-full bg-white border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 text-center hover:bg-slate-50 transition">
-                        Abrir em nova aba
-                      </a>
-                    </div>
-                    <button type="button" onClick={() => { setStep("processing"); startPolling(); }} className="mt-2 w-full rounded-full bg-slate-900 px-6 py-3.5 text-sm font-semibold text-white hover:bg-black transition">
-                      Já paguei, verificar ativação
+                  <div className="mt-5 grid grid-cols-2 gap-2">
+                    <button type="button" onClick={() => setStep("checkout")} className="rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition">
+                      Voltar
                     </button>
+                    <a href={mpUrl} target="_blank" rel="noopener noreferrer" className="rounded-full bg-white border border-slate-200 px-4 py-3 text-sm font-medium text-slate-700 text-center hover:bg-slate-50 transition">
+                      Nova aba
+                    </a>
                   </div>
-                ) : (
-                  <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-sm text-amber-800 flex items-center gap-3">
-                    <span className="w-8 h-8 rounded-full border-2 border-amber-200 border-t-amber-600 animate-spin shrink-0" /> Preparando pagamento seguro...
+                  <button type="button" onClick={() => { setStep("processing"); startPolling(); }} className="mt-2 w-full rounded-full bg-slate-900 px-6 py-3.5 text-sm font-semibold text-white hover:bg-black transition">
+                    Já paguei, verificar ativação
+                  </button>
+
+                  <div className="mt-4 flex gap-2 items-start rounded-xl bg-emerald-50/60 border border-emerald-100 px-3.5 py-3">
+                    <span className="text-emerald-700 text-sm leading-none mt-0.5">🔒</span>
+                    <p className="text-xs text-emerald-800/70 leading-4"><b className="text-emerald-900">Pagamento seguro.</b> Processado pelo Mercado Pago. Seus dados de pagamento são protegidos.</p>
                   </div>
-                )}
-
-                {checkoutError && <p className="rounded-xl bg-red-50 border border-red-100 px-4 py-3 text-sm text-red-700">{checkoutError}</p>}
-
-                <div className="lg:hidden flex gap-2 items-start rounded-xl bg-emerald-50/60 border border-emerald-100 px-3.5 py-3">
-                  <span className="text-emerald-700 text-sm">🔒</span>
-                  <p className="text-xs text-emerald-800/70 leading-4"><b className="text-emerald-900">Pagamento seguro.</b> Processado pelo Mercado Pago.</p>
                 </div>
-              </div>
+              ) : (
+                <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-sm text-amber-800 flex items-center gap-3">
+                  <span className="w-8 h-8 rounded-full border-2 border-amber-200 border-t-amber-600 animate-spin shrink-0" /> Preparando pagamento seguro...
+                </div>
+              )}
+
+              {checkoutError && <p className="rounded-xl bg-red-50 border border-red-100 px-4 py-3 text-sm text-red-700">{checkoutError}</p>}
             </div>
           )}
 
@@ -679,6 +672,7 @@ export function CheckoutModal({ open, onClose, planId }: { open: boolean; onClos
               </div>
             </div>
           )}
+          </div>
         </div>
 
         <div className="border-t border-slate-100 px-5 sm:px-8 py-4 bg-slate-50/50">
