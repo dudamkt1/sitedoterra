@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { INCLUDED_CATALOG } from "@/lib/platform-includes";
-import { CheckoutModal } from "@/components/checkout/CheckoutModal";
 
 interface PricingPlan {
   name?: string;
@@ -58,7 +57,6 @@ function titleParts(title: string): { main: string; emphasis?: string } {
 const INTENT_KEY = "checkout_intent_v1";
 
 export function Pricing({ content }: { content: PricingContent }) {
-  const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [demoLoading, setDemoLoading] = useState(false);
   const offer = content.offer;
 
@@ -66,7 +64,8 @@ export function Pricing({ content }: { content: PricingContent }) {
     try {
       if (offer) localStorage.setItem(INTENT_KEY, JSON.stringify({ offer, ts: Date.now() }));
     } catch {}
-    setCheckoutOpen(true);
+    // Nova página de checkout transparente — não usa mais modal
+    window.location.href = "/checkout";
   }
 
   async function handleDemo() {
@@ -91,36 +90,33 @@ export function Pricing({ content }: { content: PricingContent }) {
     const plans = content.plans || [];
     if (plans.length === 0) return null;
     return (
-      <>
-        <section id="planos">
-          <div className="planos-inner">
-            <div className="planos-eyebrow">
-              <span className="eyebrow-line"></span>
-              <span className="eyebrow-text">{content.eyebrow || "Chamada final"}</span>
-              <span className="eyebrow-line"></span>
-            </div>
-            <h2 className="planos-title">{content.title || "Planos"}</h2>
-            {content.subtitle && <p className="planos-sub">{content.subtitle}</p>}
-            <div className="planos-cards">
-              {plans.map((plan, i) => (
-                <div key={i} className={"plano-card" + (plan.popular ? " destaque" : "")}>
-                  {plan.badge && <div className="plano-badge">{plan.badge}</div>}
-                  <div className="plano-tipo">{plan.name}</div>
-                  <div className="plano-preco"><sup>R$</sup>{plan.price}</div>
-                  {plan.period && <div className="plano-period">{plan.period}</div>}
-                  {plan.economy && <div className="plano-economia">{plan.economy}</div>}
-                  <hr className="plano-divider" />
-                  <ul className="plano-features">
-                    {(plan.features || []).map((f, j) => <li key={j}>{f}</li>)}
-                  </ul>
-                  <button type="button" onClick={handleOpen} className="btn-plano">{plan.buttonText || "Começar agora"}</button>
-                </div>
-              ))}
-            </div>
+      <section id="planos">
+        <div className="planos-inner">
+          <div className="planos-eyebrow">
+            <span className="eyebrow-line"></span>
+            <span className="eyebrow-text">{content.eyebrow || "Chamada final"}</span>
+            <span className="eyebrow-line"></span>
           </div>
-        </section>
-        <CheckoutModal open={checkoutOpen} onClose={() => setCheckoutOpen(false)} />
-      </>
+          <h2 className="planos-title">{content.title || "Planos"}</h2>
+          {content.subtitle && <p className="planos-sub">{content.subtitle}</p>}
+          <div className="planos-cards">
+            {plans.map((plan, i) => (
+              <div key={i} className={"plano-card" + (plan.popular ? " destaque" : "")}>
+                {plan.badge && <div className="plano-badge">{plan.badge}</div>}
+                <div className="plano-tipo">{plan.name}</div>
+                <div className="plano-preco"><sup>R$</sup>{plan.price}</div>
+                {plan.period && <div className="plano-period">{plan.period}</div>}
+                {plan.economy && <div className="plano-economia">{plan.economy}</div>}
+                <hr className="plano-divider" />
+                <ul className="plano-features">
+                  {(plan.features || []).map((f, j) => <li key={j}>{f}</li>)}
+                </ul>
+                <button type="button" onClick={handleOpen} className="btn-plano">{plan.buttonText || "Começar agora"}</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
     );
   }
 
@@ -242,7 +238,6 @@ export function Pricing({ content }: { content: PricingContent }) {
           </div>
         </div>
       </div>
-      <CheckoutModal open={checkoutOpen} onClose={() => setCheckoutOpen(false)} />
     </section>
   );
 }
