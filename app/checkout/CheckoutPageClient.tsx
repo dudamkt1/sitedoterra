@@ -422,39 +422,41 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
     );
   }
 
-  // CHECKOUT — fidelidade máxima à referência checkout.png
+  // CHECKOUT — idêntico a /checkout.png (centralizado, sem invadir NAV/rodapé)
   if (step === "checkout") {
     return (
-      <div className="w-full">
-        {/* Título */}
-        <div className="text-center pt-2 sm:pt-4 pb-2 mb-7 sm:mb-9">
-          <h1 className="text-[28px] sm:text-[34px] font-bold tracking-tight text-[#0f1a2a] leading-tight">
+      <div className="w-full flex flex-col items-center">
+        {/* Título centralizado — exatamente como checkout.png */}
+        <div className="text-center w-full max-w-[980px] mx-auto pt-1 sm:pt-2 pb-2 mb-8 sm:mb-10">
+          <h1 className="text-[28px] sm:text-[32px] font-bold tracking-[-0.02em] text-[#0f1a2a] leading-none">
             Ative seu site profissional
           </h1>
-          <p className="text-[13.5px] sm:text-[14.5px] leading-6 text-[#6b7a89] mt-3 max-w-[560px] mx-auto">Pagamento seguro e ativação imediata após a confirmação.</p>
+          <p className="text-[13.5px] sm:text-[14px] leading-6 text-[#6b7a89] mt-3 max-w-[560px] mx-auto">
+            Pagamento seguro e ativação imediata após a confirmação.
+          </p>
         </div>
 
-        {/* Grid 2 colunas */}
-        <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-6 lg:gap-6 items-start max-w-[980px] mx-auto">
+        {/* Grid 2 colunas — exatamente checkout.png: 360px + flex */}
+        <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-5 lg:gap-5 items-start w-full max-w-[980px] mx-auto">
           {/* ESQUERDA — Resumo do plano */}
           <div className="w-full">
-            <div className="rounded-[20px] bg-white border border-[#eef2ee] shadow-[0_8px_28px_rgba(0,0,0,0.05)] overflow-hidden">
-              <div className="p-6 sm:p-[26px]">
-                <h2 className="text-[16px] font-bold text-[#0f1a2a] leading-none">Resumo do plano</h2>
+            <div className="rounded-[16px] bg-white border border-[#e7ece8] shadow-[0_8px_24px_rgba(16,61,45,0.06)] overflow-hidden">
+              <div className="p-6">
+                <h2 className="text-[15px] font-bold text-[#0f1a2a] leading-none">Resumo do plano</h2>
 
-                <div className="mt-6 flex gap-4">
-                  <div className="w-[56px] h-[56px] rounded-[14px] bg-[#eef6ee] border border-[#e2efe4] flex items-center justify-center shrink-0">
-                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
-                      <circle cx="12" cy="12" r="9" stroke="#103d2d" strokeWidth="1.7" />
-                      <ellipse cx="12" cy="12" rx="4.5" ry="9" stroke="#103d2d" strokeWidth="1.4" />
-                      <path d="M3 12h18M12 3c1.8 2.2 2.8 5 2.8 9s-1 6.8-2.8 9c-1.8-2.2-2.8-5-2.8-9s1-6.8 2.8-9Z" stroke="#103d2d" strokeWidth="1.4" strokeLinecap="round" />
-                      <path d="M4.5 8.5h15M4.5 15.5h15" stroke="#103d2d" strokeWidth="1.2" strokeLinecap="round" />
+                <div className="mt-6 flex gap-3.5">
+                  <div className="w-[52px] h-[52px] rounded-[12px] bg-[#eef4ef] border border-[#e2ece8] flex items-center justify-center shrink-0">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+                      <circle cx="12" cy="12" r="9" stroke="#1a4d2e" strokeWidth="1.6" />
+                      <ellipse cx="12" cy="12" rx="4.4" ry="9" stroke="#1a4d2e" strokeWidth="1.35" />
+                      <path d="M3.2 12H20.8M12 3.2c1.7 2.15 2.65 4.85 2.65 8.8S13.7 18.65 12 20.8c-1.7-2.15-2.65-4.85-2.65-8.8S10.3 5.35 12 3.2Z" stroke="#1a4d2e" strokeWidth="1.25" strokeLinecap="round" />
+                      <path d="M5 8.4H19M5 15.6H19" stroke="#1a4d2e" strokeWidth="1.15" strokeLinecap="round" />
                     </svg>
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-[10.5px] font-semibold tracking-[0.11em] uppercase text-[#8a9aa8] leading-none">Seu plano</p>
-                    <p className="text-[16.5px] font-bold text-[#0f1a2a] mt-1.5 leading-tight">Site Profissional</p>
-                    <p className="text-[13px] leading-[19px] text-[#6b7a89] mt-2">Inclui domínio, hospedagem e suporte. Sem fidelidade.</p>
+                    <p className="text-[10px] font-bold tracking-[0.14em] uppercase text-[#8a9aa8] leading-none">Seu plano</p>
+                    <p className="text-[15.5px] font-bold text-[#0f1a2a] mt-1.5 leading-none tracking-tight">Site Profissional</p>
+                    <p className="text-[12.5px] leading-[18px] text-[#6b7a89] mt-2">Inclui domínio, hospedagem e suporte. Sem fidelidade.</p>
                   </div>
                 </div>
 
@@ -462,36 +464,36 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
 
                 <div className="mt-5 space-y-4">
                   <div className="flex items-center justify-between gap-4">
-                    <p className="text-[13.5px] text-[#4a5a6a] leading-none">Ativação (pagamento único)</p>
-                    <p className="text-[14px] font-semibold text-[#0f1a2a] shrink-0">{brl(activationCents)}</p>
+                    <p className="text-[13px] text-[#475569] leading-none">Ativação (pagamento único)</p>
+                    <p className="text-[13.5px] font-semibold text-[#0f1a2a] shrink-0 tracking-tight">{brl(activationCents)}</p>
                   </div>
                   <div className="flex items-start justify-between gap-4">
-                    <p className="text-[13.5px] text-[#4a5a6a] leading-none pt-1">Mensalidade</p>
+                    <p className="text-[13px] text-[#475569] leading-none pt-0.5">Mensalidade</p>
                     <div className="text-right shrink-0">
-                      <p className="text-[14px] font-semibold text-[#0f1a2a] leading-none">{brl(monthlyCents)}/mês</p>
-                      <p className="text-[11.5px] text-[#6b7a89] mt-1 leading-none">após {trialMonths} meses</p>
+                      <p className="text-[13.5px] font-semibold text-[#0f1a2a] leading-none tracking-tight">{brl(monthlyCents)}/mês</p>
+                      <p className="text-[11px] text-[#6b7a89] mt-1 leading-none">após {trialMonths} meses</p>
                     </div>
                   </div>
                 </div>
 
                 <div className="mt-6 h-px bg-[#eef2ee]" />
 
-                <div className="mt-5 rounded-[14px] bg-[#f2f7f3] border border-[#e6efe7] px-4 py-4 flex items-center justify-between gap-3">
+                <div className="mt-5 rounded-[12px] bg-[#f2f7f3] border border-[#e6efe7] px-4 py-3.5 flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-[10.5px] font-semibold tracking-[0.11em] uppercase text-[#6b7a89] leading-none">Total hoje</p>
-                    <p className="text-[22px] font-extrabold text-[#103d2d] leading-none mt-2 tracking-tight">{brl(activationCents)}</p>
+                    <p className="text-[10px] font-bold tracking-[0.13em] uppercase text-[#6b7a89] leading-none">Total hoje</p>
+                    <p className="text-[22px] font-extrabold text-[#13402e] leading-none mt-1.5 tracking-tight">{brl(activationCents)}</p>
                   </div>
-                  <span className="shrink-0 inline-flex items-center rounded-full bg-[#e2f3e3] border border-[#d3ead5] px-3 py-1.5 text-[10px] font-bold tracking-[0.08em] uppercase text-[#166534]">Pagamento único</span>
+                  <span className="shrink-0 inline-flex items-center rounded-full bg-[#dff0e2] border border-[#cde7d1] px-2.5 py-1 text-[10px] font-extrabold tracking-[0.07em] uppercase text-[#166534]">Pagamento único</span>
                 </div>
 
-                <div className="mt-5 rounded-[14px] bg-[#f8faf8] border border-[#edf2ed] px-4 py-4 flex gap-3">
-                  <span className="w-7 h-7 rounded-full bg-white border border-[#dbe8dd] flex items-center justify-center shrink-0 mt-0.5">
+                <div className="mt-4 rounded-[12px] bg-[#f8faf8] border border-[#edf2ed] px-3.5 py-3.5 flex gap-3">
+                  <span className="w-7 h-7 rounded-full bg-white border border-[#e2efe4] flex items-center justify-center shrink-0 mt-0.5">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
                   </span>
-                  <div className="text-[12.5px] leading-[18px] text-[#4a5a6a]">
-                    <p className="font-medium text-[#2d3a4a]">Sem taxas escondidas.</p>
-                    <p className="font-medium text-[#2d3a4a]">Cancele quando quiser.</p>
-                    <p className="text-[#6b7a89] mt-1">Ativação imediata após a confirmação.</p>
+                  <div className="text-[12px] leading-[17px] text-[#475569]">
+                    <p className="font-semibold text-[#334155] leading-none">Sem taxas escondidas.</p>
+                    <p className="font-semibold text-[#334155] leading-none mt-1">Cancele quando quiser.</p>
+                    <p className="text-[#64748b] mt-1">Ativação imediata após a confirmação.</p>
                   </div>
                 </div>
               </div>
@@ -500,30 +502,30 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
 
           {/* DIREITA — Pagamento */}
           <div className="w-full min-w-0">
-            <div className="rounded-[20px] bg-white border border-[#eef2ee] shadow-[0_8px_28px_rgba(0,0,0,0.05)] p-6 sm:p-[26px]">
+            <div className="rounded-[16px] bg-white border border-[#e7ece8] shadow-[0_8px_24px_rgba(16,61,45,0.06)] p-6">
               <div className="flex items-center justify-between gap-3">
-                <h2 className="text-[16px] font-bold text-[#0f1a2a]">Pagamento</h2>
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-white border border-[#e6ecef] px-2.5 py-1.5 shadow-sm shrink-0">
+                <h2 className="text-[15px] font-bold text-[#0f1a2a] leading-none">Pagamento</h2>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-white border border-[#e6ecef] px-3 py-1.5 shadow-[0_1px_4px_rgba(0,0,0,0.04)] shrink-0">
                   <span className="w-[18px] h-[18px] rounded-full bg-[#009ee3] flex items-center justify-center">
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="white"><path d="M12 4l-8 4.5V12l8 4.5L20 12V8.5z" /></svg>
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="white"><path d="M12 4L-1 10.5V13.5L12 20L25 13.5V10.5Z" /></svg>
                   </span>
-                  <span className="text-[12px] font-semibold text-[#2d3a4a]">Mercado Pago</span>
+                  <span className="text-[11.5px] font-bold text-[#2d3a4a] tracking-tight">Mercado Pago</span>
                 </span>
               </div>
 
-              <p className="text-[13px] text-[#6b7a89] mt-2 leading-5">Escolha sua forma de pagamento abaixo.</p>
+              <p className="text-[12.5px] text-[#6b7a89] mt-2.5 leading-5">Escolha sua forma de pagamento abaixo.</p>
 
-              {/* Selector */}
-              <div className="mt-5 rounded-[12px] border border-[#a7d0b4] bg-[#fbfdfb] px-4 py-3.5 flex items-center gap-3 shadow-[0_0_0_1px_rgba(16,61,45,0.04)]">
-                <span className="w-5 h-5 rounded-full border-[5px] border-[#103d2d] bg-white flex items-center justify-center shrink-0" />
-                <span className="w-8 h-8 rounded-[10px] bg-[#eef6ee] border border-[#e2efe4] flex items-center justify-center shrink-0">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#103d2d" strokeWidth="1.6"><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M2 9h20" /></svg>
+              {/* Selector — borda verde exata da referência */}
+              <div className="mt-5 rounded-[12px] border-[1.5px] border-[#a7d0b4] bg-[#fbfdfb] px-3.5 py-3 flex items-center gap-3">
+                <span className="w-[20px] h-[20px] rounded-full border-[5px] border-[#103d2d] bg-white flex items-center justify-center shrink-0" />
+                <span className="w-8 h-8 rounded-[9px] bg-[#eef6ee] border border-[#e2efe4] flex items-center justify-center shrink-0">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#103d2d" strokeWidth="1.5"><rect x="2.5" y="5.5" width="19" height="13" rx="1.8" /><path d="M2.5 9.2H21.5" /></svg>
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[13px] font-semibold text-[#0f1a2a] leading-none">PIX e cartão — sem sair do site</p>
-                  <p className="text-[12px] text-[#6b7a89] leading-none mt-1.5">Aprovação em segundos via PIX</p>
+                  <p className="text-[12.5px] font-semibold text-[#0f1a2a] leading-none">PIX e cartão — sem sair do site</p>
+                  <p className="text-[11.5px] text-[#64748b] leading-none mt-1">Aprovação em segundos via PIX</p>
                 </div>
-                <span className="hidden sm:inline-flex items-center rounded-full bg-[#e8f5e9] border border-[#d4ead5] px-2.5 py-1 text-[11px] font-semibold text-[#2e7d32] whitespace-nowrap">100% seguro</span>
+                <span className="hidden sm:inline-flex items-center rounded-full bg-[#eaf6ec] border border-[#cfe8d2] px-2.5 py-1 text-[11px] font-bold text-[#1b6b2e] whitespace-nowrap tracking-tight">100% seguro</span>
               </div>
 
               {checkoutError && <p className="mt-4 rounded-xl bg-[#fef2f2] border border-[#fde4e4] px-4 py-3 text-sm text-[#991b1b]">{checkoutError}</p>}
@@ -532,71 +534,70 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
                 type="button"
                 onClick={startCheckout}
                 disabled={checkoutLoading}
-                className="mt-6 w-full rounded-[12px] bg-[#0f3d2d] hover:bg-[#0c3326] active:bg-[#0a2e22] px-6 py-[14px] text-center shadow-[0_6px_18px_rgba(15,61,45,0.22)] hover:shadow-[0_8px_22px_rgba(15,61,45,0.26)] transition-all disabled:opacity-60 disabled:cursor-not-allowed disabled:shadow-none group"
+                className="mt-5 w-full rounded-[12px] bg-[#0f3d2d] hover:bg-[#0c3326] active:bg-[#0a2e22] px-6 py-[13px] text-center shadow-[0_6px_18px_rgba(15,61,45,0.2)] hover:shadow-[0_8px_22px_rgba(15,61,45,0.24)] transition-all disabled:opacity-60 disabled:cursor-not-allowed disabled:shadow-none"
               >
-                <span className="flex items-center justify-center gap-2 text-[15px] font-semibold text-white leading-none">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /><circle cx="12" cy="16" r="1.2" fill="white" stroke="none" /></svg>
+                <span className="flex items-center justify-center gap-2 text-[14.5px] font-semibold text-white leading-none">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /><circle cx="12" cy="16" r="1.1" fill="white" stroke="none" /></svg>
                   {checkoutLoading ? "Processando pagamento..." : "Pagar e ativar meu site"}
                 </span>
-                <span className="block text-[12px] font-medium text-white/80 mt-1.5 leading-none">{checkoutLoading ? "Aguarde um instante" : `Pagamento único de ${brl(activationCents)} hoje`}</span>
+                <span className="block text-[11.5px] font-medium text-white/80 mt-1 leading-none">{checkoutLoading ? "Aguarde um instante" : `Pagamento único de ${brl(activationCents)} hoje`}</span>
               </button>
 
-              <div className="mt-5 flex gap-3 items-start rounded-[12px] bg-[#f6faf7] border border-[#e8f0e8] px-4 py-4">
-                <span className="w-8 h-8 rounded-full bg-white border border-[#dbe8dd] flex items-center justify-center shrink-0">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12 3l7 3.5v5.5c0 4-2.8 7-7 8-4.2-1-7-4-7-8V6.5L12 3Z" stroke="#166534" strokeWidth="1.6" fill="none" />
-                    <path d="M9.5 12.5l1.8 1.8 3.7-3.7" stroke="#166534" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                    <rect x="10.2" y="14.2" width="3.6" height="3.6" rx="0.8" fill="#166534" />
+              <div className="mt-4 flex gap-3 items-start rounded-[12px] bg-[#f6faf7] border border-[#e8f0e8] px-4 py-3.5">
+                <span className="w-8 h-8 rounded-full bg-white border border-[#dde8dc] flex items-center justify-center shrink-0">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 3L17.9 6.2V12.1C17.9 15.45 15.5 18.3 12 19.4C8.5 18.3 6.1 15.45 6.1 12.1V6.2L12 3Z" stroke="#166534" strokeWidth="1.5" fill="none" />
+                    <path d="M9.2 11.1L11 12.9L14.9 9.1" stroke="#166534" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </span>
                 <div className="min-w-0">
-                  <p className="text-[13px] font-semibold text-[#0f1a2a] leading-none">Pagamento seguro</p>
-                  <p className="text-[12.5px] leading-[18px] text-[#6b7a89] mt-1.5">Seu pagamento é processado com segurança pelo Mercado Pago. Seus dados são protegidos com criptografia.</p>
+                  <p className="text-[12.5px] font-semibold text-[#0f1a2a] leading-none">Pagamento seguro</p>
+                  <p className="text-[12px] leading-[17px] text-[#64748b] mt-1">Seu pagamento é processado com segurança pelo Mercado Pago. Seus dados são protegidos com criptografia.</p>
                 </div>
               </div>
 
-              <div className="mt-5 flex flex-wrap items-center justify-center gap-1.5 text-[12px] leading-4 text-[#6b7a89]">
-                <span>Logado como <b className="font-semibold text-[#2d3a4a]">{userEmail}</b></span>
-                <span className="w-1 h-1 rounded-full bg-[#cbd5d1] mx-1" />
-                <button type="button" onClick={() => router.push("/")} className="text-[#1e6b4a] hover:text-[#103d2d] hover:underline font-medium">voltar ao site</button>
-                <span className="w-1 h-1 rounded-full bg-[#cbd5d1] mx-1" />
-                <button type="button" onClick={() => setStep("identify")} className="text-[#1e6b4a] hover:text-[#103d2d] hover:underline font-medium">trocar conta</button>
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-1.5 text-[11.5px] leading-4 text-[#6b7a89]">
+                <span>Logado como <b className="font-semibold text-[#334155]">{userEmail}</b></span>
+                <span className="w-1 h-1 rounded-full bg-[#cbd5d1] mx-0.5" />
+                <button type="button" onClick={() => router.push("/")} className="text-[#1a6b4a] hover:text-[#103d2d] hover:underline font-medium">voltar ao site</button>
+                <span className="w-1 h-1 rounded-full bg-[#cbd5d1] mx-0.5" />
+                <button type="button" onClick={() => setStep("identify")} className="text-[#1a6b4a] hover:text-[#103d2d] hover:underline font-medium">trocar conta</button>
               </div>
 
-              <div className="mt-4 border-t border-[#eef2ee] pt-4">
-                <p className="text-[11.5px] leading-[17px] text-[#6b7a89] text-center">Ao continuar, você concorda com a contratação e ativação automática após a confirmação do pagamento. Suporte via WhatsApp após a compra.</p>
+              <div className="mt-3.5 border-t border-[#eef2ee] pt-3.5">
+                <p className="text-[11px] leading-[16px] text-[#6b7a89] text-center max-w-[520px] mx-auto">Ao continuar, você concorda com a contratação e ativação automática após a confirmação do pagamento. Suporte via WhatsApp após a compra.</p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Benefícios */}
-        <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-[980px] mx-auto">
-          <div className="rounded-[16px] bg-white border border-[#eef2ee] p-4 flex gap-3 items-center shadow-[0_4px_16px_rgba(0,0,0,0.03)]">
+        {/* Benefícios — barra única branca exatamente como checkout.png */}
+        <div className="mt-5 w-full max-w-[980px] mx-auto rounded-[16px] bg-white border border-[#e7ece8] shadow-[0_4px_16px_rgba(0,0,0,0.04)] grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-[#eef2ee] overflow-hidden">
+          <div className="flex gap-3 items-center px-5 py-4">
             <span className="w-9 h-9 rounded-xl bg-[#eef6ee] border border-[#e2efe4] flex items-center justify-center text-[#103d2d] shrink-0">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M12 16V3M12 3l-4 4M12 3l4 4" strokeLinecap="round" strokeLinejoin="round" /><rect x="3" y="16" width="18" height="5" rx="1.5" /></svg>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M12 3v13M12 16l-4-4M12 16l4-4" strokeLinecap="round" strokeLinejoin="round" /><rect x="3" y="16" width="18" height="5" rx="1.4" /></svg>
             </span>
             <div>
-              <p className="text-[13px] font-semibold text-[#0f1a2a] leading-none">Ativação imediata</p>
-              <p className="text-[11.5px] text-[#6b7a89] mt-1 leading-none">Assim que o pagamento for confirmado</p>
+              <p className="text-[12.5px] font-semibold text-[#0f1a2a] leading-none">Ativação imediata</p>
+              <p className="text-[11px] text-[#64748b] mt-1 leading-none">Assim que o pagamento for confirmado</p>
             </div>
           </div>
-          <div className="rounded-[16px] bg-white border border-[#eef2ee] p-4 flex gap-3 items-center shadow-[0_4px_16px_rgba(0,0,0,0.03)]">
-            <span className="w-9 h-9 rounded-xl bg-[#f1f5f9] border border-[#e2e8f0] flex items-center justify-center text-[#1e3a5f] shrink-0">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 3l7 3.5v5.5c0 4-2.8 7-7 8-4.2-1-7-4-7-8V6.5L12 3Z" stroke="currentColor" strokeWidth="1.6" /><path d="M9.2 12.8l1.7 1.7 4-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          <div className="flex gap-3 items-center px-5 py-4">
+            <span className="w-9 h-9 rounded-xl bg-[#f0f6fb] border border-[#e2e8f0] flex items-center justify-center text-[#1e3a5f] shrink-0">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 3L17.8 6V12.2C17.8 15.2 15.4 17.9 12 19.1C8.6 17.9 6.2 15.2 6.2 12.2V6L12 3Z" stroke="currentColor" strokeWidth="1.5" /><path d="M9 12L11 14L15 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </span>
             <div>
-              <p className="text-[13px] font-semibold text-[#0f1a2a] leading-none">100% seguro</p>
-              <p className="text-[11.5px] text-[#6b7a89] mt-1 leading-none">Seus dados sempre protegidos</p>
+              <p className="text-[12.5px] font-semibold text-[#0f1a2a] leading-none">100% seguro</p>
+              <p className="text-[11px] text-[#64748b] mt-1 leading-none">Seus dados sempre protegidos</p>
             </div>
           </div>
-          <div className="rounded-[16px] bg-white border border-[#eef2ee] p-4 flex gap-3 items-center shadow-[0_4px_16px_rgba(0,0,0,0.03)]">
-            <span className="w-9 h-9 rounded-xl bg-[#fefdf5] border border-[#f3e8c7] flex items-center justify-center text-[#7a5a1a] shrink-0">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0-18 0" /><path d="M9 12l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          <div className="flex gap-3 items-center px-5 py-4">
+            <span className="w-9 h-9 rounded-xl bg-[#fdf8ec] border border-[#f3e8c7] flex items-center justify-center text-[#7a5a1a] shrink-0">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 21a9 9 0 1 0 0-18a9 9 0 0 0 0 18Z" /><path d="M9 12l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </span>
             <div>
-              <p className="text-[13px] font-semibold text-[#0f1a2a] leading-none">Sem fidelidade</p>
-              <p className="text-[11.5px] text-[#6b7a89] mt-1 leading-none">Cancele quando quiser</p>
+              <p className="text-[12.5px] font-semibold text-[#0f1a2a] leading-none">Sem fidelidade</p>
+              <p className="text-[11px] text-[#64748b] mt-1 leading-none">Cancele quando quiser</p>
             </div>
           </div>
         </div>

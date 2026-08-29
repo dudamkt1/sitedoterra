@@ -83,12 +83,14 @@ export default async function CheckoutPage({
       <style dangerouslySetInnerHTML={{ __html: `#tenant-site nav:not(.scrolled){background:rgba(247,242,234,0.92);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid rgba(196,150,58,0.15);} #tenant-site nav:not(.scrolled) .nav-logo{color:var(--verde);} #tenant-site nav:not(.scrolled) .nav-links a{color:var(--cinza);} #tenant-site nav:not(.scrolled) .nav-links a:hover{color:var(--verde);} #tenant-site nav:not(.scrolled) .hamburger span{background:var(--verde);} #tenant-site nav:not(.scrolled) .nav-extra-link{color:var(--ouro);border-color:rgba(196,150,58,0.4);} ` }} />
       <SiteEffects />
       <Header logoText={logoText} logoUrl={logoUrl} logoLightUrl={logoLightUrl} navItems={navItems} extraNav={extraNav} />
-      {/* pt-[70px] = altura do NAV fixo (site.css). pt-10/pb-14 = respiro entre NAV/checkout e checkout/rodapé — checkout isolado, sem invadir rodapé */}
-      <main className="flex-1 bg-[#fdfcfa] pt-[70px]">
-        <div className="max-w-[1160px] mx-auto px-4 sm:px-6 lg:px-8 pt-10 sm:pt-12 pb-14 sm:pb-16">
-          <Suspense fallback={<div className="max-w-[640px] mx-auto py-12 text-center text-sm text-slate-500">Carregando checkout...</div>}>
-            <CheckoutPageClient planIdParam={planId} />
-          </Suspense>
+      {/* Isolado do NAV fixo (70px) + respiro — checkout central 100% checkout.png, sem invadir rodapé */}
+      <main className="flex-1 bg-[#fcf9f5] pt-[70px]">
+        <div className="max-w-[1160px] mx-auto px-4 sm:px-6 lg:px-8 pt-10 sm:pt-12 pb-14 sm:pb-16 flex justify-center">
+          <div className="w-full">
+            <Suspense fallback={<div className="max-w-[640px] mx-auto py-12 text-center text-sm text-slate-500">Carregando checkout...</div>}>
+              <CheckoutPageClient planIdParam={planId} />
+            </Suspense>
+          </div>
         </div>
       </main>
       <Footer
