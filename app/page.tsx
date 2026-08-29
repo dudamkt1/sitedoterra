@@ -50,19 +50,39 @@ async function resolveHomePwa() {
 
 export async function generateMetadata(): Promise<Metadata> {
   try {
+    const homeSlug = process.env.HOME_TENANT_SLUG || "usuarioteste";
+    const tenant = await getPublicTenantBySlug(homeSlug).catch(() => null);
+    const siteData = (tenant?.site_data as Record<string, unknown> | null) || {};
+    const faviconUrl = (siteData.faviconUrl as string) || undefined;
+
     const pwa = await resolveHomePwa();
-    if (!pwa?.settings.enabled) return {};
-    const { manifestUrl, iconUrl } = pwaUrls(pwa.basePath);
-    return {
-      manifest: manifestUrl,
-      icons: [{ url: iconUrl, type: "image/svg+xml", sizes: "any" }],
-      appleWebApp: {
-        capable: true,
-        title: pwa.settings.short_name || pwa.settings.app_name,
-        statusBarStyle: "default",
-      },
-      other: { "apple-mobile-web-app-capable": "yes" },
-    };
+    const iconList: { url: string; type?: string; sizes?: string }[] = [];
+    // FAVICON PNG do painel (site_data.faviconUrl) — prioridade máxima na aba do navegador
+    if (faviconUrl) {
+      iconList.push({ url: faviconUrl, type: "image/png", sizes: "any" });
+      // Apple touch icon também usa o mesmo PNG para iOS
+      iconList.push({ url: faviconUrl, type: "image/png", sizes: "180x180" });
+    }
+    if (pwa?.settings.enabled) {
+      const { manifestUrl, iconUrl } = pwaUrls(pwa.basePath);
+      // PWA icons PNG (192/512) já vão no manifest; aqui adiciona o SVG dinâmico como fallback
+      // e também expõe os PNGs diretamente para browsers que ignoram manifest
+      if (pwa.settings.icon_192_url) iconList.push({ url: pwa.settings.icon_192_url, type: "image/png", sizes: "192x192" });
+      if (pwa.settings.icon_512_url) iconList.push({ url: pwa.settings.icon_512_url, type: "image/png", sizes: "512x512" });
+      iconList.push({ url: iconUrl, type: "image/svg+xml", sizes: "any" });
+      return {
+        manifest: manifestUrl,
+        icons: iconList.length ? iconList : undefined,
+        appleWebApp: {
+          capable: true,
+          title: pwa.settings.short_name || pwa.settings.app_name,
+          statusBarStyle: "default",
+        },
+        other: { "apple-mobile-web-app-capable": "yes" },
+      };
+    }
+    if (iconList.length) return { icons: iconList };
+    return {};
   } catch {
     return {};
   }
