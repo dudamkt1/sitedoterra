@@ -12,7 +12,8 @@ import { themePrimaryColor, type SiteThemeConfig } from "@/lib/site-theme";
 import type { PublicTenant } from "@/types";
 import "@/app/(site)/site.css";
 
-export const dynamic = "force-dynamic";
+// HOME é pública — ISR 60s + cache em memória deixam TTFB instantâneo e ainda refletem edições do painel
+export const revalidate = 60;
 
 const DEMO_TENANT: PublicTenant = {
   tenant_id: "index",
@@ -48,45 +49,56 @@ async function resolveHomePwa() {
 }
 
 export async function generateMetadata(): Promise<Metadata> {
-  const pwa = await resolveHomePwa();
-  if (!pwa?.settings.enabled) return {};
-  const { manifestUrl, iconUrl } = pwaUrls(pwa.basePath);
-  return {
-    manifest: manifestUrl,
-    icons: [{ url: iconUrl, type: "image/svg+xml", sizes: "any" }],
-    appleWebApp: {
-      capable: true,
-      title: pwa.settings.short_name || pwa.settings.app_name,
-      statusBarStyle: "default",
-    },
-    other: { "apple-mobile-web-app-capable": "yes" },
-  };
+  try {
+    const pwa = await resolveHomePwa();
+    if (!pwa?.settings.enabled) return {};
+    const { manifestUrl, iconUrl } = pwaUrls(pwa.basePath);
+    return {
+      manifest: manifestUrl,
+      icons: [{ url: iconUrl, type: "image/svg+xml", sizes: "any" }],
+      appleWebApp: {
+        capable: true,
+        title: pwa.settings.short_name || pwa.settings.app_name,
+        statusBarStyle: "default",
+      },
+      other: { "apple-mobile-web-app-capable": "yes" },
+    };
+  } catch {
+    return {};
+  }
 }
 
 export async function generateViewport(): Promise<Viewport> {
-  const pwa = await resolveHomePwa();
-  let themeColor = pwa?.settings.theme_color || "#1d5c3a";
   try {
-    const homeSlug = process.env.HOME_TENANT_SLUG || "usuarioteste";
-    const tenant = await getPublicTenantBySlug(homeSlug);
-    const theme = (tenant?.site_data as Record<string, unknown> | null)?.theme as SiteThemeConfig | undefined;
-    if (theme) themeColor = themePrimaryColor(theme);
-  } catch {}
-  return { themeColor };
+    const pwa = await resolveHomePwa();
+    let themeColor = pwa?.settings.theme_color || "#1d5c3a";
+    try {
+      const homeSlug = process.env.HOME_TENANT_SLUG || "usuarioteste";
+      const tenant = await getPublicTenantBySlug(homeSlug);
+      const theme = (tenant?.site_data as Record<string, unknown> | null)?.theme as SiteThemeConfig | undefined;
+      if (theme) themeColor = themePrimaryColor(theme);
+    } catch {}
+    return { themeColor };
+  } catch {
+    return { themeColor: "#1d5c3a" };
+  }
 }
 
 export default async function HomePage() {
-  const user = await getCurrentUser();
+  // getCurrentUser é opcional na HOME (só mostra "Logado como"); não bloqueia render se Supabase estiver lento
+  const userPromise = getCurrentUser().catch(() => null);
 
   const homeSlug = process.env.HOME_TENANT_SLUG || "usuarioteste";
-  const tenant = (await getPublicTenantBySlug(homeSlug)) || DEMO_TENANT;
-  const pwa = await resolveHomePwa();
+  // Paraleliza tenant + PWA para cortar ~300ms de waterfall
+  const [tenantRaw, pwa] = await Promise.all([getPublicTenantBySlug(homeSlug), resolveHomePwa()]);
+  const tenant = tenantRaw || DEMO_TENANT;
   const pwaEnabled = Boolean(pwa?.settings.enabled);
   const { manifestUrl, swUrl } = pwaUrls(pwa?.basePath || "/");
 
   const sections = await resolveHomeSections({ tenant, tenantDataOverridesGlobal: true });
   const siteData = (tenant.site_data || {}) as Record<string, unknown>;
   const theme = (siteData.theme as SiteThemeConfig | undefined) || null;
+  const user = await userPromise;
 
   return (
     <>

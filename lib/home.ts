@@ -42,18 +42,25 @@ export function deepMerge<T extends Record<string, unknown>>(base: T, ...overrid
   return out as T;
 }
 
+// Cache simples em memória (60s) para evitar 3 queries repetidas por request na HOME
+let globalSectionsCache: { data: SiteSection[]; ts: number } | null = null;
+let activeOfferCache: { data: unknown; ts: number } | null = null;
+
 export async function getGlobalSections(): Promise<SiteSection[]> {
   if (!hasSupabaseEnv()) return DEFAULT_SECTIONS;
+  if (globalSectionsCache && Date.now() - globalSectionsCache.ts < 60_000) return globalSectionsCache.data;
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("site_sections")
     .select("*")
     .order("sort_order", { ascending: true });
   if (error || !data || data.length === 0) return DEFAULT_SECTIONS;
-  return (data as unknown as SiteSection[]).map((s) => ({
+  const mapped = (data as unknown as SiteSection[]).map((s) => ({
     ...s,
     permissions: normalizeSectionPermissions(s.permissions),
   }));
+  globalSectionsCache = { data: mapped, ts: Date.now() };
+  return mapped;
 }
 
 export async function getTenantSections(tenantId: string): Promise<Map<string, TenantSection>> {
@@ -170,23 +177,37 @@ export interface ResolveOptions {
  * - Mescla conteúdo global + legado + override do usuário.
  */
 export async function resolveHomeSections(opts: ResolveOptions): Promise<ResolvedHomeSection[]> {
-  const global = opts.globalSections || (await getGlobalSections());
+  // Paraleliza global + tenant (economiza ~1 RTT Supabase)
+  const [global, tenantMapRaw] = await Promise.all([
+    opts.globalSections ? Promise.resolve(opts.globalSections) : getGlobalSections(),
+    opts.tenantSectionMap
+      ? Promise.resolve(opts.tenantSectionMap)
+      : opts.tenant?.tenant_id && hasSupabaseEnv()
+        ? getTenantSections(opts.tenant.tenant_id)
+        : Promise.resolve(new Map<string, TenantSection>()),
+  ]);
+  const globalSections = global as SiteSection[];
   const siteData = (opts.tenant?.site_data || {}) as Record<string, unknown>;
-  let tenantMap = opts.tenantSectionMap;
-  if (!tenantMap && opts.tenant?.tenant_id && hasSupabaseEnv()) {
-    tenantMap = await getTenantSections(opts.tenant.tenant_id);
-  }
-  tenantMap = tenantMap || new Map<string, TenantSection>();
+  const tenantMap: Map<string, TenantSection> = (tenantMapRaw as Map<string, TenantSection>) || new Map();
 
   // Fonte de verdade comercial: a seção "Planos / Oferta" exibe os dados
   // cadastrados pelo Super Admin (tabela plans), nunca valores em código.
-  const hasPricing = global.some((s) => s.type === "pricing");
-  const activeOffer = hasPricing ? await getActiveOffer() : null;
-  const pricingOverlay = activeOffer ? buildPricingContent(activeOffer) : {};
+  const hasPricing = globalSections.some((s) => s.type === "pricing");
+  // usa cache de 60s para plans também
+  let activeOffer: unknown = null;
+  if (hasPricing) {
+    if (activeOfferCache && Date.now() - activeOfferCache.ts < 60_000) {
+      activeOffer = activeOfferCache.data;
+    } else {
+      activeOffer = await getActiveOffer();
+      activeOfferCache = { data: activeOffer, ts: Date.now() };
+    }
+  }
+  const pricingOverlay = activeOffer ? buildPricingContent(activeOffer as never) : {};
 
   const resolved: ResolvedHomeSection[] = [];
 
-  for (const section of global) {
+  for (const section of globalSections) {
     const perms = normalizeSectionPermissions(section.permissions);
     const override = tenantMap.get(section.id);
     const canToggle = perms.can_toggle !== false && !section.is_required;

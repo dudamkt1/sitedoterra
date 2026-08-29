@@ -12,13 +12,23 @@ function hasSupabaseEnv(): boolean {
   return !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
 }
 
+// Cache 60s para slugs públicos (HOME e checkout batem no mesmo slug repetidamente)
+const tenantBySlugCache = new Map<string, { data: PublicTenant | null; ts: number }>();
+
 export async function getPublicTenantBySlug(slug: string): Promise<PublicTenant | null> {
   if (!hasSupabaseEnv()) return null;
+  const cached = tenantBySlugCache.get(slug);
+  if (cached && Date.now() - cached.ts < 60_000) return cached.data;
   const admin = createAdminClient();
   const { data, error } = await admin.rpc("get_public_tenant_by_slug", { p_slug: slug });
   if (error) return null;
-  if (!data || (Array.isArray(data) && data.length === 0)) return null;
-  return (Array.isArray(data) ? data[0] : data) as PublicTenant;
+  if (!data || (Array.isArray(data) && data.length === 0)) {
+    tenantBySlugCache.set(slug, { data: null, ts: Date.now() });
+    return null;
+  }
+  const tenant = (Array.isArray(data) ? data[0] : data) as PublicTenant;
+  tenantBySlugCache.set(slug, { data: tenant, ts: Date.now() });
+  return tenant;
 }
 
 export async function getPublicTenantByDomain(hostname: string): Promise<PublicTenant | null> {

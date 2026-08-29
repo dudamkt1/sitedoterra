@@ -75,6 +75,8 @@ async function resolveSlugByHostname(host: string): Promise<string | null> {
   if (!url || !anon) return null;
 
   const domain = host.toLowerCase().replace(/^www\./, "").split(":")[0];
+  const cached = slugByHostCache.get(domain);
+  if (cached && Date.now() - cached.ts < 30_000) return cached.slug;
   try {
     const res = await fetch(`${url}/rest/v1/rpc/get_public_tenant_by_domain`, {
       method: "POST",
@@ -86,11 +88,19 @@ async function resolveSlugByHostname(host: string): Promise<string | null> {
       body: JSON.stringify({ p_domain: domain }),
       cache: "no-store",
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      slugByHostCache.set(domain, { slug: null, ts: Date.now() });
+      return null;
+    }
     const data: unknown = await res.json();
-    if (!data) return null;
+    if (!data) {
+      slugByHostCache.set(domain, { slug: null, ts: Date.now() });
+      return null;
+    }
     const row = Array.isArray(data) ? data[0] : data;
-    return (row as { slug?: string } | null)?.slug || null;
+    const slug = (row as { slug?: string } | null)?.slug || null;
+    slugByHostCache.set(domain, { slug, ts: Date.now() });
+    return slug;
   } catch {
     return null;
   }
@@ -104,9 +114,46 @@ export async function middleware(request: NextRequest) {
   }
 }
 
+// Cache 30s para domínio personalizado (evita RPC Supabase em todo hit)
+const slugByHostCache = new Map<string, { slug: string | null; ts: number }>();
+
+// Rotas públicas puras — não precisam de Supabase Auth nem de HMAC demo
+function isPublicPath(pathname: string): boolean {
+  if (pathname === "/" || pathname === "/checkout" || pathname.startsWith("/checkout/")) return true;
+  if (pathname === "/site-indisponivel" || pathname === "/manifest.webmanifest" || pathname === "/sw.js") return true;
+  if (pathname.startsWith("/_next") || pathname.startsWith("/api/pwa") || pathname.startsWith("/api/gateway")) return true;
+  // rota pública de tenant: /[slug] com apenas um segmento, mas exclui áreas protegidas/autenticação
+  if (/^\/[^/]+$/.test(pathname)) {
+    if (PROTECTED_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"))) return false;
+    if (AUTH_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"))) return false;
+    if (pathname.startsWith("/api/")) return false;
+    return true;
+  }
+  return false;
+}
+
 async function handleMiddleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const host = request.headers.get("host") || request.headers.get("x-forwarded-host") || "";
+
+  // Atalho leve para rotas 100% públicas: só resolve domínio personalizado, sem Supabase Auth
+  if (isPublicPath(pathname)) {
+    if (isCustomDomain(host)) {
+      if (!pathname || pathname === "/" || pathname === "/index.html") {
+        const slug = await resolveSlugByHostname(host);
+        if (slug) {
+          const url = request.nextUrl.clone();
+          url.pathname = `/${slug}`;
+          return NextResponse.rewrite(url);
+        }
+        const url = request.nextUrl.clone();
+        url.pathname = "/site-indisponivel";
+        return NextResponse.rewrite(url);
+      }
+    }
+    // Devolve imediatamente — sem criar client Supabase nem getUser()
+    return NextResponse.next({ request });
+  }
 
   // ---- Resolução de domínio personalizado ----
   if (isCustomDomain(host)) {

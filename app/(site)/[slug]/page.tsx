@@ -13,8 +13,8 @@ import { resolvePwaForRequest } from "@/lib/pwa/resolver";
 import { pwaUrls } from "@/lib/pwa/config";
 import { themePrimaryColor, type SiteThemeConfig } from "@/lib/site-theme";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+// Páginas públicas de tenants — ISR 60s (rápido + reflete edições do painel)
+export const revalidate = 60;
 
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
   if (params.slug === "demonstracao") {
@@ -112,14 +112,16 @@ export default async function TenantSitePage({ params }: { params: { slug: strin
     );
   }
 
-  const { tenant, access } = await resolveTenantAccess({ slug: params.slug });
+  // Paraleliza tenant + PWA + user para não somar waterfalls
+  const [{ tenant, access }, user, pwa] = await Promise.all([
+    resolveTenantAccess({ slug: params.slug }),
+    getCurrentUser().catch(() => null),
+    resolvePwaForRequest({ slugParam: params.slug }),
+  ]);
 
   if (!tenant) {
     notFound();
   }
-
-  const user = await getCurrentUser();
-  const pwa = await resolvePwaForRequest({ slugParam: params.slug });
 
   const headerList = headers();
   const host = headerList.get("x-forwarded-host") || headerList.get("host") || "";

@@ -5,7 +5,7 @@ import "@/app/globals.css";
 
 const display = Cormorant_Garamond({
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600"],
+  weight: ["400", "600"],
   style: ["normal", "italic"],
   variable: "--font-display",
   display: "swap",
@@ -13,7 +13,7 @@ const display = Cormorant_Garamond({
 
 const body = DM_Sans({
   subsets: ["latin"],
-  weight: ["300", "400", "500"],
+  weight: ["400", "500"],
   variable: "--font-body",
   display: "swap",
 });

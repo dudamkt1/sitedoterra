@@ -40,9 +40,10 @@ export default async function CheckoutPage({
   const user = await getCurrentUser();
   const planId = searchParams?.planId || searchParams?.plan || undefined;
 
-  // --- Cabeçalho e rodapé SINCRONIZADOS com a HOME (mesma fonte de verdade) ---
+  // --- Cabeçalho e rodapé SINCRONIZADOS com a HOME (mesma fonte de verdade) — cache 60s ---
   const homeSlug = process.env.HOME_TENANT_SLUG || "usuarioteste";
-  const tenant = (await getPublicTenantBySlug(homeSlug)) || DEMO_TENANT;
+  const tenantRaw = await getPublicTenantBySlug(homeSlug);
+  const tenant = tenantRaw || DEMO_TENANT;
   const sections = await resolveHomeSections({ tenant, tenantDataOverridesGlobal: true });
   const siteData = (tenant.site_data || {}) as Record<string, unknown>;
   const theme = (siteData.theme as SiteThemeConfig | undefined) || null;
