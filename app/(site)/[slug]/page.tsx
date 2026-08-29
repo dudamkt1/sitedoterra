@@ -49,11 +49,13 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   // PWA do usuário
   const pwa = await resolvePwaForRequest({ slugParam: params.slug });
 
-  // IMPORTANTE: metadata.icons pode ser objeto OU array (quando há favicon).
-  // Constrói sempre um ARRAY novo — nunca espalhar (spread) meta.icons,
-  // que quebra o SSR com "(icons ?? []) is not iterable".
+  // FAVICON PNG transparente do painel — HTML usa só ele (não SVG) para garantir fundo transparente
   const iconList: { url: string; type?: string; sizes?: string }[] = [];
-  if (faviconUrl) iconList.push({ url: faviconUrl });
+  if (faviconUrl) {
+    const bust = faviconUrl.includes("?") ? faviconUrl : `${faviconUrl}?v=2`;
+    iconList.push({ url: bust, type: "image/png", sizes: "32x32" });
+    iconList.push({ url: bust, type: "image/png", sizes: "192x192" });
+  }
 
   const meta: Metadata = {
     title: `${name} | Consultora doTERRA`,
@@ -61,9 +63,9 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   };
 
   if (pwa?.settings.enabled) {
-    const { manifestUrl, iconUrl } = pwaUrls(pwa.basePath);
+    const { manifestUrl } = pwaUrls(pwa.basePath);
     meta.manifest = manifestUrl;
-    iconList.push({ url: iconUrl, type: "image/svg+xml", sizes: "any" });
+    // Não adiciona SVG ao HTML — favicon PNG transparente já é o correto; SVG fica só no manifest como fallback maskable
     meta.appleWebApp = {
       capable: true,
       title: pwa.settings.short_name || pwa.settings.app_name || name,
