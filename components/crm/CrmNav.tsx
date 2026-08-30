@@ -8,6 +8,7 @@ const MODULES: { href: string; label: string; icon: string; code: CrmModuleCode 
   { href: "/painel/crm", label: "Dashboard", icon: "📊", code: null },
   { href: "/painel/crm/clientes", label: "Clientes", icon: "👥", code: null },
   { href: "/painel/crm/fidelidade", label: "Fidelidade", icon: "🎁", code: "fidelidade" },
+  { href: "/painel/crm/catalogo", label: "Catálogo", icon: "📦", code: null },
   { href: "/painel/crm/vendas", label: "Vendas", icon: "🛒", code: null },
   { href: "/painel/crm/financeiro", label: "Financeiro", icon: "💰", code: "financeiro" },
   { href: "/painel/crm/cobrancas", label: "Cobranças", icon: "🧾", code: "cobrancas" },

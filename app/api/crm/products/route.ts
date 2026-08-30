@@ -12,8 +12,8 @@ export async function GET(request: Request) {
   const all = url.searchParams.get("all") === "1";
   const q = (url.searchParams.get("q") || "").trim().toLowerCase();
 
-  let query = admin.from("crm_products").select("id, name, description, price_cents, category, image_url, active, created_at, updated_at").eq("tenant_id", tenant!.id);
-  if (q) query = query.or(`name.ilike.%${q}%,category.ilike.%${q}%`);
+  let query = admin.from("crm_products").select("id, name, description, price_cents, category, image_url, active, sku, unit, notes, show_publicly, created_at, updated_at").eq("tenant_id", tenant!.id);
+  if (q) query = query.or(`name.ilike.%${q}%,category.ilike.%${q}%,sku.ilike.%${q}%`);
   if (!all) query = query.eq("active", true);
   query = query.order("name", { ascending: true }).limit(1000);
 
@@ -70,6 +70,10 @@ export async function POST(request: Request) {
       category: body.category || null,
       image_url: body.image_url || null,
       active: body.active !== false,
+      sku: body.sku ? String(body.sku).trim().slice(0, 80) || null : null,
+      unit: typeof body.unit === "string" && body.unit.trim() ? String(body.unit).trim().slice(0, 20) : "un",
+      notes: body.notes ? String(body.notes).trim().slice(0, 2000) || null : null,
+      show_publicly: body.show_publicly !== false,
     })
     .select()
     .single();

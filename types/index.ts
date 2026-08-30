@@ -501,6 +501,14 @@ export interface CrmProduct {
   category: string | null;
   image_url: string | null;
   active: boolean;
+  /** Código/SKU opcional para identificação interna. */
+  sku: string | null;
+  /** Unidade de venda (ex.: un, cx, kg, ml). Default "un". */
+  unit: string;
+  /** Observações internas (não aparecem no catálogo público). */
+  notes: string | null;
+  /** Exibe no catálogo público compartilhado. Default true. */
+  show_publicly: boolean;
   created_at: string;
   updated_at: string;
   /** Computado: quantidade vendida / total vendido. */

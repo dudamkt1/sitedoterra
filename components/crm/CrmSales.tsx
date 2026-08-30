@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { CrmModal, EmptyState, LoadingState, ErrorState, Toast, Field, apiPost, apiPut, apiDelete, confirmDialog, CrmStatusBadge } from "@/components/crm/crm-ui";
 import { MoneyInput } from "@/components/ui/MoneyInput";
@@ -42,6 +42,7 @@ export default function CrmSales() {
   const [editingSaleId, setEditingSaleId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [showCatalogPicker, setShowCatalogPicker] = useState(false);
 
   const [statusFilter, setStatusFilter] = useState("");
   const [clientFilter, setClientFilter] = useState("");
@@ -307,7 +308,18 @@ export default function CrmSales() {
 
           <div className="flex items-center justify-between mb-2">
             <label className="label mb-0">Produtos da venda</label>
-            <button type="button" className="btn btn-outline !py-1 !px-3 !text-xs" onClick={addItem}>+ Adicionar produto</button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowCatalogPicker(true)}
+                disabled={products.length === 0}
+                className="inline-flex items-center gap-1.5 rounded-[10px] border border-[#1d5c3a]/30 bg-[#eaf6ec] px-3 py-1.5 text-[12px] font-semibold text-[#103d28] hover:bg-[#d8efe1] transition disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Escolher um produto já cadastrado no catálogo"
+              >
+                📦 Selecionar do catálogo
+              </button>
+              <button type="button" className="btn btn-outline !py-1 !px-3 !text-xs" onClick={addItem}>+ Avulso</button>
+            </div>
           </div>
           <div className="space-y-2 mb-4">
             {form.items.length === 0 && <p className="text-sm text-gray-400">Nenhum item. Clique em &quot;+ Adicionar produto&quot;.</p>}
@@ -365,6 +377,117 @@ export default function CrmSales() {
           </div>
         </CrmModal>
       )}
+
+      {showCatalogPicker && (
+        <CatalogPickerModal
+          products={products}
+          onClose={() => setShowCatalogPicker(false)}
+          onPick={(p) => {
+            setForm((f) => ({
+              ...f,
+              items: [
+                ...f.items,
+                {
+                  product_id: p.id,
+                  product_name: p.name,
+                  quantity: 1,
+                  unit_price_cents: p.price_cents,
+                },
+              ],
+            }));
+            setShowCatalogPicker(false);
+            setToast({ ok: true, text: `${p.name} adicionado. Você pode ajustar preço e quantidade.` });
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+function CatalogPickerModal({
+  products,
+  onClose,
+  onPick,
+}: {
+  products: CrmProduct[];
+  onClose: () => void;
+  onPick: (p: CrmProduct) => void;
+}) {
+  const [q, setQ] = useState("");
+  const active = products.filter((p) => p.active);
+  const filtered = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    if (!s) return active;
+    return active.filter((p: CrmProduct) => [p.name, p.category || "", p.sku || ""].join(" ").toLowerCase().includes(s));
+  }, [active, q]);
+
+  return (
+    <CrmModal title="📦 Selecionar do catálogo" onClose={onClose} wide>
+      <div className="mb-3 relative">
+        <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9aa5a0]" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <circle cx="11" cy="11" r="7" />
+          <path d="M21 21l-4.3-4.3" />
+        </svg>
+        <input
+          type="search"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Buscar no catálogo..."
+          autoFocus
+          className="w-full rounded-[10px] border border-[#dde2dc] bg-white pl-9 pr-3 py-2.5 text-[14px] focus:outline-none focus:ring-2 focus:ring-[#1d5c3a]/15 focus:border-[#1d5c3a]"
+        />
+      </div>
+      <p className="text-[11.5px] text-[#6b7a72] mb-2">
+        {filtered.length} produto{filtered.length === 1 ? "" : "s"} disponíve{filtered.length === 1 ? "l" : "is"}. Selecionar preenche nome, preço e descrição — você pode ajustar a venda.
+      </p>
+      {active.length === 0 ? (
+        <div className="rounded-[12px] border border-dashed border-[#cfd5cf] bg-white p-8 text-center">
+          <p className="text-[14px] font-semibold text-[#0d3320]">Seu catálogo ainda não tem produtos ativos</p>
+          <p className="text-[12.5px] text-[#6b7a72] mt-1">Cadastre produtos em <b>/painel/crm/catalogo</b> para usar aqui.</p>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="rounded-[12px] border border-dashed border-[#cfd5cf] bg-white p-6 text-center text-[13px] text-[#6b7a72]">
+          Nenhum produto encontrado para &ldquo;{q}&rdquo;.
+        </div>
+      ) : (
+        <ul className="space-y-1.5 max-h-[55vh] overflow-y-auto pr-1">
+          {filtered.map((p) => (
+            <li
+              key={p.id}
+              className="flex items-center gap-3 rounded-[10px] border border-[#e2e8e0] bg-white p-2.5 hover:border-[#1d5c3a]/40 hover:bg-[#f4faf5] transition"
+            >
+              <div className="w-12 h-12 rounded-[8px] bg-[#eaf6ec] border border-[#dde2dc] overflow-hidden shrink-0 flex items-center justify-center">
+                {p.image_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={p.image_url} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                ) : (
+                  <span className="text-lg text-[#1d5c3a]/40">📦</span>
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[14px] font-semibold text-[#0d3320] truncate">{p.name}</p>
+                <p className="text-[11.5px] text-[#6b7a72] truncate">
+                  {p.category || "Sem categoria"}{p.sku ? ` · SKU ${p.sku}` : ""}
+                </p>
+              </div>
+              <div className="text-right shrink-0">
+                <p className="text-[14px] font-bold text-[#0d3320]">{formatBRL(p.price_cents)}</p>
+                <p className="text-[10.5px] text-[#6b7a72]">/ {p.unit || "un"}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => onPick(p)}
+                className="shrink-0 inline-flex items-center gap-1 rounded-[8px] bg-[#1d5c3a] hover:bg-[#164a2e] text-white text-[12px] font-semibold px-3 py-1.5 shadow-[0_4px_10px_rgba(29,92,58,0.18)] transition"
+              >
+                + Adicionar
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="mt-4 flex justify-end">
+        <button type="button" className="btn btn-outline" onClick={onClose}>Fechar</button>
+      </div>
+    </CrmModal>
   );
 }

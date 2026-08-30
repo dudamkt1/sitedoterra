@@ -9,9 +9,10 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   if (error) return error;
   const body = await request.json();
   const payload: Record<string, unknown> = {};
-  for (const k of ["name", "description", "category", "image_url", "active"] as const) {
+  for (const k of ["name", "description", "category", "image_url", "active", "unit", "notes", "show_publicly"] as const) {
     if (body[k] !== undefined) payload[k] = body[k];
   }
+  if (body.sku !== undefined) payload.sku = body.sku ? String(body.sku).trim().slice(0, 80) || null : null;
   if (body.price_cents !== undefined) payload.price_cents = Math.round(Number(body.price_cents) || 0);
   if (payload.name !== undefined && !String(payload.name).trim()) {
     return NextResponse.json({ error: "Nome é obrigatório." }, { status: 400 });
