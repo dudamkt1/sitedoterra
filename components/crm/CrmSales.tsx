@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CrmModal, EmptyState, LoadingState, ErrorState, Toast, Field, apiPost, apiDelete, confirmDialog, CrmStatusBadge } from "@/components/crm/crm-ui";
+import { MoneyInput } from "@/components/ui/MoneyInput";
 import { formatBRL } from "@/lib/utils";
 import { SALE_STATUSES, SALE_STATUS_COLORS } from "@/lib/crm-shared";
 import type { CrmSale, CrmClient, CrmProduct } from "@/types";
@@ -234,9 +235,28 @@ export default function CrmSales() {
                   <option value="">Escolher produto do catálogo</option>
                   {products.map((p) => <option key={p.id} value={p.id}>{p.name} — {formatBRL(p.price_cents)}</option>)}
                 </select>
-                <input className="input col-span-3 !py-1.5" placeholder="Descrição (avulso)" value={it.product_name} onChange={(e) => updateItem(idx, { product_name: e.target.value })} />
-                <input type="number" className="input col-span-1 !py-1.5" min="1" value={it.quantity} onChange={(e) => updateItem(idx, { quantity: Math.max(1, Number(e.target.value)) })} />
-                <input type="number" className="input col-span-2 !py-1.5" placeholder="R$/unid" value={it.unit_price_cents ? (it.unit_price_cents / 100).toFixed(2) : ""} onChange={(e) => updateItem(idx, { unit_price_cents: Math.round(parseFloat(e.target.value) * 100 || 0) })} />
+                <input className="input col-span-2 !py-1.5" placeholder="Descrição (avulso)" value={it.product_name} onChange={(e) => updateItem(idx, { product_name: e.target.value })} />
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  className="input col-span-1 !py-1.5 text-center [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  placeholder="Qtd"
+                  value={it.quantity}
+                  onChange={(e) => {
+                    const digits = e.target.value.replace(/\D+/g, "").slice(0, 4);
+                    updateItem(idx, { quantity: Math.max(1, Number(digits) || 1) });
+                  }}
+                />
+                <div className="col-span-3">
+                  <MoneyInput
+                    className="input !py-1.5 w-full"
+                    value={it.unit_price_cents}
+                    onChange={(cents) => updateItem(idx, { unit_price_cents: cents })}
+                    placeholder="R$ 0,00"
+                    aria-label="Valor unitário"
+                  />
+                </div>
                 <button type="button" className="text-red-500 text-sm col-span-1" onClick={() => setForm((f) => ({ ...f, items: f.items.filter((_, i) => i !== idx) }))}>✕</button>
               </div>
             ))}
