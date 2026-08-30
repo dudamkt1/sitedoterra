@@ -370,82 +370,139 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
     );
   }
 
-  // IDENTIFY — page version com estilo harmonizado ao checkout
+  // IDENTIFY — Etapa 1 (Criar conta / Entrar) — premium, com plano no topo
   if (step === "identify") {
     return (
-      <div className="max-w-[520px] mx-auto w-full">
-        <div className="text-center mb-8 pt-4">
-          <h1 className="text-[28px] font-bold tracking-tight text-[#0f1a2a]">Vamos criar seu acesso</h1>
-          <p className="text-[14px] leading-6 text-[#6b7a89] mt-2">Crie sua conta em segundos para continuar. Depois você configura seu site no painel.</p>
+      <div className="w-full flex flex-col items-center">
+        {/* Stepper discreto — Etapa 1 de 2 */}
+        <div className="w-full max-w-[520px] mb-5 sm:mb-6 flex items-center justify-center gap-2.5">
+          <span className="flex items-center gap-2 text-[12px] font-semibold text-[#103d2d]">
+            <span className="w-6 h-6 rounded-full bg-[#103d2d] text-white flex items-center justify-center text-[11px] font-bold">1</span>
+            Sua conta
+          </span>
+          <span className="h-px w-8 sm:w-12 bg-[#cfd8d2]" />
+          <span className="flex items-center gap-2 text-[12px] font-medium text-[#8a9aa8]">
+            <span className="w-6 h-6 rounded-full bg-white border border-[#cfd8d2] text-[#8a9aa8] flex items-center justify-center text-[11px] font-bold">2</span>
+            Pagamento
+          </span>
         </div>
 
-        <div className="rounded-[16px] border border-[#eef2ee] bg-white px-4 py-3.5 flex items-center justify-between gap-3 mb-6 shadow-[0_4px_16px_rgba(0,0,0,0.04)]">
-          <div className="min-w-0">
-            <p className="text-[10px] font-semibold tracking-[0.12em] uppercase text-[#8a9aa8]">Plano</p>
-            <p className="text-sm font-semibold text-[#0f1a2a] truncate">{planName}</p>
+        {/* Plano selecionado — card topo, mesma identidade visual da Etapa 2 */}
+        <div className="w-full max-w-[520px] mb-6 sm:mb-8">
+          <div className="rounded-[16px] bg-white border border-[#e7ece8] shadow-[0_6px_20px_rgba(16,61,45,0.05)] overflow-hidden">
+            <div className="px-5 sm:px-6 py-4 sm:py-5 flex items-center gap-4">
+              <span className="w-11 h-11 rounded-[12px] bg-[#eef6ee] border border-[#e2efe4] flex items-center justify-center shrink-0">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#103d2d" strokeWidth="1.6">
+                  <rect x="3.2" y="4.5" width="17.6" height="15" rx="2.2" />
+                  <path d="M3.2 9.2H20.8" />
+                  <circle cx="8.4" cy="14.2" r="1.1" fill="#103d2d" stroke="none" />
+                  <path d="M12.4 14.2H17.6" strokeLinecap="round" />
+                </svg>
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-bold tracking-[0.13em] uppercase text-[#8a9aa8] leading-4">Plano</p>
+                <p className="text-[15px] font-bold text-[#0f1a2a] mt-0.5 leading-6 tracking-tight truncate">{planName}</p>
+              </div>
+              <div className="text-right shrink-0">
+                <p className="text-[10px] font-bold tracking-[0.13em] uppercase text-[#8a9aa8] leading-4">Total hoje</p>
+                <p className="text-[16px] font-extrabold text-[#103d2d] mt-0.5 leading-6 tracking-tight">{brl(activationCents)}</p>
+              </div>
+            </div>
           </div>
-          <p className="text-sm font-bold text-[#103d2d] shrink-0">{brl(activationCents)}</p>
         </div>
 
-        {authMode === "signup" ? (
-          <form onSubmit={handleSignup} className="rounded-[20px] border border-[#eef2ee] bg-white p-6 sm:p-7 space-y-4 shadow-[0_8px_28px_rgba(0,0,0,0.04)]">
-            <div>
-              <h3 className="text-[15px] font-semibold text-[#0f1a2a]">Crie sua conta</h3>
-              <p className="text-sm text-[#6b7a89] mt-1">Apenas 3 campos. O resto você completa no painel.</p>
-            </div>
-            <div className="space-y-3">
-              <div>
-                <label className="text-sm font-medium text-[#2d3a4a]">Nome</label>
-                <input type="text" required value={name} onChange={(e) => setName(e.target.value)} placeholder="Seu nome completo" className="mt-1.5 w-full rounded-xl border border-[#dde6de] bg-white px-4 py-3.5 text-[15px] placeholder:text-[#9aa8b5] focus:outline-none focus:ring-2 focus:ring-[#103d2d]/10 focus:border-[#103d2d]" />
+        <div className="w-full max-w-[520px]">
+          {authMode === "signup" ? (
+            <form onSubmit={handleSignup} className="rounded-[20px] border border-[#e7ece8] bg-white p-6 sm:p-8 space-y-5 shadow-[0_10px_30px_rgba(16,61,45,0.06)]">
+              <div className="text-center pb-1">
+                <h1 className="text-[22px] sm:text-[24px] font-bold tracking-tight text-[#0f1a2a] leading-7">Crie sua conta</h1>
+                <p className="text-[13.5px] leading-5 text-[#6b7a89] mt-1.5">Comece agora seu site profissional.<br className="hidden sm:block" /> Crie sua conta em poucos segundos. Depois você continuará para o pagamento seguro.</p>
               </div>
-              <div>
-                <label className="text-sm font-medium text-[#2d3a4a]">E-mail</label>
-                <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="voce@email.com" className="mt-1.5 w-full rounded-xl border border-[#dde6de] bg-white px-4 py-3.5 text-[15px] placeholder:text-[#9aa8b5] focus:outline-none focus:ring-2 focus:ring-[#103d2d]/10 focus:border-[#103d2d]" />
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[13px] font-semibold text-[#0f1a2a] mb-1.5">Nome completo</label>
+                  <input type="text" required autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Seu nome completo" className="w-full rounded-[12px] border border-[#dde6de] bg-white px-4 py-3.5 text-[15px] text-[#0f1a2a] placeholder:text-[#9aa8b5] focus:outline-none focus:ring-2 focus:ring-[#103d2d]/15 focus:border-[#103d2d] transition" />
+                </div>
+                <div>
+                  <label className="block text-[13px] font-semibold text-[#0f1a2a] mb-1.5">E-mail</label>
+                  <input type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="voce@email.com" className="w-full rounded-[12px] border border-[#dde6de] bg-white px-4 py-3.5 text-[15px] text-[#0f1a2a] placeholder:text-[#9aa8b5] focus:outline-none focus:ring-2 focus:ring-[#103d2d]/15 focus:border-[#103d2d] transition" />
+                </div>
+                <div>
+                  <label className="block text-[13px] font-semibold text-[#0f1a2a] mb-1.5">Senha</label>
+                  <input type="password" required minLength={6} autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mínimo 6 caracteres" className="w-full rounded-[12px] border border-[#dde6de] bg-white px-4 py-3.5 text-[15px] text-[#0f1a2a] placeholder:text-[#9aa8b5] focus:outline-none focus:ring-2 focus:ring-[#103d2d]/15 focus:border-[#103d2d] transition" />
+                </div>
               </div>
-              <div>
-                <label className="text-sm font-medium text-[#2d3a4a]">Senha</label>
-                <input type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mínimo 6 caracteres" className="mt-1.5 w-full rounded-xl border border-[#dde6de] bg-white px-4 py-3.5 text-[15px] placeholder:text-[#9aa8b5] focus:outline-none focus:ring-2 focus:ring-[#103d2d]/10 focus:border-[#103d2d]" />
-              </div>
-            </div>
-            {authError && <p className="rounded-xl bg-[#fef2f2] border border-[#fde4e4] px-4 py-3 text-sm text-[#991b1b]">{authError}</p>}
-            {authMsg && <p className="rounded-xl bg-[#f0fdf4] border border-[#dcfce7] px-4 py-3 text-sm text-[#166534]">{authMsg}</p>}
-            <button type="submit" disabled={authLoading} className="w-full rounded-xl bg-[#103d2d] px-6 py-4 text-[15px] font-semibold text-white shadow-[0_8px_24px_rgba(16,61,45,0.18)] hover:bg-[#0e3326] transition disabled:opacity-60">
-              {authLoading ? "Criando..." : "Continuar para pagamento →"}
-            </button>
-            <p className="text-center text-sm">
-              <button type="button" onClick={() => setAuthMode("login")} className="font-medium text-[#6b7a89] hover:text-[#0f1a2a]">
-                Já tenho conta → <span className="underline">Entrar</span>
+              {authError && (
+                <div className="rounded-[12px] bg-[#fef2f2] border border-[#fde4e4] px-4 py-3 text-sm text-[#991b1b] leading-5 flex items-start gap-2">
+                  <span className="text-[15px] leading-5">⚠️</span>
+                  <div className="min-w-0">
+                    <p>{authError}</p>
+                    {/cadastrad|already exists|user already/i.test(authError) && (
+                      <button type="button" onClick={() => { setAuthError(null); setAuthMode("login"); }} className="mt-1.5 text-[13px] font-semibold text-[#103d2d] hover:underline">Já tenho uma conta → Entrar</button>
+                    )}
+                  </div>
+                </div>
+              )}
+              {authMsg && <p className="rounded-[12px] bg-[#f0fdf4] border border-[#dcfce7] px-4 py-3 text-sm text-[#166534] leading-5">{authMsg}</p>}
+              <button type="submit" disabled={authLoading} className="w-full rounded-[12px] bg-[#103d2d] px-6 py-4 text-[15px] font-semibold text-white shadow-[0_8px_24px_rgba(16,61,45,0.18)] hover:bg-[#0e3326] active:bg-[#0a2e22] transition disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                {authLoading ? (
+                  <>
+                    <span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                    Criando sua conta...
+                  </>
+                ) : (
+                  <>Continuar para pagamento <span aria-hidden>→</span></>
+                )}
               </button>
-            </p>
-          </form>
-        ) : (
-          <form onSubmit={handleLogin} className="rounded-[20px] border border-[#eef2ee] bg-white p-6 sm:p-7 space-y-4 shadow-[0_8px_28px_rgba(0,0,0,0.04)]">
-            <div>
-              <h3 className="text-[15px] font-semibold text-[#0f1a2a]">Entrar</h3>
-              <p className="text-sm text-[#6b7a89] mt-1">Voltaremos ao checkout do plano escolhido.</p>
-            </div>
-            <div className="space-y-3">
-              <div>
-                <label className="text-sm font-medium text-[#2d3a4a]">E-mail</label>
-                <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="voce@email.com" className="mt-1.5 w-full rounded-xl border border-[#dde6de] bg-white px-4 py-3.5 text-[15px] placeholder:text-[#9aa8b5] focus:outline-none focus:ring-2 focus:ring-[#103d2d]/10 focus:border-[#103d2d]" />
+              <p className="text-center text-[13.5px] text-[#6b7a89] pt-1">
+                Já tenho uma conta →{" "}
+                <button type="button" onClick={() => { setAuthError(null); setAuthMsg(null); setAuthMode("login"); }} className="font-semibold text-[#103d2d] hover:underline">Entrar</button>
+              </p>
+            </form>
+          ) : (
+            <form onSubmit={handleLogin} className="rounded-[20px] border border-[#e7ece8] bg-white p-6 sm:p-8 space-y-5 shadow-[0_10px_30px_rgba(16,61,45,0.06)]">
+              <div className="text-center pb-1">
+                <h1 className="text-[22px] sm:text-[24px] font-bold tracking-tight text-[#0f1a2a] leading-7">Entrar na sua conta</h1>
+                <p className="text-[13.5px] leading-5 text-[#6b7a89] mt-1.5">Voltaremos automaticamente para o pagamento do <b className="text-[#0f1a2a]">{planName}</b>.</p>
               </div>
-              <div>
-                <label className="text-sm font-medium text-[#2d3a4a]">Senha</label>
-                <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="mt-1.5 w-full rounded-xl border border-[#dde6de] bg-white px-4 py-3.5 text-[15px] placeholder:text-[#9aa8b5] focus:outline-none focus:ring-2 focus:ring-[#103d2d]/10 focus:border-[#103d2d]" />
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[13px] font-semibold text-[#0f1a2a] mb-1.5">E-mail</label>
+                  <input type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="voce@email.com" className="w-full rounded-[12px] border border-[#dde6de] bg-white px-4 py-3.5 text-[15px] text-[#0f1a2a] placeholder:text-[#9aa8b5] focus:outline-none focus:ring-2 focus:ring-[#103d2d]/15 focus:border-[#103d2d] transition" />
+                </div>
+                <div>
+                  <label className="block text-[13px] font-semibold text-[#0f1a2a] mb-1.5">Senha</label>
+                  <input type="password" required autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Sua senha" className="w-full rounded-[12px] border border-[#dde6de] bg-white px-4 py-3.5 text-[15px] text-[#0f1a2a] placeholder:text-[#9aa8b5] focus:outline-none focus:ring-2 focus:ring-[#103d2d]/15 focus:border-[#103d2d] transition" />
+                </div>
               </div>
-            </div>
-            {authError && <p className="rounded-xl bg-[#fef2f2] border border-[#fde4e4] px-4 py-3 text-sm text-[#991b1b]">{authError}</p>}
-            {authMsg && <p className="rounded-xl bg-[#f0fdf4] border border-[#dcfce7] px-4 py-3 text-sm text-[#166534]">{authMsg}</p>}
-            <button type="submit" disabled={authLoading} className="w-full rounded-xl bg-[#103d2d] px-6 py-4 text-[15px] font-semibold text-white shadow-[0_8px_24px_rgba(16,61,45,0.18)] hover:bg-[#0e3326] transition disabled:opacity-60">
-              {authLoading ? "Entrando..." : "Entrar e continuar →"}
-            </button>
-            <p className="text-center text-sm">
-              <button type="button" onClick={() => setAuthMode("signup")} className="font-medium text-[#6b7a89] hover:text-[#0f1a2a]">
-                Ainda não tem conta? <span className="underline">Criar conta</span>
+              {authError && <p className="rounded-[12px] bg-[#fef2f2] border border-[#fde4e4] px-4 py-3 text-sm text-[#991b1b] leading-5">{authError}</p>}
+              {authMsg && <p className="rounded-[12px] bg-[#f0fdf4] border border-[#dcfce7] px-4 py-3 text-sm text-[#166534] leading-5">{authMsg}</p>}
+              <button type="submit" disabled={authLoading} className="w-full rounded-[12px] bg-[#103d2d] px-6 py-4 text-[15px] font-semibold text-white shadow-[0_8px_24px_rgba(16,61,45,0.18)] hover:bg-[#0e3326] active:bg-[#0a2e22] transition disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                {authLoading ? (
+                  <>
+                    <span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                    Entrando...
+                  </>
+                ) : (
+                  <>Entrar e continuar para pagamento <span aria-hidden>→</span></>
+                )}
               </button>
-            </p>
-          </form>
-        )}
+              <p className="text-center text-[13.5px] text-[#6b7a89] pt-1">
+                Ainda não tem conta?{" "}
+                <button type="button" onClick={() => { setAuthError(null); setAuthMsg(null); setAuthMode("signup"); }} className="font-semibold text-[#103d2d] hover:underline">Criar conta</button>
+              </p>
+            </form>
+          )}
+
+          {/* Selo de segurança — alinhado com a Etapa 2 */}
+          <div className="mt-5 sm:mt-6 flex items-center justify-center gap-2 text-[12px] text-[#6b7a89]">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#166534" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <rect x="5" y="11" width="14" height="10" rx="2" />
+              <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+            </svg>
+            <span className="leading-5">Ambiente seguro • Seus dados são protegidos com criptografia</span>
+          </div>
+        </div>
       </div>
     );
   }
@@ -454,8 +511,21 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
   if (step === "checkout") {
     return (
       <div className="w-full flex flex-col items-center">
+        {/* Stepper discreto — Etapa 2 de 2 */}
+        <div className="w-full max-w-[980px] mb-6 sm:mb-7 flex items-center justify-center gap-2.5">
+          <span className="flex items-center gap-2 text-[12px] font-medium text-[#8a9aa8]">
+            <span className="w-6 h-6 rounded-full bg-[#eaf6ec] border border-[#cfe8d2] text-[#1b6b2e] flex items-center justify-center text-[11px] font-bold">✓</span>
+            Sua conta
+          </span>
+          <span className="h-px w-8 sm:w-12 bg-[#103d2d]" />
+          <span className="flex items-center gap-2 text-[12px] font-semibold text-[#103d2d]">
+            <span className="w-6 h-6 rounded-full bg-[#103d2d] text-white flex items-center justify-center text-[11px] font-bold">2</span>
+            Pagamento
+          </span>
+        </div>
+
         {/* Título centralizado — mais respiro e legibilidade */}
-        <div className="text-center w-full max-w-[980px] mx-auto pt-2 sm:pt-3 pb-2 mb-10 sm:mb-12">
+        <div className="text-center w-full max-w-[980px] mx-auto pt-1 sm:pt-2 pb-1 mb-8 sm:mb-10">
           <h1 className="text-[26px] sm:text-[32px] font-bold tracking-[-0.02em] text-[#0f1a2a] leading-tight sm:leading-none">
             Ative seu site profissional
           </h1>
@@ -483,7 +553,7 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-[10px] font-bold tracking-[0.14em] uppercase text-[#8a9aa8] leading-4">Seu plano</p>
-                    <p className="text-[15.5px] font-bold text-[#0f1a2a] mt-1 leading-6 tracking-tight">Site Profissional</p>
+                    <p className="text-[15.5px] font-bold text-[#0f1a2a] mt-1 leading-6 tracking-tight">{planName}</p>
                     <p className="text-[12.5px] leading-6 text-[#64748b] mt-2">Inclui domínio, hospedagem e suporte. Sem fidelidade.</p>
                   </div>
                 </div>
