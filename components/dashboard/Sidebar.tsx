@@ -7,6 +7,7 @@ import { useState } from "react";
 const USER_LINKS = [
   { href: "/painel", label: "Visão geral", icon: "📊" },
   { href: "/painel/meu-site", label: "Meu Site", icon: "🌐" },
+  { href: "/painel/checklist", label: "Meu Checklist", icon: "✅" },
   { href: "/painel/agendamentos", label: "Agendamentos", icon: "📅" },
   { href: "/painel/midias", label: "Biblioteca de Mídia", icon: "📁" },
   { href: "/painel/crm", label: "CRM", icon: "📇" },
@@ -63,7 +64,9 @@ export default function DashboardSidebar({
         {USER_LINKS.map((l) => {
           const active = l.href === "/painel/crm"
             ? pathname === "/painel/crm" || pathname.startsWith("/painel/crm/")
-            : pathname === l.href;
+            : l.href === "/painel/checklist"
+              ? pathname === "/painel/checklist" || pathname.startsWith("/painel/checklist/")
+              : pathname === l.href;
           return (
             <Link
               key={l.href}
