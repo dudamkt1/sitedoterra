@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /**
  * Input monetário com máscara brasileira (R$ 0.000,00).
@@ -9,9 +9,14 @@ import { useEffect, useRef } from "react";
  * - Aceita digitação livre: o usuário digita números/`,`/`.` e o componente
  *   formata visualmente em R$ 0.000,00 sem bloquear a edição.
  * - Substitui `<input type="number">` removendo as setas nativas de stepper.
- * - Mantém o cursor no lugar enquanto a máscara reformata o texto.
  * - Em mobile, ativa teclado numérico (`inputMode="numeric"`).
  * - Cola valores em vários formatos: "1.234,56" / "1234.56" / "1234" / "R$ 1.500,00".
+ *
+ * IMPORTANTE: usa **string local** sincronizada com o `value` em cents.
+ * O input é controlado pela string local (não pelo `value` em cents) para
+ * que cada keystroke atualize a máscara sem reescrever o input do zero a
+ * cada render — isso evita perda de cursor, regressão de caracteres e
+ * a sensação de "o campo não aceita digitação".
  */
 type Props = {
   /** Valor em centavos (inteiro). */
@@ -90,35 +95,51 @@ export function MoneyInput({
   maxCents,
   "aria-label": ariaLabel,
 }: Props) {
+  // String controlada localmente — refletida 1:1 no <input value={...} />.
+  // Isso é o que permite digitação livre, cursor estável e reatividade sem
+  // reescrever o DOM a cada keystroke.
+  const [text, setText] = useState(() => formatCentsToBRL(value, prefix));
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const lastFormatted = useRef<string>("");
+  // Guarda o último cents emitido por este input, para distinguir mudanças
+  // externas (ex.: seleção de produto) de mudanças causadas pelo próprio usuário.
+  const lastEmittedCents = useRef<number>(value);
 
-  // Sincroniza o input controlado quando o valor externo muda (ex.: ao escolher produto).
+  // Sincroniza SOMENTE quando o `value` externo muda por uma fonte diferente
+  // do próprio input (ex.: pickProduct() no pai). Não dispara em updates
+  // originados pelo onChange deste componente.
   useEffect(() => {
-    if (!inputRef.current) return;
+    if (value === lastEmittedCents.current) return;
     const formatted = formatCentsToBRL(value, prefix);
-    if (inputRef.current.value !== formatted) {
-      inputRef.current.value = formatted;
-      lastFormatted.current = formatted;
-    }
+    setText(formatted);
+    lastEmittedCents.current = value;
   }, [value, prefix]);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const raw = e.target.value;
-    const cents = parseBRLToCents(raw, allowNegative);
+    const next = e.target.value;
+    setText(next);
+    const cents = parseBRLToCents(next, allowNegative);
     const capped = typeof maxCents === "number" ? Math.min(cents, maxCents) : cents;
+    lastEmittedCents.current = capped;
     onChange(capped);
-    // Reflete imediatamente a formatação canônica no DOM
+  }
+
+  function handleBlur() {
+    // Ao sair do campo, normaliza para a forma canônica "R$ 0.000,00".
+    const cents = parseBRLToCents(text, allowNegative);
+    const capped = typeof maxCents === "number" ? Math.min(cents, maxCents) : cents;
     const formatted = formatCentsToBRL(capped, prefix);
-    if (raw !== formatted) {
-      e.target.value = formatted;
+    setText(formatted);
+    if (capped !== lastEmittedCents.current) {
+      lastEmittedCents.current = capped;
+      onChange(capped);
     }
-    lastFormatted.current = formatted;
   }
 
   function handleFocus(e: React.FocusEvent<HTMLInputElement>) {
-    // Seleciona tudo para edição rápida (UX comum em campos monetários)
-    requestAnimationFrame(() => e.target.select());
+    // Seleciona tudo para edição rápida (UX comum em campos monetários).
+    requestAnimationFrame(() => {
+      try { e.target.select(); } catch { /* noop */ }
+    });
   }
 
   return (
@@ -132,11 +153,11 @@ export function MoneyInput({
       disabled={disabled}
       placeholder={placeholder}
       aria-label={ariaLabel}
-      defaultValue={formatCentsToBRL(value, prefix)}
+      value={text}
       onChange={handleChange}
+      onBlur={handleBlur}
       onFocus={handleFocus}
       // Esconde setas de number em todos os browsers (defesa em profundidade)
-      // type="text" já remove, mas em alguns browsers o inputMode=numeric não interfere.
       className={`${className} [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield]`}
     />
   );
