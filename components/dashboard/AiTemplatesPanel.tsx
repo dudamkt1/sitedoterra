@@ -47,13 +47,32 @@ function defaultValues(structure: AiTemplate["structure"]): Record<string, strin
   return out;
 }
 
+// Formatos padrão para redes sociais (Story = 9:16, Feed = 4:5).
+// O override de formato é salvo no próprio `values` do editor (chave `format`)
+// sem alterar o schema do template — apenas controla a renderização.
+type TemplateFormat = "story" | "feed";
+const FORMAT_OPTIONS: { value: TemplateFormat; label: string; px: string; ratio: string; icon: string }[] = [
+  { value: "story", label: "Stories", px: "1080 × 1920 px", ratio: "9:16", icon: "📲" },
+  { value: "feed", label: "Feed", px: "1080 × 1350 px", ratio: "4:5", icon: "📱" },
+];
+
+function normalizeFormat(value: string | undefined, layout: string): TemplateFormat {
+  if (value === "story" || value === "feed") return value;
+  // Fallback: deriva do layout do template (carrossel -> feed; resto -> stories)
+  return layout === "carrossel" ? "feed" : "story";
+}
+
 /** Renderiza a prévia visual do template com fundos profissionais doTERRA. */
 function TemplatePreview({
   template,
   values,
+  format,
+  showSafeArea,
 }: {
   template: AiTemplate;
   values: Record<string, string>;
+  format?: TemplateFormat;
+  showSafeArea?: boolean;
 }) {
   const layout = template.structure?.layout || "story";
   const bg = values.bgColor || "#1d5c3a";
@@ -62,19 +81,26 @@ function TemplatePreview({
   const position = values.position || "center";
   const align = position === "top" ? "flex-start" : position === "bottom" ? "flex-end" : "center";
 
+  // Define aspect-ratio final: prioridade do override de formato; depois layout do template.
   const isCarrossel = layout === "carrossel";
-  // Usa imagem profissional do template ou fallback doTERRA — nunca fica só cor chapada
+  const effectiveFormat: TemplateFormat = format ?? (isCarrossel ? "feed" : "story");
+  const aspectClass = effectiveFormat === "feed" ? "aspect-[4/5]" : "aspect-[9/16]";
+  const isStories = effectiveFormat === "story";
+
   const rawImage = values.image?.trim() ? values.image : getFallbackImage(template.code);
-  // fallback silencioso se imagem quebrar (ex.: URL inválida) — troca para imagem doTERRA válida
   const [imgSrc, setImgSrc] = useState(rawImage);
   useEffect(() => { setImgSrc(rawImage); }, [rawImage]);
 
+  // Margens de segurança (Stories 1080x1920): top 200px, bottom 300px.
+  // Convertidas para % equivalentes no contêiner 9:16.
+  const SAFE_TOP_PCT = (200 / 1920) * 100;   // ~10.42%
+  const SAFE_BOTTOM_PCT = (300 / 1920) * 100; // ~15.62%
+
   return (
     <div
-      className={`relative overflow-hidden rounded-2xl border border-gray-200 shadow-sm ${isCarrossel ? "aspect-[4/5]" : "aspect-[9/16]"} w-full`}
+      className={`relative overflow-hidden rounded-2xl border border-gray-200 shadow-sm ${aspectClass} w-full`}
       style={{ background: bg, color: text }}
     >
-      {/* Fundo profissional doTERRA */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={imgSrc}
@@ -87,8 +113,51 @@ function TemplatePreview({
       {/* Overlay gradiente profissional para legibilidade + identidade */}
       <div className="absolute inset-0" style={{ background: `linear-gradient(to bottom, ${bg}00 10%, ${bg}CC 55%, ${bg} 92%)` }} />
       <div className="absolute inset-0 bg-black/15" />
-      {/* Conteúdo */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center px-5 text-center gap-2" style={{ justifyContent: align, paddingTop: align === "flex-start" ? 28 : undefined, paddingBottom: align === "flex-end" ? 28 : undefined }}>
+
+      {/* Área de segurança — visível apenas em Stories e quando solicitado.
+          Imagens de fundo continuam ocupando toda a área 9:16 (full bleed),
+          apenas textos/elementos essenciais são alertados. */}
+      {isStories && showSafeArea && (
+        <>
+          {/* Faixas de risco (top 200px / bottom 300px) */}
+          <div
+            className="absolute left-0 right-0 top-0 pointer-events-none"
+            style={{ height: `${SAFE_TOP_PCT}%`, background: "repeating-linear-gradient(135deg, rgba(220,38,38,0.18) 0 6px, transparent 6px 12px)" }}
+            aria-hidden
+          />
+          <div
+            className="absolute left-0 right-0 bottom-0 pointer-events-none"
+            style={{ height: `${SAFE_BOTTOM_PCT}%`, background: "repeating-linear-gradient(135deg, rgba(220,38,38,0.18) 0 6px, transparent 6px 12px)" }}
+            aria-hidden
+          />
+          {/* Limites da área segura (linha contínua verde tracejada) */}
+          <div
+            className="absolute left-0 right-0 border-t-2 border-dashed border-emerald-300 pointer-events-none"
+            style={{ top: `${SAFE_TOP_PCT}%` }}
+            aria-hidden
+          />
+          <div
+            className="absolute left-0 right-0 border-t-2 border-dashed border-emerald-300 pointer-events-none"
+            style={{ top: `${100 - SAFE_BOTTOM_PCT}%` }}
+            aria-hidden
+          />
+          {/* Etiquetas de margem */}
+          <span className="absolute right-2 top-1 text-[0.55rem] font-semibold text-red-100 bg-red-600/85 rounded px-1.5 py-0.5">200 px</span>
+          <span className="absolute right-2 bottom-1 text-[0.55rem] font-semibold text-red-100 bg-red-600/85 rounded px-1.5 py-0.5">300 px</span>
+        </>
+      )}
+
+      {/* Conteúdo (stories ajustam o padding para respeitar a área segura visual) */}
+      <div
+        className="absolute inset-0 flex flex-col items-center text-center gap-2"
+        style={{
+          justifyContent: align,
+          paddingTop: align === "flex-start" ? 28 : isStories && showSafeArea ? `calc(${SAFE_TOP_PCT}% + 14px)` : undefined,
+          paddingBottom: align === "flex-end" ? 28 : isStories && showSafeArea ? `calc(${SAFE_BOTTOM_PCT}% + 14px)` : undefined,
+          paddingLeft: 20,
+          paddingRight: 20,
+        }}
+      >
         {values.logo && (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img src={values.logo} alt="Logo" className="h-8 w-auto object-contain max-w-[70%] drop-shadow-md" referrerPolicy="no-referrer" />
@@ -137,8 +206,17 @@ function TemplateEditor({
   const [savedName, setSavedName] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [format, setFormat] = useState<TemplateFormat>(
+    normalizeFormat(initial.format, template.structure?.layout || "story"),
+  );
+  const [showSafeArea, setShowSafeArea] = useState(true);
 
   const fields = template.structure?.fields || [];
+
+  function setFormatValue(next: TemplateFormat) {
+    setFormat(next);
+    setValues((v) => ({ ...v, format: next }));
+  }
 
   async function copyText() {
     const lines = [
@@ -200,6 +278,19 @@ function TemplateEditor({
             value={value}
             onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
           />
+          {/* Orientação Postimages — discreta, link clicável em nova aba */}
+          <p className="mt-1.5 text-[11.5px] leading-5 text-slate-500">
+            💡 Precisa hospedar uma imagem? Use o{" "}
+            <a
+              href="https://postimages.org/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-emerald-700 underline decoration-emerald-300 underline-offset-2 hover:text-emerald-800"
+            >
+              Postimages
+            </a>{" "}
+            gratuitamente. Depois de enviar a imagem, copie o <b>link direto da imagem</b> e cole aqui.
+          </p>
           <div className="mt-1.5 flex gap-1.5 flex-wrap">
             {DOTERRA_IMAGES.slice(0, 4).map((url) => (
               <button key={url} type="button" onClick={() => setValues((v) => ({ ...v, [f.key]: url }))} className={`h-10 w-14 rounded-lg overflow-hidden border-2 ${value === url ? "border-[#1d5c3a]" : "border-gray-200"}`}>
@@ -260,7 +351,56 @@ function TemplateEditor({
         <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="max-w-[320px] mx-auto w-full md:sticky md:top-2 self-start">
-              <TemplatePreview template={template} values={values} />
+              {/* Seletor de formato + área segura */}
+              <div className="mb-3">
+                <p className="text-[10px] font-bold tracking-[0.12em] uppercase text-slate-500 mb-1.5">Formato do post</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {FORMAT_OPTIONS.map((opt) => {
+                    const active = format === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setFormatValue(opt.value)}
+                        aria-pressed={active}
+                        className={`text-left rounded-lg border px-3 py-2.5 transition ${
+                          active
+                            ? "border-[#1d5c3a] bg-[#eaf6ec] shadow-[0_2px_8px_rgba(29,92,58,0.12)]"
+                            : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={`w-3.5 h-3.5 rounded-full border-2 shrink-0 ${
+                              active ? "border-[#1d5c3a] bg-[#1d5c3a]" : "border-slate-300 bg-white"
+                            }`}
+                            aria-hidden
+                          >
+                            {active && <span className="block w-full h-full rounded-full scale-50 bg-white" />}
+                          </span>
+                          <span className="text-[12.5px] font-semibold text-slate-800 leading-tight">
+                            {opt.icon} {opt.label}
+                          </span>
+                        </div>
+                        <p className="text-[10.5px] text-slate-500 mt-0.5 pl-5 leading-tight">{opt.px} • {opt.ratio}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+                {format === "story" && (
+                  <label className="mt-2 flex items-center gap-2 text-[11.5px] text-slate-500 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={showSafeArea}
+                      onChange={(e) => setShowSafeArea(e.target.checked)}
+                      className="rounded border-slate-300 text-[#1d5c3a] focus:ring-[#1d5c3a]"
+                    />
+                    Mostrar área segura (200 px topo / 300 px base)
+                  </label>
+                )}
+              </div>
+
+              <TemplatePreview template={template} values={values} format={format} showSafeArea={showSafeArea} />
               <p className="text-[11px] text-center text-slate-400 mt-2">Prévia real com foto doTERRA gratuita</p>
             </div>
 
@@ -391,7 +531,11 @@ export function AiTemplatesPanel({ templates, userTemplates, onSavedTemplate }: 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {suggestions.map(({ key, tpl, values }) => (
               <div key={key} className="rounded-xl border border-white bg-white p-3 shadow-sm">
-                <TemplatePreview template={tpl} values={values} />
+                <TemplatePreview
+                  template={tpl}
+                  values={values}
+                  format={normalizeFormat(values.format, tpl.structure?.layout || "story")}
+                />
                 <p className="font-semibold text-sm mt-2">{tpl.emoji} {tpl.name}</p>
                 <p className="text-xs text-gray-500 mt-1 line-clamp-2">{values.body}</p>
                 <button className="btn btn-primary w-full !py-2 !text-xs mt-3" onClick={() => setEditing({ template: tpl, initial: values })}>
@@ -424,7 +568,11 @@ export function AiTemplatesPanel({ templates, userTemplates, onSavedTemplate }: 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {visibleTemplates.map((template) => (
           <div key={template.id} className="rounded-xl border border-gray-100 bg-gray-50 p-4">
-            <TemplatePreview template={template} values={defaultValues(template.structure)} />
+            <TemplatePreview
+              template={template}
+              values={defaultValues(template.structure)}
+              format={normalizeFormat(undefined, template.structure?.layout || "story")}
+            />
             <div className="mt-3">
               <p className="font-semibold text-sm">{template.emoji} {template.name}</p>
               <p className="text-xs text-gray-500 mt-1 leading-relaxed">{template.description}</p>
