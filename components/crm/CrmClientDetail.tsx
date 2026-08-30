@@ -494,7 +494,21 @@ export default function CrmClientDetail({ clientId }: { clientId: string }) {
       </div>
 
       {showEdit && (
-        <CrmModal title={`✏️ Editar ${c.name}`} onClose={() => setShowEdit(false)} wide>
+        <CrmModal
+          title={`✏️ Editar ${c.name}`}
+          onClose={() => setShowEdit(false)}
+          wide
+          footer={
+            <>
+              <button type="button" className="btn btn-outline" onClick={() => setShowEdit(false)}>
+                Cancelar
+              </button>
+              <button type="button" className="btn btn-primary" disabled={saving || !form.name} onClick={saveEdit}>
+                {saving ? "Salvando..." : "Salvar alterações"}
+              </button>
+            </>
+          }
+        >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="md:col-span-2">
               <Field label="Nome completo"><input className="input" value={form.name || ""} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} /></Field>
@@ -522,10 +536,6 @@ export default function CrmClientDetail({ clientId }: { clientId: string }) {
               }} />
               Marcar como cliente VIP manualmente
             </label>
-          </div>
-          <div className="flex justify-end gap-2 mt-5">
-            <button className="btn btn-outline" onClick={() => setShowEdit(false)}>Cancelar</button>
-            <button className="btn btn-primary" disabled={saving || !form.name} onClick={saveEdit}>{saving ? "Salvando..." : "Salvar alterações"}</button>
           </div>
         </CrmModal>
       )}

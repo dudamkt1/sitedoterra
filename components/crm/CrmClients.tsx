@@ -229,7 +229,21 @@ export default function CrmClients({ initialSettings }: { initialSettings?: any 
       )}
 
       {showCreate && (
-        <CrmModal title="+ Novo cliente" onClose={() => setShowCreate(false)} wide>
+        <CrmModal
+          title="+ Novo cliente"
+          onClose={() => setShowCreate(false)}
+          wide
+          footer={
+            <>
+              <button type="button" className="btn btn-outline" onClick={() => setShowCreate(false)}>
+                Cancelar
+              </button>
+              <button type="button" className="btn btn-primary" disabled={saving || !form.name} onClick={createClient}>
+                {saving ? "Salvando..." : "Salvar cliente"}
+              </button>
+            </>
+          }
+        >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="md:col-span-2">{input("name", "Nome completo *")}</div>
             <Field label="Categoria">
@@ -254,12 +268,6 @@ export default function CrmClients({ initialSettings }: { initialSettings?: any 
                 <textarea className="input min-h-20" value={form.notes || ""} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} />
               </Field>
             </div>
-          </div>
-          <div className="flex justify-end gap-2 mt-5">
-            <button className="btn btn-outline" onClick={() => setShowCreate(false)}>Cancelar</button>
-            <button className="btn btn-primary" disabled={saving || !form.name} onClick={createClient}>
-              {saving ? "Salvando..." : "Salvar cliente"}
-            </button>
           </div>
         </CrmModal>
       )}

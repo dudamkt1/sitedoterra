@@ -190,7 +190,21 @@ export default function CrmSales() {
       )}
 
       {showForm && (
-        <CrmModal title="+ Registrar venda" onClose={() => setShowForm(false)} wide>
+        <CrmModal
+          title="+ Registrar venda"
+          onClose={() => setShowForm(false)}
+          wide
+          footer={
+            <>
+              <button type="button" className="btn btn-outline" onClick={() => setShowForm(false)}>
+                Cancelar
+              </button>
+              <button type="button" className="btn btn-primary" disabled={saving} onClick={saveSale}>
+                {saving ? "Salvando..." : "Registrar venda"}
+              </button>
+            </>
+          }
+        >
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
             <Field label="Cliente">
               <select className="input" value={form.client_id} onChange={(e) => setForm((f) => ({ ...f, client_id: e.target.value }))}>
@@ -210,7 +224,7 @@ export default function CrmSales() {
 
           <div className="flex items-center justify-between mb-2">
             <label className="label mb-0">Produtos da venda</label>
-            <button className="btn btn-outline !py-1 !px-3 !text-xs" onClick={addItem}>+ Adicionar produto</button>
+            <button type="button" className="btn btn-outline !py-1 !px-3 !text-xs" onClick={addItem}>+ Adicionar produto</button>
           </div>
           <div className="space-y-2 mb-4">
             {form.items.length === 0 && <p className="text-sm text-gray-400">Nenhum item. Clique em &quot;+ Adicionar produto&quot;.</p>}
@@ -223,12 +237,12 @@ export default function CrmSales() {
                 <input className="input col-span-3 !py-1.5" placeholder="Descrição (avulso)" value={it.product_name} onChange={(e) => updateItem(idx, { product_name: e.target.value })} />
                 <input type="number" className="input col-span-1 !py-1.5" min="1" value={it.quantity} onChange={(e) => updateItem(idx, { quantity: Math.max(1, Number(e.target.value)) })} />
                 <input type="number" className="input col-span-2 !py-1.5" placeholder="R$/unid" value={it.unit_price_cents ? (it.unit_price_cents / 100).toFixed(2) : ""} onChange={(e) => updateItem(idx, { unit_price_cents: Math.round(parseFloat(e.target.value) * 100 || 0) })} />
-                <button className="text-red-500 text-sm col-span-1" onClick={() => setForm((f) => ({ ...f, items: f.items.filter((_, i) => i !== idx) }))}>✕</button>
+                <button type="button" className="text-red-500 text-sm col-span-1" onClick={() => setForm((f) => ({ ...f, items: f.items.filter((_, i) => i !== idx) }))}>✕</button>
               </div>
             ))}
           </div>
 
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 flex-1">
               <Field label="Forma de pagamento">
                 <select className="input" value={form.payment_method} onChange={(e) => setForm((f) => ({ ...f, payment_method: e.target.value }))}>
@@ -246,11 +260,6 @@ export default function CrmSales() {
               <p className="text-xs text-gray-400 uppercase">Total da venda</p>
               <p className="text-2xl font-semibold" style={{ fontFamily: "var(--font-display)" }}>{formatBRL(subtotal)}</p>
             </div>
-          </div>
-
-          <div className="flex justify-end gap-2">
-            <button className="btn btn-outline" onClick={() => setShowForm(false)}>Cancelar</button>
-            <button className="btn btn-primary" disabled={saving} onClick={saveSale}>{saving ? "Salvando..." : "Registrar venda"}</button>
           </div>
         </CrmModal>
       )}
