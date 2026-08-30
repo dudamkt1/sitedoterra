@@ -2,11 +2,29 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CrmModal, EmptyState, LoadingState, ErrorState, Toast, Field, apiPost, apiDelete, confirmDialog, CrmStatusBadge } from "@/components/crm/crm-ui";
+import { CrmModal, EmptyState, LoadingState, ErrorState, Toast, Field, apiPost, apiPut, apiDelete, confirmDialog, CrmStatusBadge } from "@/components/crm/crm-ui";
 import { MoneyInput } from "@/components/ui/MoneyInput";
 import { formatBRL } from "@/lib/utils";
 import { SALE_STATUSES, SALE_STATUS_COLORS } from "@/lib/crm-shared";
 import type { CrmSale, CrmClient, CrmProduct } from "@/types";
+
+type FormState = {
+  client_id: string;
+  sale_date: string;
+  status: string;
+  payment_method: string;
+  notes: string;
+  items: { product_id: string; product_name: string; quantity: number; unit_price_cents: number }[];
+};
+
+const EMPTY_FORM: FormState = {
+  client_id: "",
+  sale_date: "",
+  status: "Pago",
+  payment_method: "",
+  notes: "",
+  items: [],
+};
 
 export default function CrmSales() {
   const [sales, setSales] = useState<CrmSale[]>([]);
@@ -21,7 +39,8 @@ export default function CrmSales() {
   const [clients, setClients] = useState<CrmClient[]>([]);
   const [products, setProducts] = useState<CrmProduct[]>([]);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ client_id: "", sale_date: "", status: "Pago", payment_method: "", notes: "", items: [] as { product_id: string; product_name: string; quantity: number; unit_price_cents: number }[] });
+  const [editingSaleId, setEditingSaleId] = useState<string | null>(null);
+  const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
 
   const [statusFilter, setStatusFilter] = useState("");
@@ -62,10 +81,46 @@ export default function CrmSales() {
     }).catch(() => {});
   }, []);
 
-  async function openCreate() {
+  function openCreate() {
     const sp = new URLSearchParams(window.location.search);
-    setForm({ client_id: sp.get("clientId") || "", sale_date: new Date().toISOString().slice(0, 10), status: "Pago", payment_method: "", notes: "", items: [] });
+    setForm({
+      ...EMPTY_FORM,
+      client_id: sp.get("clientId") || "",
+      sale_date: new Date().toISOString().slice(0, 10),
+    });
+    setEditingSaleId(null);
     setShowForm(true);
+  }
+
+  async function openEdit(s: CrmSale) {
+    try {
+      const res = await fetch(`/api/crm/sales/${s.id}`);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Erro ao carregar venda.");
+      const items = (json.items || []).map((it: { product_id: string | null; product_name: string; quantity: number; unit_price_cents: number }) => ({
+        product_id: it.product_id || "",
+        product_name: it.product_name || "",
+        quantity: Math.max(1, Number(it.quantity) || 1),
+        unit_price_cents: Math.round(Number(it.unit_price_cents) || 0),
+      }));
+      setForm({
+        client_id: s.client_id || "",
+        sale_date: s.sale_date || new Date().toISOString().slice(0, 10),
+        status: s.status || "Pago",
+        payment_method: s.payment_method || "",
+        notes: s.notes || "",
+        items,
+      });
+      setEditingSaleId(s.id);
+      setShowForm(true);
+    } catch (e) {
+      setToast({ ok: false, text: e instanceof Error ? e.message : "Erro ao abrir edição." });
+    }
+  }
+
+  function closeForm() {
+    setShowForm(false);
+    setEditingSaleId(null);
   }
 
   function addItem() {
@@ -86,26 +141,32 @@ export default function CrmSales() {
     try {
       const items = form.items.filter((it) => it.unit_price_cents > 0 && it.product_name);
       if (!items.length) throw new Error("Adicione pelo menos um item com valor.");
-      await apiPost("/api/crm/sales", {
+      const body = {
         client_id: form.client_id || null,
         sale_date: form.sale_date,
         status: form.status,
         payment_method: form.payment_method,
         notes: form.notes,
         items,
-      });
-      setToast({ ok: true, text: "Venda registrada com sucesso!" });
-      setShowForm(false);
+      };
+      if (editingSaleId) {
+        await apiPut(`/api/crm/sales/${editingSaleId}`, body);
+        setToast({ ok: true, text: "Venda atualizada com sucesso!" });
+      } else {
+        await apiPost("/api/crm/sales", body);
+        setToast({ ok: true, text: "Venda registrada com sucesso!" });
+      }
+      closeForm();
       load();
     } catch (e) {
-      setToast({ ok: false, text: e instanceof Error ? e.message : "Erro ao registrar venda." });
+      setToast({ ok: false, text: e instanceof Error ? e.message : "Erro ao salvar venda." });
     } finally {
       setSaving(false);
     }
   }
 
   async function removeSale(s: CrmSale) {
-    if (!confirmDialog(`Excluir a venda de ${formatBRL(s.total_cents)}?`)) return;
+    if (!confirmDialog(`Excluir a venda de ${formatBRL(s.total_cents)}? Esta ação não pode ser desfeita.`)) return;
     try {
       await apiDelete(`/api/crm/sales/${s.id}`);
       setToast({ ok: true, text: "Venda excluída." });
@@ -174,7 +235,28 @@ export default function CrmSales() {
                     <td className="font-medium">{formatBRL(s.total_cents)}</td>
                     <td className="text-sm text-gray-500">{s.payment_method || "—"}</td>
                     <td><CrmStatusBadge value={s.status} colorMap={SALE_STATUS_COLORS} /></td>
-                    <td><button className="text-red-500 text-sm px-1" onClick={() => removeSale(s)}>🗑</button></td>
+                    <td>
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          type="button"
+                          onClick={() => openEdit(s)}
+                          className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#1d5c3a] hover:border-[#1d5c3a]/30 transition"
+                          aria-label="Editar venda"
+                          title="Editar venda"
+                        >
+                          ✏️ <span className="hidden sm:inline">Editar</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeSale(s)}
+                          className="inline-flex items-center gap-1 rounded-md border border-red-100 bg-white px-2 py-1 text-[11px] font-semibold text-red-600 hover:bg-red-50 hover:border-red-200 transition"
+                          aria-label="Excluir venda"
+                          title="Excluir venda"
+                        >
+                          🗑 <span className="hidden sm:inline">Excluir</span>
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -192,16 +274,16 @@ export default function CrmSales() {
 
       {showForm && (
         <CrmModal
-          title="+ Registrar venda"
-          onClose={() => setShowForm(false)}
+          title={editingSaleId ? "✏️ Editar venda" : "+ Registrar venda"}
+          onClose={closeForm}
           wide
           footer={
             <>
-              <button type="button" className="btn btn-outline" onClick={() => setShowForm(false)}>
+              <button type="button" className="btn btn-outline" onClick={closeForm}>
                 Cancelar
               </button>
               <button type="button" className="btn btn-primary" disabled={saving} onClick={saveSale}>
-                {saving ? "Salvando..." : "Registrar venda"}
+                {saving ? "Salvando..." : (editingSaleId ? "Salvar alterações" : "Registrar venda")}
               </button>
             </>
           }
