@@ -3,6 +3,7 @@ import DashboardSidebar from "@/components/dashboard/Sidebar";
 import { DashboardBannerDemo } from "@/components/demo/DashboardBannerDemo";
 import { DemoFetchBridge } from "@/components/demo/DemoFetchBridge";
 import { getPainelContext } from "@/lib/demo/painel-context";
+import FeedbackBanner from "@/components/feedback/FeedbackBanner";
 
 export default async function PainelLayout({ children }: { children: ReactNode }) {
   const { isDemo, ctx } = await getPainelContext();
@@ -21,8 +22,9 @@ export default async function PainelLayout({ children }: { children: ReactNode }
         siteSlug={siteSlug}
         isDemo={isDemo}
       />
-      <main className="flex-1 px-8 py-8 max-w-6xl">
+      <main className="flex-1 px-4 sm:px-6 md:px-8 py-6 sm:py-8 max-w-6xl">
         {isDemo && <DashboardBannerDemo />}
+        {!isDemo && <FeedbackBanner />}
         {children}
       </main>
     </div>

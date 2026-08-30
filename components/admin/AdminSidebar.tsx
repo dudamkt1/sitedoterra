@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 const LINKS = [
   { href: "/admin", label: "Visão geral", icon: "📊" },
@@ -17,10 +18,58 @@ const LINKS = [
   { href: "/admin/planos", label: "Planos e Preços", icon: "💰" },
   { href: "/admin/pagamentos", label: "Pagamentos (Gateway)", icon: "💱" },
   { href: "/admin/emails", label: "E-mails (SMTP)", icon: "📧" },
+  { href: "/admin/feedback", label: "Feedback", icon: "💬" },
 ];
 
 export default function AdminSidebar({ email }: { email: string }) {
   const pathname = usePathname();
+  const [unread, setUnread] = useState(0);
+
+  // Polling leve (60s) só quando o admin está numa rota /admin/*
+  useEffect(() => {
+    let alive = true;
+    async function load() {
+      try {
+        const res = await fetch("/api/admin/feedback/count", { cache: "no-store" });
+        if (!res.ok) return;
+        const j = await res.json();
+        if (alive) setUnread(j.unread || 0);
+      } catch {
+        // silencioso — sem poluir o sidebar
+      }
+    }
+    load();
+    const t = setInterval(load, 60_000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, [pathname]);
+
+  function renderLink(l: (typeof LINKS)[number]) {
+    const active = pathname === l.href;
+    const isFeedback = l.href === "/admin/feedback";
+    return (
+      <Link
+        key={l.href}
+        href={l.href}
+        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+          active ? "bg-white/10 text-white" : "text-white/60 hover:bg-white/5 hover:text-white"
+        }`}
+      >
+        <span>{l.icon}</span>
+        <span className="truncate flex-1">{l.label}</span>
+        {isFeedback && unread > 0 && (
+          <span
+            className="inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-full bg-red-500 text-white text-[11px] font-bold leading-none shadow-[0_0_0_2px_rgba(13,51,32,0.6)]"
+            aria-label={`${unread} mensagens pendentes`}
+          >
+            {unread > 99 ? "99+" : unread}
+          </span>
+        )}
+      </Link>
+    );
+  }
 
   return (
     <aside className="w-full md:w-64 shrink-0 border-r border-gray-200 bg-[#0d3320] text-white flex flex-col sticky top-0 md:h-screen">
@@ -50,21 +99,7 @@ export default function AdminSidebar({ email }: { email: string }) {
 
       {/* Navegação (desktop: coluna lateral; mobile: faixa horizontal rolável) */}
       <nav className="flex-1 min-h-0 py-4 px-3 space-y-1 overflow-y-auto md:flex-col hidden md:flex">
-        {LINKS.map((l) => {
-          const active = pathname === l.href;
-          return (
-            <Link
-              key={l.href}
-              href={l.href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                active ? "bg-white/10 text-white" : "text-white/60 hover:bg-white/5 hover:text-white"
-              }`}
-            >
-              <span>{l.icon}</span>
-              {l.label}
-            </Link>
-          );
-        })}
+        {LINKS.map(renderLink)}
         <Link href="/painel" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-white/60 hover:bg-white/5 hover:text-white">
           <span>🏠</span>
           Meu painel
@@ -73,21 +108,7 @@ export default function AdminSidebar({ email }: { email: string }) {
 
       {/* Mobile: navegação em linha com rolagem horizontal */}
       <nav className="md:hidden flex gap-2 overflow-x-auto px-3 py-2 border-t border-white/10">
-        {LINKS.map((l) => {
-          const active = pathname === l.href;
-          return (
-            <Link
-              key={l.href}
-              href={l.href}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
-                active ? "bg-white/10 text-white" : "text-white/60 hover:bg-white/5 hover:text-white"
-              }`}
-            >
-              <span>{l.icon}</span>
-              {l.label}
-            </Link>
-          );
-        })}
+        {LINKS.map(renderLink)}
         <Link href="/painel" className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap text-white/60 hover:bg-white/5 hover:text-white">
           <span>🏠</span>
           Meu painel
