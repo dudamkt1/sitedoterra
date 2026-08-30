@@ -24,6 +24,9 @@ export async function GET() {
       hasToken: Boolean(gateways.mercadopago.accessToken),
       publicKey: gateways.mercadopago.publicKey || null,
       hasPublicKey: Boolean(gateways.mercadopago.publicKey),
+      pixDiscountPercent: gateways.mercadopago.pixDiscountPercent,
+      installments: gateways.mercadopago.installments,
+      installmentsWithoutInterest: gateways.mercadopago.installmentsWithoutInterest,
     },
     offer: offer
       ? {

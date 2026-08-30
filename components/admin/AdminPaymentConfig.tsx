@@ -18,6 +18,11 @@ interface ConfigState {
     webhook_mask: string | null;
     sandbox: boolean;
     has_token: boolean;
+    public_key: string;
+    has_public_key: boolean;
+    pix_discount_percent: number;
+    installments: number;
+    installments_without_interest: boolean;
   };
   policy: {
     plan_id: string;
@@ -39,6 +44,10 @@ export default function AdminPaymentConfig() {
   const [stripePublishable, setStripePublishable] = useState("");
   const [mpToken, setMpToken] = useState("");
   const [mpWebhook, setMpWebhook] = useState("");
+  const [mpPublicKey, setMpPublicKey] = useState("");
+  const [pixDiscount, setPixDiscount] = useState(0);
+  const [installments, setInstallments] = useState(0);
+  const [installmentsWithoutInterest, setInstallmentsWithoutInterest] = useState(true);
 
   const [activation, setActivation] = useState(0);
   const [monthly, setMonthly] = useState(0);
@@ -60,6 +69,10 @@ export default function AdminPaymentConfig() {
           setGateway(json.gateway);
           setStripePublishable(json.stripe.publishable_key || "");
           setSandbox(json.mercadopago.sandbox);
+          setMpPublicKey(json.mercadopago.public_key || "");
+          setPixDiscount(Number(json.mercadopago.pix_discount_percent || 0));
+          setInstallments(Number(json.mercadopago.installments || 0));
+          setInstallmentsWithoutInterest(json.mercadopago.installments_without_interest !== false);
           if (json.policy) {
             // Estado em REAIS (o banco guarda centavos) — exibição "R$ 00,00".
             setActivation(json.policy.activation_price_cents / 100);
@@ -87,12 +100,16 @@ export default function AdminPaymentConfig() {
         body: JSON.stringify({
           gateway,
           mercadopago_sandbox: sandbox,
+          mercadopago_pix_discount_percent: pixDiscount,
+          mercadopago_installments: installments,
+          mercadopago_installments_without_interest: installmentsWithoutInterest,
           // Segredos só são enviados quando digitados (vazio = manter)
           ...(stripeSecret ? { stripe_secret_key: stripeSecret } : {}),
           ...(stripeWebhook ? { stripe_webhook_secret: stripeWebhook } : {}),
           ...(stripePublishable ? { stripe_publishable_key: stripePublishable } : {}),
           ...(mpToken ? { mercadopago_access_token: mpToken } : {}),
           ...(mpWebhook ? { mercadopago_webhook_secret: mpWebhook } : {}),
+          ...(mpPublicKey ? { mercadopago_public_key: mpPublicKey } : {}),
           policy: {
             // Converte de volta para centavos ao salvar.
             activation_price_cents: Math.round(activation * 100),
@@ -264,10 +281,48 @@ export default function AdminPaymentConfig() {
               <PasswordField id="mp-wh" value={mpWebhook} onChange={setMpWebhook}
                 placeholder="secreto do webhook" autoComplete="off" />
             </div>
+            <div>
+              <label className="label">Public Key (opcional — Checkout Transparente/Bricks)</label>
+              <input className="input" value={mpPublicKey} onChange={(e) => setMpPublicKey(e.target.value)}
+                placeholder="APP_USR-... public key" />
+              <p className="text-xs text-gray-400 mt-1">Usada no frontend para o Bricks/Checkout Transparente. Não é segredo.</p>
+            </div>
             <label className="flex items-center gap-2 text-sm cursor-pointer">
               <input type="checkbox" checked={sandbox} onChange={(e) => setSandbox(e.target.checked)} />
               Usar SANDBOX (ambiente de testes)
             </label>
+
+            <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4 space-y-3 mt-2">
+              <p className="text-sm font-semibold text-emerald-900">Condições exibidas no checkout — Mercado Pago</p>
+              <p className="text-xs text-emerald-700/80 leading-5">
+                Estas condições são carregadas dinamicamente no <b>/checkout</b>. O que você configurar aqui aparece automaticamente para o comprador, sem alterar código.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="label">Desconto no PIX (%)</label>
+                  <input type="number" min={0} max={50} step={1} className="input" value={pixDiscount}
+                    onChange={(e) => setPixDiscount(Math.min(50, Math.max(0, Number(e.target.value) || 0)))} />
+                  <p className="text-xs text-gray-500 mt-1">
+                    {pixDiscount > 0 ? `PIX: ${pixDiscount}% off → ${formatBRL(Math.round((activation * 100) * (100 - pixDiscount) / 100))}` : "0 = sem desconto"}
+                  </p>
+                </div>
+                <div>
+                  <label className="label">Parcelamento (máx. parcelas)</label>
+                  <input type="number" min={0} max={12} step={1} className="input" value={installments}
+                    onChange={(e) => setInstallments(Math.min(12, Math.max(0, Math.round(Number(e.target.value) || 0))))} />
+                  <p className="text-xs text-gray-500 mt-1">
+                    {installments > 0 ? (installmentsWithoutInterest ? `${installments}x sem juros → ${formatBRL(Math.round((activation * 100) / installments))} cada` : `${installments}x com juros`) : "0 = sem parcelamento exibido"}
+                  </p>
+                </div>
+                <div className="flex flex-col justify-end">
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input type="checkbox" checked={installmentsWithoutInterest} onChange={(e) => setInstallmentsWithoutInterest(e.target.checked)} disabled={installments === 0} />
+                    Sem juros
+                  </label>
+                  <p className="text-xs text-gray-500 mt-1">Marque para exibir &quot;sem juros&quot; no checkout.</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

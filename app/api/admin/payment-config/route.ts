@@ -65,6 +65,11 @@ export async function GET() {
       webhook_mask: mask(resolved.mercadopago.webhookSecret),
       sandbox: resolved.mercadopago.sandbox,
       has_token: Boolean(resolved.mercadopago.accessToken),
+      public_key: resolved.mercadopago.publicKey || "",
+      has_public_key: Boolean(resolved.mercadopago.publicKey),
+      pix_discount_percent: resolved.mercadopago.pixDiscountPercent,
+      installments: resolved.mercadopago.installments,
+      installments_without_interest: resolved.mercadopago.installmentsWithoutInterest,
     },
     policy: plan
       ? {
@@ -106,6 +111,20 @@ export async function PUT(request: Request) {
 
   if (typeof body.mercadopago_sandbox === "boolean") {
     updates.mercadopago_sandbox = body.mercadopago_sandbox;
+  }
+  if (typeof body.mercadopago_public_key === "string" && body.mercadopago_public_key.trim() !== "") {
+    updates.mercadopago_public_key = body.mercadopago_public_key.trim();
+  }
+  if (body.mercadopago_pix_discount_percent !== undefined) {
+    const v = Math.min(50, Math.max(0, Number(body.mercadopago_pix_discount_percent) || 0));
+    updates.mercadopago_pix_discount_percent = v;
+  }
+  if (body.mercadopago_installments !== undefined) {
+    const v = Math.min(12, Math.max(0, Math.round(Number(body.mercadopago_installments) || 0)));
+    updates.mercadopago_installments = v;
+  }
+  if (typeof body.mercadopago_installments_without_interest === "boolean") {
+    updates.mercadopago_installments_without_interest = body.mercadopago_installments_without_interest;
   }
 
   const { error } = await admin

@@ -10,12 +10,29 @@ const INTENT_KEY = "checkout_intent_v1";
 type GatewayInfo = {
   gateway: "stripe" | "mercadopago";
   stripe: { publishableKey: string | null };
-  mercadopago?: { publicKey: string | null; hasPublicKey?: boolean; sandbox?: boolean };
+  mercadopago?: {
+    publicKey: string | null;
+    hasPublicKey?: boolean;
+    sandbox?: boolean;
+    pixDiscountPercent?: number;
+    installments?: number;
+    installmentsWithoutInterest?: boolean;
+  };
   offer: { id: string; name: string; activation_price_cents: number; monthly_price_cents: number; trial_months: number; activation_regular_price_cents?: number } | null;
 };
 
 function brl(cents: number) {
   return (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+function pixCentsFrom(activationCents: number, discountPercent: number): number {
+  if (!discountPercent || discountPercent <= 0) return activationCents;
+  return Math.round(activationCents * (100 - discountPercent) / 100);
+}
+function installmentText(activationCents: number, installments: number, withoutInterest: boolean): string | null {
+  if (!installments || installments <= 0) return null;
+  const per = Math.round(activationCents / installments);
+  if (withoutInterest) return `${installments}x de ${brl(per)} sem juros`;
+  return `${installments}x de ${brl(per)}`;
 }
 function saveIntent(offer: GatewayInfo["offer"]) {
   try {
@@ -332,6 +349,17 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
   const monthlyCents = offer?.monthly_price_cents ?? 4700;
   const trialMonths = offer?.trial_months ?? 3;
   const planName = offer?.name || "Site Profissional";
+  const mpPixDiscount = Number(gatewayInfo?.mercadopago?.pixDiscountPercent || 0);
+  const mpInstallments = Number(gatewayInfo?.mercadopago?.installments || 0);
+  const mpInstallmentsWithoutInterest = gatewayInfo?.mercadopago?.installmentsWithoutInterest !== false;
+  const pixCents = pixCentsFrom(activationCents, mpPixDiscount);
+  const installmentLabel = installmentText(activationCents, mpInstallments, mpInstallmentsWithoutInterest);
+  const hasMpConditions = gateway === "mercadopago" && (mpPixDiscount > 0 || mpInstallments > 0);
+  const gatewayLabel = gateway === "mercadopago" ? "Mercado Pago" : "Stripe";
+  const gatewaySecureText =
+    gateway === "mercadopago"
+      ? "Seu pagamento é processado com segurança pelo Mercado Pago. Seus dados são protegidos com criptografia."
+      : "Seu pagamento é processado com segurança pelo Stripe. Seus dados são protegidos com criptografia.";
 
   if (checkingAuth && step === "identify") {
     return (
@@ -501,32 +529,95 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
           </div>
 
           {/* DIREITA — Pagamento — mais respiro */}
-          <div className="w-full min-w-0">
+          <div className="w-full min-w-0 overflow-hidden">
             <div className="rounded-[16px] bg-white border border-[#e7ece8] shadow-[0_8px_24px_rgba(16,61,45,0.06)] p-6 sm:p-7">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-[15px] font-bold text-[#0f1a2a] leading-6">Pagamento</h2>
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-white border border-[#e6ecef] px-3 py-1.5 shadow-[0_1px_4px_rgba(0,0,0,0.04)] shrink-0">
-                  <span className="w-[18px] h-[18px] rounded-full bg-[#009ee3] flex items-center justify-center">
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="white"><path d="M12 4L-1 10.5V13.5L12 20L25 13.5V10.5Z" /></svg>
-                  </span>
-                  <span className="text-[11.5px] font-bold text-[#2d3a4a] tracking-tight">Mercado Pago</span>
+                  {gateway === "mercadopago" ? (
+                    <>
+                      <span className="w-[18px] h-[18px] rounded-full bg-[#009ee3] flex items-center justify-center">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="white"><path d="M12 4L-1 10.5V13.5L12 20L25 13.5V10.5Z" /></svg>
+                      </span>
+                      <span className="text-[11.5px] font-bold text-[#2d3a4a] tracking-tight">Mercado Pago</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="w-[18px] h-[18px] rounded-full bg-[#635bff] flex items-center justify-center text-[7px] font-bold text-white">S</span>
+                      <span className="text-[11.5px] font-bold text-[#2d3a4a] tracking-tight">Stripe</span>
+                    </>
+                  )}
                 </span>
               </div>
 
-              <p className="text-[13px] text-[#64748b] mt-3 leading-6">Escolha sua forma de pagamento abaixo.</p>
+              <p className="text-[13px] text-[#64748b] mt-3 leading-6">
+                {gateway === "mercadopago" ? "Escolha sua forma de pagamento abaixo." : "Pagamento com cartão via Stripe — seguro e sem sair do site."}
+              </p>
 
-              {/* Selector — borda verde exata da referência */}
+              {/* Selector — borda verde exata da referência — conteúdo dinâmico */}
               <div className="mt-6 rounded-[12px] border-[1.5px] border-[#a7d0b4] bg-[#fbfdfb] px-4 py-4 flex items-center gap-3.5">
                 <span className="w-[20px] h-[20px] rounded-full border-[5px] border-[#103d2d] bg-white flex items-center justify-center shrink-0" />
                 <span className="w-8 h-8 rounded-[9px] bg-[#eef6ee] border border-[#e2efe4] flex items-center justify-center shrink-0">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#103d2d" strokeWidth="1.5"><rect x="2.5" y="5.5" width="19" height="13" rx="1.8" /><path d="M2.5 9.2H21.5" /></svg>
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[13px] font-semibold text-[#0f1a2a] leading-6">PIX e cartão — sem sair do site</p>
-                  <p className="text-[12px] text-[#64748b] leading-5">Aprovação em segundos via PIX</p>
+                  <p className="text-[13px] font-semibold text-[#0f1a2a] leading-6">
+                    {gateway === "mercadopago" ? "PIX e cartão — sem sair do site" : "Cartão de crédito — sem sair do site"}
+                  </p>
+                  <p className="text-[12px] text-[#64748b] leading-5">
+                    {gateway === "mercadopago"
+                      ? hasMpConditions
+                        ? `${mpInstallments > 0 ? installmentLabel : "Cartão disponível"}${mpInstallments > 0 && mpPixDiscount > 0 ? " • " : ""}${mpPixDiscount > 0 ? `PIX ${mpPixDiscount}% OFF` : "PIX em segundos"}`
+                        : "Aprovação em segundos via PIX"
+                      : "Processamento instantâneo e seguro"}
+                  </p>
                 </div>
                 <span className="hidden sm:inline-flex items-center rounded-full bg-[#eaf6ec] border border-[#cfe8d2] px-2.5 py-1 text-[11px] font-bold text-[#1b6b2e] whitespace-nowrap tracking-tight leading-4">100% seguro</span>
               </div>
+
+              {/* Condições dinâmicas reais do Mercado Pago — só aparecem quando configuradas */}
+              {gateway === "mercadopago" && hasMpConditions && (
+                <div className="mt-4 rounded-[12px] border border-[#e7ece8] bg-[#fafdfb] overflow-hidden divide-y divide-[#eef2ee]">
+                  {mpInstallments > 0 && (
+                    <div className="flex items-center justify-between gap-3 px-4 py-3.5">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="w-8 h-8 rounded-[9px] bg-white border border-[#e2efe4] flex items-center justify-center shrink-0 text-[13px]">💳</span>
+                        <div className="min-w-0">
+                          <p className="text-[13px] font-semibold text-[#0f1a2a] leading-5">Cartão de crédito</p>
+                          <p className="text-[12px] text-[#64748b] leading-4">
+                            Até <b className="text-[#0f1a2a]">{mpInstallments}x {mpInstallmentsWithoutInterest ? "sem juros" : "com juros"}</b>
+                          </p>
+                        </div>
+                      </div>
+                      <span className="text-[12.5px] font-bold text-[#13402e] shrink-0 text-right leading-5">
+                        {mpInstallments}x de {brl(Math.round(activationCents / mpInstallments))} {mpInstallmentsWithoutInterest ? "s/ juros" : ""}
+                      </span>
+                    </div>
+                  )}
+                  {mpPixDiscount > 0 && (
+                    <div className="flex items-center justify-between gap-3 px-4 py-3.5 bg-[#f0fdf4]/40">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="w-8 h-8 rounded-[9px] bg-[#eef6ee] border border-[#cfe8d2] flex items-center justify-center shrink-0">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="1.7"><path d="M12 2.8l6.8 3.4v6.3c0 3.2-1.9 5.9-6.8 7.7C7.1 18.4 5.2 15.7 5.2 12.5V6.2L12 2.8Z" /><path d="M8.5 12.2l2.2 2.2 4.3-4.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-[13px] font-semibold text-[#0f1a2a] leading-5">PIX</p>
+                          <p className="text-[12px] font-semibold text-[#16a34a] leading-4">{mpPixDiscount}% de desconto</p>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-[13px] font-extrabold text-[#16a34a] leading-5">{brl(pixCents)}</p>
+                        <p className="text-[11px] text-[#64748b] line-through leading-4">{brl(activationCents)}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              {gateway === "mercadopago" && !hasMpConditions && (
+                <p className="mt-3 text-[11.5px] text-[#6b7a89] leading-5 px-1">
+                  PIX copia e cola e cartão disponíveis após clicar em pagar. Condições de parcelamento e desconto no PIX são configuradas pelo admin.
+                </p>
+              )}
 
               {checkoutError && <p className="mt-5 rounded-xl bg-[#fef2f2] border border-[#fde4e4] px-4 py-3 text-sm leading-6 text-[#991b1b]">{checkoutError}</p>}
 
@@ -538,9 +629,11 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
               >
                 <span className="flex items-center justify-center gap-2 text-[15px] font-semibold text-white leading-6">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /><circle cx="12" cy="16" r="1.1" fill="white" stroke="none" /></svg>
-                  {checkoutLoading ? "Processando pagamento..." : "Pagar e ativar meu site"}
+                  {checkoutLoading ? "Processando pagamento..." : "🔒 Pagar e ativar meu site"}
                 </span>
-                <span className="block text-[12px] font-medium text-white/80 mt-1.5 leading-5">{checkoutLoading ? "Aguarde um instante" : `Pagamento único de ${brl(activationCents)} hoje`}</span>
+                <span className="block text-[12px] font-medium text-white/80 mt-1.5 leading-5">
+                  {checkoutLoading ? "Aguarde um instante" : mpPixDiscount > 0 ? `PIX ${brl(pixCents)} com ${mpPixDiscount}% OFF ou ${brl(activationCents)} no cartão` : `Pagamento único de ${brl(activationCents)} hoje`}
+                </span>
               </button>
 
               <div className="mt-6 flex gap-3.5 items-start rounded-[12px] bg-[#f6faf7] border border-[#e8f0e8] px-4 py-4">
@@ -552,7 +645,7 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
                 </span>
                 <div className="min-w-0">
                   <p className="text-[13px] font-semibold text-[#0f1a2a] leading-6">Pagamento seguro</p>
-                  <p className="text-[12.5px] leading-6 text-[#64748b] mt-1.5">Seu pagamento é processado com segurança pelo Mercado Pago. Seus dados são protegidos com criptografia.</p>
+                  <p className="text-[12.5px] leading-6 text-[#64748b] mt-1.5">{gatewaySecureText}</p>
                 </div>
               </div>
 

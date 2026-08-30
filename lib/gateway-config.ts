@@ -20,6 +20,9 @@ export interface GatewayRow {
   mercadopago_webhook_secret: string | null;
   mercadopago_sandbox: boolean;
   mercadopago_public_key?: string | null;
+  mercadopago_pix_discount_percent?: number | null;
+  mercadopago_installments?: number | null;
+  mercadopago_installments_without_interest?: boolean | null;
 }
 
 async function getRow(): Promise<GatewayRow | null> {
@@ -48,6 +51,9 @@ export interface ResolvedGateways {
     webhookSecret: string | null;
     sandbox: boolean;
     publicKey: string | null;
+    pixDiscountPercent: number;
+    installments: number;
+    installmentsWithoutInterest: boolean;
   };
 }
 
@@ -76,6 +82,13 @@ export async function resolveGateways(): Promise<ResolvedGateways> {
     process.env.MERCADOPAGO_PUBLIC_KEY ||
     null;
 
+  const rawPix = (row as unknown as Record<string, unknown>)?.mercadopago_pix_discount_percent;
+  const pixDiscount = rawPix != null ? Math.min(50, Math.max(0, Number(rawPix) || 0)) : Number(process.env.MERCADOPAGO_PIX_DISCOUNT_PERCENT || 0) || 0;
+  const rawInst = (row as unknown as Record<string, unknown>)?.mercadopago_installments;
+  const installments = rawInst != null ? Math.min(12, Math.max(0, Math.round(Number(rawInst) || 0))) : Math.round(Number(process.env.MERCADOPAGO_INSTALLMENTS || 0) || 0);
+  const rawInstWo = (row as unknown as Record<string, unknown>)?.mercadopago_installments_without_interest;
+  const installmentsWithoutInterest = typeof rawInstWo === "boolean" ? rawInstWo : (process.env.MERCADOPAGO_INSTALLMENTS_WITHOUT_INTEREST ?? "true") !== "false";
+
   let gateway: Gateway = row?.gateway === "mercadopago" ? "mercadopago" : "stripe";
   // Segurança: se o gateway escolhido não tem chave nenhuma configurada,
   // cai automaticamente para o outro (evita checkout quebrado em produção).
@@ -85,7 +98,7 @@ export async function resolveGateways(): Promise<ResolvedGateways> {
   return {
     gateway,
     stripe: { secretKey: stripeSecret, webhookSecret: stripeWebhook, publishableKey: stripePublishable },
-    mercadopago: { accessToken: mpToken, webhookSecret: mpWebhook, sandbox: mpSandbox, publicKey: mpPublicKey },
+    mercadopago: { accessToken: mpToken, webhookSecret: mpWebhook, sandbox: mpSandbox, publicKey: mpPublicKey, pixDiscountPercent: pixDiscount, installments, installmentsWithoutInterest },
   };
 }
 
