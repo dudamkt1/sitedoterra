@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MediaPicker } from "@/components/media/MediaPicker";
 import {
   computePwaStatus,
@@ -19,6 +19,23 @@ const LEVEL_STYLES: Record<string, string> = {
   incomplete: "bg-amber-100 text-amber-900 border-amber-300",
 };
 
+// Limites para o ícone PWA. PWA exige imagens quadradas ≥ 192px; Android
+// 512+ é altamente recomendado para a tela inicial. Aceitamos PNG (com ou
+// sem fundo transparente), JPEG e WebP — SVG não (risco de XSS e Chrome não
+// aceita SVG como purpose=any no manifest).
+const ICON_MIME = /^image\/(png|jpe?g|webp)$/i;
+const ICON_MIN = 192;
+const ICON_RECOMMENDED = 512;
+
+async function probeImage(url: string): Promise<{ width: number; height: number } | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
+}
+
 export function PwaManager() {
   const [data, setData] = useState<LoadResult | null>(null);
   const [form, setForm] = useState<PwaSettings | null>(null);
@@ -27,6 +44,9 @@ export function PwaManager() {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [iconInfo, setIconInfo] = useState<{ width: number; height: number; isSquare: boolean; isPngLike: boolean } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -45,6 +65,28 @@ export function PwaManager() {
       setLoading(false);
     })();
   }, []);
+
+  // Quando o ícone mudar, valida dimensões e formato
+  const iconUrl = form?.icon_512_url || form?.icon_192_url;
+  useEffect(() => {
+    if (!iconUrl) {
+      setIconInfo(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const probe = await probeImage(iconUrl);
+      if (cancelled || !probe) return;
+      const isPngLike = ICON_MIME.test(iconUrl) || /\.(png|jpe?g|webp)($|\?)/i.test(iconUrl);
+      setIconInfo({
+        width: probe.width,
+        height: probe.height,
+        isSquare: probe.width === probe.height,
+        isPngLike,
+      });
+    })();
+    return () => { cancelled = true; };
+  }, [iconUrl]);
 
   const platformUrl = useMemo(() => {
     if (!data?.slug) return "";
@@ -90,6 +132,64 @@ export function PwaManager() {
     setForm((f) => (f ? { ...f, ...p } : f));
   }
 
+  async function uploadPwaIcon(file: File) {
+    if (!file) return;
+    setUploading(true);
+    setMsg(null);
+    try {
+      if (!/^image\/(png|jpe?g|webp)$/i.test(file.type)) {
+        setMsg({ ok: false, text: `Formato "${file.type || "desconhecido"}}" não suportado. Use PNG (com ou sem fundo), JPG ou WebP.` });
+        return;
+      }
+      // Limite: 5 MB para o ícone do PWA
+      if (file.size > 5 * 1024 * 1024) {
+        setMsg({ ok: false, text: "Arquivo muito grande. Limite de 5 MB para o ícone do PWA." });
+        return;
+      }
+      // Valida dimensões antes de enviar
+      const localUrl = URL.createObjectURL(file);
+      const probe = await probeImage(localUrl);
+      URL.revokeObjectURL(localUrl);
+      if (!probe) {
+        setMsg({ ok: false, text: "Não foi possível ler a imagem. Tente outro arquivo." });
+        return;
+      }
+      if (probe.width < ICON_MIN || probe.height < ICON_MIN) {
+        setMsg({
+          ok: false,
+          text: `A imagem tem ${probe.width}×${probe.height}px. O ícone do PWA precisa ter no mínimo ${ICON_MIN}×${ICON_MIN}px. Use uma imagem quadrada maior.`,
+        });
+        return;
+      }
+
+      // Envia via endpoint de media (já tem validação de MIME/extensão/tamanho
+      // e quota no servidor). Categoria "products" para consistência, ou "logo".
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("category", "products");
+      const res = await fetch("/api/media/upload", { method: "POST", body: fd });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMsg({ ok: false, text: json.error || "Erro ao enviar imagem." });
+        return;
+      }
+      const url: string | undefined = json.file?.public_url;
+      if (!url) {
+        setMsg({ ok: false, text: "Upload concluído, mas a URL não foi retornada." });
+        return;
+      }
+      // Salva automaticamente em ambos os campos (192 e 512 recebem a mesma imagem
+      // — o navegador escala para o tamanho correto em cada densidade).
+      patch({ icon_192_url: url, icon_512_url: url });
+      setMsg({ ok: true, text: "Logo enviado! Clique em \"Salvar configurações\" para aplicar." });
+    } catch {
+      setMsg({ ok: false, text: "Falha ao enviar imagem." });
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
   async function save() {
     if (!form) return;
     setSaving(true);
@@ -102,7 +202,10 @@ export function PwaManager() {
       });
       const json = await res.json();
       if (res.ok) {
-        setMsg({ ok: true, text: "Configurações do aplicativo salvas!" });
+        setMsg({ ok: true, text: "✓ Logo atualizado com sucesso! O ícone aparecerá na próxima vez que os usuários abrirem o app instalado." });
+        if (json.settings) {
+          setForm(json.settings);
+        }
       } else {
         setMsg({ ok: false, text: json.error || "Erro ao salvar." });
       }
@@ -124,6 +227,7 @@ export function PwaManager() {
   if (!form) return <p className="text-sm text-red-600">{msg?.text || "Não foi possível carregar."}</p>;
 
   const statusStyle = status ? LEVEL_STYLES[status.level] : "";
+  const currentIcon = form.icon_512_url || form.icon_192_url;
 
   return (
     <div className="space-y-6">
@@ -277,32 +381,105 @@ export function PwaManager() {
 
       {/* ---------- Logo & Ícones ---------- */}
       <div className="card">
-        <h2 className="card-title mb-1">Logo e ícone do aplicativo</h2>
+        <h2 className="card-title mb-1">Logo do PWA</h2>
         <p className="text-sm text-gray-500 mb-4">
-          <strong>Ícone do app (quadrado 1:1):</strong> será usado na tela inicial do celular. Aceita PNG/JPG/WebP com ou sem fundo transparente.
+          <strong>Envie o logotipo que aparecerá no aplicativo instalado no celular.</strong>
           <br />
-          <span className="text-gray-400">Logo (opcional):</span> para uso em outras áreas do painel.
+          Use uma imagem <b>quadrada</b> (mesma largura e altura) de pelo menos <b>512×512 px</b> para melhor qualidade na tela inicial.
+          Aceita <b>PNG com ou sem fundo transparente</b>, JPG ou WebP.
         </p>
 
         <div className="space-y-5">
           {/* Ícone principal do App (1:1) */}
           <div>
-            <label className="label">Ícone do aplicativo <span className="text-xs text-gray-400 font-normal">(quadrado 1:1, ex.: 512×512)</span></label>
-            <div className="flex items-center gap-2">
-              <input className="input flex-1" value={form.icon_192_url || ""} placeholder="URL ou escolha na biblioteca"
-                onChange={(e) => patch({ icon_192_url: e.target.value, icon_512_url: e.target.value })} />
-              <MediaPicker scope="tenant" value={form.icon_192_url || undefined}
-                onChange={(url) => patch({ icon_192_url: url, icon_512_url: url })} />
+            <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+              <div className="flex-1">
+                <label className="label">Ícone do aplicativo <span className="text-xs text-gray-400 font-normal">(quadrado 1:1)</span></label>
+                <div className="flex items-center gap-2">
+                  <input className="input flex-1" value={form.icon_512_url || ""} placeholder="URL do ícone (envie ou escolha na biblioteca)"
+                    onChange={(e) => patch({ icon_192_url: e.target.value, icon_512_url: e.target.value })} />
+                  <MediaPicker scope="tenant" value={form.icon_512_url || undefined}
+                    onChange={(url) => patch({ icon_192_url: url, icon_512_url: url })} />
+                </div>
+                <p className="text-xs text-gray-400 mt-1">
+                  Recomendado 512×512 px (mínimo 192×192). PNG transparente é suportado.
+                </p>
+              </div>
+
+              <div className="flex flex-col items-center">
+                <label className="label">Subir novo ícone</label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) uploadPwaIcon(f);
+                  }}
+                />
+                <button
+                  type="button"
+                  disabled={uploading}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="inline-flex items-center gap-2 rounded-[10px] border border-[#1d5c3a]/30 bg-[#eaf6ec] hover:bg-[#d8efe1] text-[#103d28] text-[13px] font-semibold px-4 py-2.5 transition disabled:opacity-50"
+                >
+                  {uploading ? (
+                    <>
+                      <span className="w-4 h-4 rounded-full border-2 border-[#103d28]/30 border-t-[#103d28] animate-spin" />
+                      Enviando...
+                    </>
+                  ) : (
+                    <>📤 Enviar / Substituir</>
+                  )}
+                </button>
+              </div>
             </div>
-            <p className="text-xs text-gray-400 mt-1">
-              Uma única imagem quadrada serve para todos os tamanhos (192×192, 512×512, máscaras adaptáveis).
-              Fundo transparente é recomendado, mas não obrigatório.
-            </p>
+
+            {/* Status do ícone atual */}
+            {currentIcon && (
+              <div className="mt-3 rounded-[12px] border border-[#e2e8e0] bg-white p-3 flex items-center gap-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={currentIcon} alt="Ícone atual" className="w-14 h-14 rounded-lg object-cover border border-slate-200" referrerPolicy="no-referrer" />
+                <div className="min-w-0 flex-1 text-[12.5px]">
+                  <p className="text-[#0d3320] font-semibold">Ícone atual</p>
+                  {iconInfo ? (
+                    <p className="text-[#4a5a52] mt-0.5">
+                      {iconInfo.width}×{iconInfo.height}px
+                      {" · "}
+                      <span className={iconInfo.isSquare ? "text-emerald-700" : "text-amber-700"}>
+                        {iconInfo.isSquare ? "quadrada" : "⚠️ não é quadrada"}
+                      </span>
+                      {" · "}
+                      <span className={iconInfo.isPngLike ? "text-emerald-700" : "text-slate-500"}>
+                        {iconInfo.isPngLike ? "formato suportado" : "formato razoável (PNG/JPG/WebP recomendado)"}
+                      </span>
+                    </p>
+                  ) : (
+                    <p className="text-[#8a9a8e] mt-0.5">verificando…</p>
+                  )}
+                  <p className="text-[#8a9a8e] mt-0.5 truncate">{currentIcon}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => patch({ icon_192_url: null, icon_512_url: null })}
+                  className="shrink-0 text-[11.5px] font-semibold text-red-600 hover:text-red-800"
+                >
+                  Remover
+                </button>
+              </div>
+            )}
+
+            {!currentIcon && (
+              <p className="mt-2 text-xs text-amber-700">
+                Sem ícone enviado, o sistema gera automaticamente um ícone com as cores do app.
+              </p>
+            )}
           </div>
 
           {/* Logo opcional */}
           <div>
-            <label className="label">Logo (opcional)</label>
+            <label className="label">Logo (opcional, para uso no painel)</label>
             <div className="flex items-center gap-2">
               <input className="input flex-1" value={form.logo_url || ""} placeholder="URL ou escolha na biblioteca"
                 onChange={(e) => patch({ logo_url: e.target.value })} />
@@ -311,29 +488,23 @@ export function PwaManager() {
             </div>
             <p className="text-xs text-gray-400 mt-1">Usado em outras áreas do painel. Não afeta o ícone do app no celular.</p>
           </div>
-
-          {!form.icon_192_url && (
-            <p className="text-xs text-gray-400">
-              Sem ícone enviado, o sistema gera automaticamente um ícone com as cores do app.
-            </p>
-          )}
         </div>
       </div>
 
       {/* ---------- Preview ---------- */}
       <div className="card">
         <h2 className="card-title mb-1">Prévia</h2>
-        <p className="text-sm text-gray-500 mb-4">Aparência aproximada do aplicativo instalado.</p>
+        <p className="text-sm text-gray-500 mb-4">Aparência aproximada do aplicativo instalado no celular.</p>
         <div className="flex justify-center py-2">
           <div
             className="w-44 rounded-[2rem] border-8 border-gray-900 overflow-hidden shadow-xl"
             style={{ background: form.background_color }}
           >
             <div className="pt-3 pb-2 text-center text-[0.55rem] text-gray-400">9:41</div>
-            <div className="mx-auto mt-1 w-20 h-20 rounded-2xl shadow-md overflow-hidden" style={{ background: form.theme_color }}>
-              {form.icon_192_url ? (
+            <div className="mx-auto mt-1 w-20 h-20 rounded-2xl shadow-md overflow-hidden flex items-center justify-center" style={{ background: form.theme_color }}>
+              {currentIcon ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={form.icon_192_url} alt="Ícone" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                <img src={currentIcon} alt="Ícone" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-white text-3xl font-bold" style={{ fontFamily: "Georgia, serif" }}>
                   {(form.short_name || form.app_name || "A").charAt(0).toUpperCase()}
@@ -351,6 +522,9 @@ export function PwaManager() {
             </div>
           </div>
         </div>
+        <p className="text-[11px] text-center text-slate-400 mt-2">
+          Aparência ilustrativa. O Android aplica máscara automática (squircle/círculo) no ícone.
+        </p>
       </div>
 
       {/* ---------- Ativação + salvar ---------- */}
@@ -385,10 +559,13 @@ export function PwaManager() {
           </p>
         )}
 
-        <div className="mt-5">
+        <div className="mt-5 flex items-center gap-3 flex-wrap">
           <button type="button" onClick={save} disabled={saving} className="btn btn-primary">
             {saving ? "Salvando..." : "Salvar configurações"}
           </button>
+          <p className="text-[11.5px] text-slate-500">
+            Após salvar, o novo ícone aparece no app instalado na próxima abertura (cache invalidado automaticamente).
+          </p>
         </div>
       </div>
     </div>

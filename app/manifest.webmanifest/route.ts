@@ -26,7 +26,10 @@ export async function GET() {
     status: 200,
     headers: {
       "Content-Type": "application/manifest+json",
-      "Cache-Control": "public, max-age=300",
+      // no-cache para garantir que mudanças no ícone aparecem imediatamente
+      // (CDN/browser não guardam cópia antiga). As URLs dos ícones já
+      // carregam ?v=<token> para cache-busting no cliente.
+      "Cache-Control": "no-cache, no-store, must-revalidate",
       "Service-Worker-Allowed": "/",
     },
   });

@@ -49,12 +49,28 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   // PWA do usuário
   const pwa = await resolvePwaForRequest({ slugParam: params.slug });
 
-  // FAVICON PNG transparente do painel — HTML usa só ele (não SVG) para garantir fundo transparente
-  const iconList: { url: string; type?: string; sizes?: string }[] = [];
+  // HTML precisa expor o ícone do PWA para que:
+  //  - iOS Safari use o apple-touch-icon 180x180 ao "Adicionar à Tela de Início"
+  //    (iOS NÃO consulta o manifest na instalação — usa o apple-touch-icon)
+  //  - Chrome Desktop mostre o favicon correto na aba
+  // O PWA icon vem SEMPRE à frente do favicon do site; o favicon é fallback.
+  const iconList: { url: string; type?: string; sizes?: string; rel?: string }[] = [];
+  if (pwa?.settings.enabled) {
+    const iconSrc = pwa.settings.icon_512_url || pwa.settings.icon_192_url;
+    if (iconSrc) {
+      const ts = pwa.settings.updated_at ? new Date(pwa.settings.updated_at).getTime() : Date.now();
+      const v = Number.isNaN(ts) ? Date.now().toString(36) : ts.toString(36);
+      const bust = iconSrc.includes("?") ? `${iconSrc}&v=${v}` : `${iconSrc}?v=${v}`;
+      // apple-touch-icon (iOS usa este no "Adicionar à tela inicial")
+      iconList.push({ url: bust, type: "image/png", sizes: "180x180", rel: "apple-touch-icon" });
+      iconList.push({ url: bust, type: "image/png", sizes: "192x192" });
+      iconList.push({ url: bust, type: "image/png", sizes: "512x512" });
+      iconList.push({ url: bust, type: "image/png", sizes: "32x32" });
+    }
+  }
   if (faviconUrl) {
     const bust = faviconUrl.includes("?") ? faviconUrl : `${faviconUrl}?v=2`;
     iconList.push({ url: bust, type: "image/png", sizes: "32x32" });
-    iconList.push({ url: bust, type: "image/png", sizes: "192x192" });
   }
 
   const meta: Metadata = {
