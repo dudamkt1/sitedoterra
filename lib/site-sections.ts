@@ -294,6 +294,13 @@ export const DEFAULT_SECTION_CONTENT: Record<SectionType, Record<string, unknown
     eyebrow: "Seja uma TopConsultora",
     title: "Tenha um site assim hoje mesmo",
     subtitle: "Seu negócio merece uma presença profissional na internet.",
+    paymentConditions: {
+      gateway: "mercadopago",
+      pixDiscountPercent: 0,
+      installments: 0,
+      installmentsWithoutInterest: true,
+      pixCents: 0,
+    },
     offer: {
       name: "Site Profissional",
       description: "Site profissional com IA, agendamento, CRM, endereço personalizado e suporte.",

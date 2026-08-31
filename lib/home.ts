@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { DEFAULT_SECTIONS, DEFAULT_SECTION_CONTENT, anchorFor, normalizeSectionPermissions } from "@/lib/site-sections";
 import { getActiveOffer, buildPricingContent } from "@/lib/commercial";
+import { resolveGateways } from "@/lib/gateway-config";
 import type { PublicTenant, ResolvedHomeSection, SiteSection, TenantSection } from "@/types";
 
 /**
@@ -205,6 +206,31 @@ export async function resolveHomeSections(opts: ResolveOptions): Promise<Resolve
   }
   const pricingOverlay = activeOffer ? buildPricingContent(activeOffer as never) : {};
 
+  // Condições de pagamento (PIX + parcelamento) resolvidas uma única vez por request.
+  // São opcionais — se nada estiver configurado, a HOME segue exibindo apenas o preço.
+  // A oferta comercial (plans) é a fonte de verdade do VALOR; o gateway (payment_config)
+  // é a fonte de verdade das CONDIÇÕES. Mantemos a mesma aritmética usada pelo checkout.
+  let paymentConditions: Record<string, unknown> | null = null;
+  if (hasPricing) {
+    try {
+      const gateways = await resolveGateways();
+      const pixDiscount = Math.min(50, Math.max(0, Number(gateways.mercadopago.pixDiscountPercent) || 0));
+      const installments = Math.min(12, Math.max(0, Math.round(Number(gateways.mercadopago.installments) || 0)));
+      const withoutInterest = gateways.mercadopago.installmentsWithoutInterest !== false;
+      const activationCents = (activeOffer as { activation_price_cents?: number } | null)?.activation_price_cents || 0;
+      const pixCents = pixDiscount > 0 ? Math.round((activationCents * (100 - pixDiscount)) / 100) : activationCents;
+      paymentConditions = {
+        gateway: gateways.gateway,
+        pixDiscountPercent: pixDiscount,
+        installments,
+        installmentsWithoutInterest: withoutInterest,
+        pixCents,
+      };
+    } catch {
+      paymentConditions = null;
+    }
+  }
+
   const resolved: ResolvedHomeSection[] = [];
 
   for (const section of globalSections) {
@@ -232,14 +258,16 @@ export async function resolveHomeSections(opts: ResolveOptions): Promise<Resolve
           globalContent,
           legacy,
           override?.content || {},
-          section.type === "pricing" ? pricingOverlay : {}
+          section.type === "pricing" ? pricingOverlay : {},
+          section.type === "pricing" && paymentConditions ? { paymentConditions } : {}
         )
       : deepMerge(
           DEFAULT_SECTION_CONTENT[section.type] || {},
           legacy,
           globalContent,
           override?.content || {},
-          section.type === "pricing" ? pricingOverlay : {}
+          section.type === "pricing" ? pricingOverlay : {},
+          section.type === "pricing" && paymentConditions ? { paymentConditions } : {}
         );
     const content = merged;
 

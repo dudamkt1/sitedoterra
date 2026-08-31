@@ -40,6 +40,20 @@ export interface PricingContent {
   subtitle?: string;
   offer?: OfferView;
   plans?: PricingPlan[];
+  /**
+   * Condições de pagamento configuradas pelo Super Admin em /admin/pagamentos
+   * (PIX com desconto e parcelamento sem juros no Mercado Pago). São
+   * resolvidas no servidor a partir de `payment_config` e mescladas no
+   * conteúdo da seção pricing por `lib/home.ts`. Permitem sincronizar a
+   * comunicação visual da HOME com o que o checkout realmente cobra.
+   */
+  paymentConditions?: {
+    gateway?: "stripe" | "mercadopago";
+    pixDiscountPercent?: number;
+    installments?: number;
+    installmentsWithoutInterest?: boolean;
+    pixCents?: number;
+  };
 }
 
 function brl(cents: number | undefined): string {
@@ -168,6 +182,42 @@ export function Pricing({ content }: { content: PricingContent }) {
           </div>
 
           <div className="oferta-ativa">Ativação do site · pagamento único</div>
+
+          {(() => {
+            const cond = content.paymentConditions;
+            if (!cond) return null;
+            const pixPercent = Math.max(0, Math.min(50, Number(cond.pixDiscountPercent) || 0));
+            const installments = Math.max(0, Math.min(12, Math.round(Number(cond.installments) || 0)));
+            const noInterest = cond.installmentsWithoutInterest !== false;
+            const showPix = pixPercent > 0 && promo > 0;
+            const showInstallments = installments > 0;
+            if (!showPix && !showInstallments) return null;
+            const pixCents = showPix ? Number(cond.pixCents) || Math.round(promo * (100 - pixPercent) / 100) : promo;
+            return (
+              <div className="oferta-condicoes" aria-label="Condições de pagamento">
+                <span className="oferta-condicoes-ou">ou</span>
+                <div className="oferta-condicoes-grid">
+                  {showInstallments && (
+                    <div className="oferta-condicoes-item oferta-condicoes-item--cartao">
+                      <span className="oferta-condicoes-icone" aria-hidden>💳</span>
+                      <span className="oferta-condicoes-texto">
+                        Até <strong>{installments}x {noInterest ? "sem juros" : "com juros"}</strong> no cartão
+                      </span>
+                    </div>
+                  )}
+                  {showPix && (
+                    <div className="oferta-condicoes-item oferta-condicoes-item--pix">
+                      <span className="oferta-condicoes-icone" aria-hidden>⚡</span>
+                      <span className="oferta-condicoes-texto">
+                        <strong>{pixPercent}% OFF</strong> no PIX
+                      </span>
+                      <span className="oferta-condicoes-pix-valor">{brl(pixCents)} no PIX</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
 
           {benefits.length > 0 && (
             <ul className="oferta-beneficios">
