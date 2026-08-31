@@ -104,6 +104,8 @@ export async function PUT(request: Request) {
     logo_url: safeUrl(body.logo_url),
     icon_192_url: safeUrl(body.icon_192_url),
     icon_512_url: safeUrl(body.icon_512_url),
+    icon_180_url: safeUrl(body.icon_180_url),
+    icon_maskable_512_url: safeUrl(body.icon_maskable_512_url),
     theme_color,
     background_color,
     canonical,

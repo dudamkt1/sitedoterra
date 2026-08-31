@@ -11,6 +11,8 @@ export interface PwaSettings {
   logo_url: string | null;
   icon_192_url: string | null;
   icon_512_url: string | null;
+  icon_180_url: string | null;
+  icon_maskable_512_url: string | null;
   theme_color: string;
   background_color: string;
   canonical: "platform" | "custom";
@@ -28,6 +30,8 @@ export function defaultPwaSettings(tenantId = "", userId = ""): PwaSettings {
     logo_url: null,
     icon_192_url: null,
     icon_512_url: null,
+    icon_180_url: null,
+    icon_maskable_512_url: null,
     theme_color: "#1d5c3a",
     background_color: "#faf8f2",
     canonical: "platform",
@@ -45,6 +49,8 @@ export const DEMO_PWA_SETTINGS: PwaSettings = {
   logo_url: null,
   icon_192_url: null,
   icon_512_url: null,
+  icon_180_url: null,
+  icon_maskable_512_url: null,
   theme_color: "#1d5c3a",
   background_color: "#faf8f2",
   canonical: "platform",
@@ -121,52 +127,52 @@ export function buildManifest(
   const shortName = s.short_name || name.slice(0, 12);
   const v = pwaVersionToken(s);
 
-  // Origem de cada imagem: usa `icon_512_url` se houver, senão `icon_192_url`.
-  // iOS/Android aceitam a mesma imagem servida em vários `sizes` — o que importa
-  // é a proporção quadrada e qualidade visual.
-  const iconSrc192 = s.icon_192_url || s.icon_512_url;
-  const iconSrc512 = s.icon_512_url || s.icon_192_url;
+  // Cada tamanho tem seu próprio campo no banco — permite qualidade nativa
+  // sem depender de redimensionamento do navegador.
+  const icon180 = s.icon_180_url || s.icon_192_url || s.icon_512_url;
+  const icon192 = s.icon_192_url || s.icon_512_url;
+  const icon512 = s.icon_512_url || s.icon_192_url;
+  const iconMaskable512 = s.icon_maskable_512_url || s.icon_512_url || s.icon_192_url;
 
   const icons: Record<string, unknown>[] = [];
 
-  // Apple touch icon (iOS Safari)
-  if (iconSrc192) {
+  // Apple touch icon 180×180 (iOS Safari — "Adicionar à Tela de Início")
+  if (icon180) {
     icons.push({
-      src: abs(withVersion(iconSrc192, v), ctx.origin),
+      src: abs(withVersion(icon180, v), ctx.origin),
       sizes: "180x180",
-      type: guessType(iconSrc192),
+      type: guessType(icon180),
       purpose: "any",
     });
   }
 
   // Android: 192×192 (mínimo histórico, manifest spec)
-  if (iconSrc192) {
+  if (icon192) {
     icons.push({
-      src: abs(withVersion(iconSrc192, v), ctx.origin),
+      src: abs(withVersion(icon192, v), ctx.origin),
       sizes: "192x192",
-      type: guessType(iconSrc192),
+      type: guessType(icon192),
       purpose: "any",
     });
   }
 
   // Android: 512×512 (splash + home screen em alta densidade)
-  if (iconSrc512) {
+  if (icon512) {
     icons.push({
-      src: abs(withVersion(iconSrc512, v), ctx.origin),
+      src: abs(withVersion(icon512, v), ctx.origin),
       sizes: "512x512",
-      type: guessType(iconSrc512),
+      type: guessType(icon512),
       purpose: "any",
     });
   }
 
-  // Android: 512×512 maskable — ícone preparado para safe zone; o Android
-  // aplica máscara (squircle/círculo) automaticamente. Só declare se o usuário
-  // tiver enviado uma imagem 512×512; nunca mascaramos imagens pequenas.
-  if (iconSrc512) {
+  // Android: 512×512 maskable — ícone preparado para safe zone (padding ~10%).
+  // Usa campo dedicado se existir; caso contrário, cai para o 512 normal.
+  if (iconMaskable512) {
     icons.push({
-      src: abs(withVersion(iconSrc512, v), ctx.origin),
+      src: abs(withVersion(iconMaskable512, v), ctx.origin),
       sizes: "512x512",
-      type: guessType(iconSrc512),
+      type: guessType(iconMaskable512),
       purpose: "maskable",
     });
   }

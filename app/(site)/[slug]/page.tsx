@@ -56,15 +56,35 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   // O PWA icon vem SEMPRE à frente do favicon do site; o favicon é fallback.
   const iconList: { url: string; type?: string; sizes?: string; rel?: string }[] = [];
   if (pwa?.settings.enabled) {
-    const iconSrc = pwa.settings.icon_512_url || pwa.settings.icon_192_url;
-    if (iconSrc) {
-      const ts = pwa.settings.updated_at ? new Date(pwa.settings.updated_at).getTime() : Date.now();
-      const v = Number.isNaN(ts) ? Date.now().toString(36) : ts.toString(36);
-      const bust = iconSrc.includes("?") ? `${iconSrc}&v=${v}` : `${iconSrc}?v=${v}`;
-      // apple-touch-icon (iOS usa este no "Adicionar à tela inicial")
+    const ts = pwa.settings.updated_at ? new Date(pwa.settings.updated_at).getTime() : Date.now();
+    const v = Number.isNaN(ts) ? Date.now().toString(36) : ts.toString(36);
+
+    // apple-touch-icon 180x180 (iOS "Adicionar à Tela de Início")
+    if (pwa.settings.icon_180_url) {
+      const bust = pwa.settings.icon_180_url.includes("?")
+        ? `${pwa.settings.icon_180_url}&v=${v}`
+        : `${pwa.settings.icon_180_url}?v=${v}`;
       iconList.push({ url: bust, type: "image/png", sizes: "180x180", rel: "apple-touch-icon" });
+    }
+    // 192x192 (Android legacy)
+    if (pwa.settings.icon_192_url) {
+      const bust = pwa.settings.icon_192_url.includes("?")
+        ? `${pwa.settings.icon_192_url}&v=${v}`
+        : `${pwa.settings.icon_192_url}?v=${v}`;
       iconList.push({ url: bust, type: "image/png", sizes: "192x192" });
+    }
+    // 512x512 (Android splash/home)
+    if (pwa.settings.icon_512_url) {
+      const bust = pwa.settings.icon_512_url.includes("?")
+        ? `${pwa.settings.icon_512_url}&v=${v}`
+        : `${pwa.settings.icon_512_url}?v=${v}`;
       iconList.push({ url: bust, type: "image/png", sizes: "512x512" });
+    }
+    // 32x32 favicon fallback
+    if (pwa.settings.icon_192_url) {
+      const bust = pwa.settings.icon_192_url.includes("?")
+        ? `${pwa.settings.icon_192_url}&v=${v}`
+        : `${pwa.settings.icon_192_url}?v=${v}`;
       iconList.push({ url: bust, type: "image/png", sizes: "32x32" });
     }
   }
