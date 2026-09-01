@@ -164,10 +164,11 @@ export default async function TenantSitePage({ params }: { params: { slug: strin
   const headerList = headers();
   const host = headerList.get("x-forwarded-host") || headerList.get("host") || "";
   const protocol = headerList.get("x-forwarded-proto") || "https";
-  const canonicalUrl =
-    host.endsWith(".vercel.app") || !host
-      ? `${process.env.NEXT_PUBLIC_APP_URL || `https://${host}`}/${tenant.slug}`
-      : `https://${host}`;
+  // Canonical: para domínios personalizados usa o host real; para vercel.app usa o domínio principal + slug
+  const isVercelHost = host.endsWith(".vercel.app") || !host;
+  const canonicalUrl = isVercelHost
+    ? `${process.env.NEXT_PUBLIC_APP_URL || `https://${host}`}/${tenant.slug}`
+    : `https://${host}`;
 
   if (access === "available") {
     // tenantDataOverridesGlobal=true: os dados do próprio tenant (site_settings,

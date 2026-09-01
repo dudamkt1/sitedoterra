@@ -9,6 +9,7 @@ import { getPublicTenantBySlug } from "@/lib/tenant";
 import { resolvePwaForRequest } from "@/lib/pwa/resolver";
 import { pwaUrls } from "@/lib/pwa/config";
 import { themePrimaryColor, type SiteThemeConfig } from "@/lib/site-theme";
+import { getPublicBaseUrl } from "@/lib/public-url";
 import type { PublicTenant } from "@/types";
 import "@/app/(site)/site.css";
 
@@ -142,8 +143,12 @@ export default async function HomePage() {
   const theme = (siteData.theme as SiteThemeConfig | undefined) || null;
   const user = await userPromise;
 
+  // Canonical para a HOME: usa a URL pública configurada (NEXT_PUBLIC_HOME_URL > NEXT_PUBLIC_APP_URL)
+  const canonicalUrl = getPublicBaseUrl();
+
   return (
     <>
+      <link rel="canonical" href={canonicalUrl} />
       {user && <LoggedInNotice email={user.email} />}
       <SiteHome
         slug={tenant.slug}

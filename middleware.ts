@@ -76,7 +76,8 @@ async function resolveSlugByHostname(host: string): Promise<string | null> {
 
   const domain = host.toLowerCase().replace(/^www\./, "").split(":")[0];
   const cached = slugByHostCache.get(domain);
-  if (cached && Date.now() - cached.ts < 30_000) return cached.slug;
+  // Cache positive results for 30s, negative for only 5s to allow quick retry
+  if (cached && Date.now() - cached.ts < (cached.slug ? 30_000 : 5_000)) return cached.slug;
   try {
     const res = await fetch(`${url}/rest/v1/rpc/get_public_tenant_by_domain`, {
       method: "POST",
@@ -94,7 +95,7 @@ async function resolveSlugByHostname(host: string): Promise<string | null> {
       return null;
     }
     const data: unknown = await res.json();
-    if (!data) {
+    if (!data || (Array.isArray(data) && data.length === 0)) {
       console.warn("[middleware] get_public_tenant_by_domain returned empty", { domain });
       slugByHostCache.set(domain, { slug: null, ts: Date.now() });
       return null;
@@ -106,6 +107,7 @@ async function resolveSlugByHostname(host: string): Promise<string | null> {
     return slug;
   } catch (err) {
     console.error("[middleware] resolveSlugByHostname error", { domain, err });
+    // Don't cache errors - allow immediate retry
     return null;
   }
 }
