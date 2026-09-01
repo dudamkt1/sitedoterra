@@ -59,13 +59,22 @@ async function isDemoCookieValid(raw: string | undefined | null): Promise<boolea
 const MAIN_HOST = (process.env.NEXT_PUBLIC_APP_URL || "")
   .replace(/^https?:\/\//, "")
   .replace(/\/$/, "");
+// Domínio principal da plataforma (apex) - ex.: topconsultores.com.br ou sitedoterra-psi.vercel.app
+// NÃO deve ser um subdomínio de tenant como oleos.topconsultores.com.br
+const PLATFORM_APEX_DOMAIN = (process.env.NEXT_PUBLIC_PLATFORM_APEX_DOMAIN || MAIN_HOST)
+  .replace(/^https?:\/\//, "")
+  .replace(/\/$/, "");
 
 function isCustomDomain(host: string): boolean {
   const h = host.toLowerCase().replace(/^www\./, "");
   if (!h) return false;
   if (h === "localhost" || h.startsWith("localhost:")) return false;
   if (h.endsWith(".vercel.app")) return false;
-  if (MAIN_HOST && h === MAIN_HOST.replace(/^www\./, "")) return false;
+  // É domínio da plataforma se for exatamente o apex OU subdomínio do apex da plataforma
+  if (PLATFORM_APEX_DOMAIN) {
+    const apex = PLATFORM_APEX_DOMAIN.replace(/^www\./, "");
+    if (h === apex || h.endsWith("." + apex)) return false;
+  }
   return true;
 }
 
