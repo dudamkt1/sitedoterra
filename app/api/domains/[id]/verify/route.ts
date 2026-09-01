@@ -2,13 +2,13 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/auth";
 import { ensureTenantForUser } from "@/lib/onboarding";
-import { getVercelDomain } from "@/lib/vercel";
+import { getVercelDomain, verifyVercelDomain } from "@/lib/vercel";
 
 export const runtime = "nodejs";
 
 /**
  * Verifica a configuração DNS/domínio na Vercel e atualiza o status.
- * GET /api/domains/[id]/verify
+ * POST /api/domains/[id]/verify
  */
 export async function POST(
   _request: Request,
@@ -36,12 +36,20 @@ export async function POST(
 
   let vercelInfo;
   try {
-    vercelInfo = await getVercelDomain(domainRow.domain.startsWith("www.") ? domainRow.domain : domainRow.domain.replace(/^www\./, ""));
+    // Primeiro tenta forçar a verificação na Vercel
+    const cleanDomain = domainRow.domain.startsWith("www.") ? domainRow.domain : domainRow.domain.replace(/^www\./, "");
+    try {
+      vercelInfo = await verifyVercelDomain(cleanDomain);
+    } catch {
+      // Se falhar o verify, tenta apenas buscar o status atual
+      vercelInfo = await getVercelDomain(cleanDomain);
+    }
   } catch (err) {
-    console.error("Falha ao consultar domínio na Vercel", err);
-    await admin.from("domains").update({ status: "error", error_message: "Não foi possível consultar o domínio na infraestrutura." }).eq("id", domainRow.id);
+    const vercelError = err instanceof Error ? err.message : String(err);
+    console.error("Falha ao consultar domínio na Vercel", { domain: domainRow.domain, error: vercelError });
+    await admin.from("domains").update({ status: "error", error_message: `Vercel: ${vercelError}` }).eq("id", domainRow.id);
     return NextResponse.json(
-      { error: "Não foi possível verificar o domínio. Tente novamente em alguns minutos." },
+      { error: `Falha ao consultar Vercel: ${vercelError}` },
       { status: 502 }
     );
   }
