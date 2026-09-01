@@ -94,6 +94,7 @@ export interface DemoSiteData {
   badgeTitle: string;
   badgeSubtitle: string;
   whatsapp: string;
+  whatsapp_floating_enabled: boolean;
   email: string;
   instagram: string;
   instagramHandle: string;

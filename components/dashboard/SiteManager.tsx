@@ -66,6 +66,7 @@ export function SiteManager({ slug, pendingSlug, siteData, appUrl, hasSubscripti
     badgeTitle: siteData?.badgeTitle || "",
     badgeSubtitle: siteData?.badgeSubtitle || "",
     whatsapp: siteData?.whatsapp || "",
+    whatsapp_floating_enabled: siteData?.whatsapp_floating_enabled ?? false,
     email: siteData?.email || "",
     instagram: siteData?.instagram || "",
     instagramHandle: siteData?.instagramHandle || "",
@@ -153,6 +154,7 @@ export function SiteManager({ slug, pendingSlug, siteData, appUrl, hasSubscripti
       badgeTitle: form.badgeTitle,
       badgeSubtitle: form.badgeSubtitle,
       whatsapp: form.whatsapp.replace(/[^\d]/g, ""),
+      whatsapp_floating_enabled: form.whatsapp_floating_enabled,
       email: form.email,
       instagram: form.instagram,
       instagramHandle: form.instagramHandle,
@@ -601,6 +603,27 @@ export function SiteManager({ slug, pendingSlug, siteData, appUrl, hasSubscripti
           {field("role", "Título / Cargo", "ex.: Consultora Wellness Diamond · doTERRA")}
           {field("eyebrow", "Subtítulo do topo", "ex.: Consultora Certificada doTERRA")}
           {field("whatsapp", "WhatsApp (com DDI)", "ex.: 5511999999999")}
+          <div className="sm:col-span-2">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-semibold text-sm">Botão flutuante de WhatsApp</p>
+                <p className="text-xs text-gray-400">Exibe um botão fixo no canto inferior direito do site para contato direto.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, whatsapp_floating_enabled: !form.whatsapp_floating_enabled })}
+                className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${form.whatsapp_floating_enabled ? "bg-[#1d5c3a]" : "bg-gray-300"}`}
+                title={form.whatsapp_floating_enabled ? "Desativar" : "Ativar"}
+              >
+                <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all ${form.whatsapp_floating_enabled ? "left-[1.4rem]" : "left-0.5"}`} />
+              </button>
+            </div>
+            {form.whatsapp_floating_enabled && !form.whatsapp && (
+              <p className="mt-2 text-xs text-amber-600 bg-amber-50 px-3 py-2 rounded-lg">
+                ⚠️ O botão flutuante está ativado, mas não há WhatsApp cadastrado. Preencha o campo WhatsApp acima para que o botão funcione.
+              </p>
+            )}
+          </div>
           {field("email", "E-mail", "voce@email.com", "email")}
           {field("instagram", "Usuário do Instagram (sem @)", "anabeatriz.doterra")}
           {field("instagramHandle", "Mostrar como (com @)", "@anabeatriz.doterra")}

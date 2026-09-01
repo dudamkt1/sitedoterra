@@ -19,7 +19,19 @@ export interface HeroContent {
   _contactWhatsapp?: string;
 }
 
-export function Hero({ content }: { content: HeroContent }) {
+interface HeroProps {
+  content: HeroContent;
+  slug?: string;
+  affiliateUserId?: string;
+}
+
+function addRefParam(url: string, affiliateUserId?: string): string {
+  if (!affiliateUserId) return url;
+  const separator = url.includes("?") ? "&" : "?";
+  return `${url}${separator}ref=${affiliateUserId}`;
+}
+
+export function Hero({ content, slug, affiliateUserId }: HeroProps) {
   const firstName = content.firstName || "Ana";
   const lastName = content.lastName || "Beatriz";
   const badgeTitle = content.badgeTitle || "Certified Wellness";
@@ -27,6 +39,9 @@ export function Hero({ content }: { content: HeroContent }) {
   const stats = content.stats?.length ? content.stats : [];
   const primary = content.primaryBtn || {};
   const secondary = content.secondaryBtn || {};
+
+  const primaryUrl = primary.url || (slug ? `/${slug}/checkout` : "/checkout");
+  const secondaryUrl = secondary.url || "#products";
 
   return (
     <section id="hero">
@@ -53,12 +68,12 @@ export function Hero({ content }: { content: HeroContent }) {
         {(primary.text || secondary.text) && (
           <div className="hero-btns">
             {primary.text && (
-              <a href={primary.url || "#about"} className="btn-primary">
+              <a href={addRefParam(primaryUrl, affiliateUserId)} className="btn-primary">
                 {primary.text}
               </a>
             )}
             {secondary.text && (
-              <a href={secondary.url || "#products"} className="btn-secondary">
+              <a href={addRefParam(secondaryUrl, affiliateUserId)} className="btn-secondary">
                 {secondary.text} →
               </a>
             )}

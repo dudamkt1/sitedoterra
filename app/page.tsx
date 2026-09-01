@@ -25,6 +25,7 @@ const DEMO_TENANT: PublicTenant = {
   profile_name: "Ana Beatriz",
   email: "contato@anabeatriz.com.br",
   monthly_billing_enabled: true,
+  user_id: "demo-user-id",
 };
 
 /**

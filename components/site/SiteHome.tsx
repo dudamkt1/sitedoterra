@@ -14,6 +14,7 @@ import { Pricing } from "@/components/site/sections/Pricing";
 import { Footer } from "@/components/site/sections/Footer";
 import { SiteEffects } from "@/components/site/sections/SiteEffects";
 import { ThemePickerSection } from "@/components/site/ThemePickerSection";
+import { FloatingWhatsApp } from "@/components/site/FloatingWhatsApp";
 import { themeStyleTag, type SiteThemeConfig } from "@/lib/site-theme";
 
 export interface SiteContact {
@@ -21,6 +22,7 @@ export interface SiteContact {
   email?: string;
   instagram?: string;
   profileName?: string;
+  whatsapp_floating_enabled?: boolean;
 }
 
 export interface SiteLogo {
@@ -38,6 +40,8 @@ interface SiteHomeProps {
   extraNav?: { label: string; href: string; className?: string }[];
   /** Tema de cores definido pelo dono em /painel/meu-site (site_settings.theme). */
   theme?: SiteThemeConfig | null;
+  /** ID do usuário afiliado (dono do site) para rastreamento de cliques */
+  affiliateUserId?: string;
 }
 
 /**
@@ -46,7 +50,7 @@ interface SiteHomeProps {
  * renderiza cada uma como componente independente, na ordem correta.
  * Seções desativadas são simplesmente ignoradas.
  */
-export function SiteHome({ slug, sections, contact, logo, extraNav = [], theme }: SiteHomeProps) {
+export function SiteHome({ slug, sections, contact, logo, extraNav = [], theme, affiliateUserId }: SiteHomeProps) {
   const visible = sections.filter((s) => s.enabled);
 
   const headerSection = visible.find((s) => s.type === "header");
@@ -65,6 +69,7 @@ export function SiteHome({ slug, sections, contact, logo, extraNav = [], theme }
   const footerContent = (footerSection?.content || {}) as Record<string, unknown>;
 
   const whatsapp = contact?.whatsapp || (footerContent._contactWhatsapp as string) || undefined;
+  const whatsappFloatingEnabled = contact?.whatsapp_floating_enabled ?? false;
   const email = contact?.email || (footerContent._contactEmail as string) || undefined;
   const instagram = contact?.instagram || (footerContent._contactInstagram as string) || undefined;
   const profileName = contact?.profileName || (footerContent._profileName as string) || (headerSection?.content.logoText as string) || undefined;
@@ -81,7 +86,7 @@ export function SiteHome({ slug, sections, contact, logo, extraNav = [], theme }
           case "header":
             return null;
           case "hero":
-            return <Hero key={s.id} content={s.content as never} />;
+            return <Hero key={s.id} content={s.content as never} slug={slug} affiliateUserId={affiliateUserId} />;
           case "trustbar":
             return <Trustbar key={s.id} content={s.content as never} />;
           case "about":
@@ -120,6 +125,9 @@ export function SiteHome({ slug, sections, contact, logo, extraNav = [], theme }
         contactInstagram={instagram}
         profileName={profileName}
       />
+
+      {/* Botão flutuante do WhatsApp */}
+      <FloatingWhatsApp whatsapp={whatsapp} enabled={whatsappFloatingEnabled} />
     </div>
   );
 }

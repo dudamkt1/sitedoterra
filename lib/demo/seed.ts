@@ -400,6 +400,7 @@ export function buildDemoSeed(): DemoData {
       badgeTitle: "Consultora Premium",
       badgeSubtitle: "há mais de 4 anos com a doTERRA",
       whatsapp: "(11) 99999-0000",
+      whatsapp_floating_enabled: false,
       email: "carla@exemplo.com",
       instagram: "carla.doterra",
       instagramHandle: "@carla.doterra",

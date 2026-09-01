@@ -173,6 +173,7 @@ export interface PublicTenant {
   profile_name: string | null;
   email: string;
   monthly_billing_enabled: boolean;
+  user_id: string;
 }
 
 // ============================ HOME MODULAR ============================
@@ -714,4 +715,71 @@ export interface CrmExportBundle {
   charges: CrmCharge[];
   tasks: CrmTask[];
   loyaltyPoints: CrmLoyaltyPoint[];
+}
+
+// ============================ AFILIADOS ============================
+
+export type AffiliateConversionStatus = "pendente" | "aprovado" | "pago" | "estornado";
+export type AffiliatePayoutStatus = "solicitado" | "em_analise" | "pago" | "rejeitado";
+export type AffiliatePayoutMethod = "pix" | "mercado_pago";
+
+export interface AffiliateSettings {
+  id: string;
+  commission_percent: number;
+  min_payout_amount: number;
+  program_active: boolean;
+  terms_version: number;
+  cookie_max_age_days: number;
+  updated_at: string;
+}
+
+export interface AffiliateStatus {
+  id: string;
+  user_id: string;
+  is_active: boolean;
+  accepted_terms_at: string | null;
+  accepted_terms_version: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AffiliateClick {
+  id: string;
+  affiliate_user_id: string;
+  visitor_token: string;
+  source_subdomain: string;
+  clicked_at: string;
+  converted: boolean;
+}
+
+export interface AffiliateConversion {
+  id: string;
+  click_id: string;
+  affiliate_user_id: string;
+  new_customer_user_id: string;
+  sale_amount: number;
+  commission_percent_at_time: number;
+  commission_amount: number;
+  status: AffiliateConversionStatus;
+  created_at: string;
+}
+
+export interface AffiliatePayout {
+  id: string;
+  affiliate_user_id: string;
+  amount: number;
+  method: AffiliatePayoutMethod;
+  pix_key: string | null;
+  mercado_pago_account_info: Record<string, unknown> | null;
+  status: AffiliatePayoutStatus;
+  requested_at: string;
+  paid_at: string | null;
+}
+
+export interface AffiliateDashboardSummary {
+  total_clicks: number;
+  total_conversions: number;
+  available_balance: number;
+  pending_balance: number;
+  total_paid: number;
 }

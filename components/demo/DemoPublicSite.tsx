@@ -181,6 +181,7 @@ export function DemoPublicSite() {
         sections={sections}
         contact={{
           whatsapp: demo.site.whatsapp?.replace(/[^\d]/g, "") || undefined,
+          whatsapp_floating_enabled: demo.site.whatsapp_floating_enabled ?? false,
           email: demo.site.email || undefined,
           instagram: instagramUrl,
           profileName: demo.site.fullName || undefined,

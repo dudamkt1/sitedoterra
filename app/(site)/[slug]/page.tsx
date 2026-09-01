@@ -185,8 +185,10 @@ export default async function TenantSitePage({ params }: { params: { slug: strin
           slug={tenant.slug}
           sections={sections}
           theme={theme}
+          affiliateUserId={tenant.user_id}
           contact={{
             whatsapp: (siteData.whatsapp as string) || undefined,
+            whatsapp_floating_enabled: (siteData.whatsapp_floating_enabled as boolean) || false,
             email: (siteData.email as string) || tenant.email || undefined,
             instagram: siteData.instagram ? `https://instagram.com/${String(siteData.instagram).replace(/^@/, "")}` : undefined,
             profileName: tenant.profile_name || undefined,

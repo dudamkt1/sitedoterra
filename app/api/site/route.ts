@@ -30,6 +30,7 @@ export async function POST(request: Request) {
     "name", "surname", "fullName", "role", "eyebrow", "description",
     "badgeTitle", "badgeSubtitle",
     "whatsapp", "email", "instagram", "instagramHandle",
+    "whatsapp_floating_enabled",
     "logoMode", "logoUrl", "logoLightUrl", "logoText",
     "faviconUrl",
     "stats", "testimonials", "history", "products", "faq", "schedule",
