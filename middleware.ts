@@ -89,19 +89,23 @@ async function resolveSlugByHostname(host: string): Promise<string | null> {
       cache: "no-store",
     });
     if (!res.ok) {
+      console.warn("[middleware] get_public_tenant_by_domain failed", { domain, status: res.status });
       slugByHostCache.set(domain, { slug: null, ts: Date.now() });
       return null;
     }
     const data: unknown = await res.json();
     if (!data) {
+      console.warn("[middleware] get_public_tenant_by_domain returned empty", { domain });
       slugByHostCache.set(domain, { slug: null, ts: Date.now() });
       return null;
     }
     const row = Array.isArray(data) ? data[0] : data;
     const slug = (row as { slug?: string } | null)?.slug || null;
+    console.log("[middleware] resolved domain", { domain, slug });
     slugByHostCache.set(domain, { slug, ts: Date.now() });
     return slug;
-  } catch {
+  } catch (err) {
+    console.error("[middleware] resolveSlugByHostname error", { domain, err });
     return null;
   }
 }
@@ -135,12 +139,14 @@ function isPublicPath(pathname: string): boolean {
 async function handleMiddleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const host = request.headers.get("host") || request.headers.get("x-forwarded-host") || "";
+  console.log("[middleware] request", { pathname, host, isCustom: isCustomDomain(host) });
 
   // Atalho leve para rotas 100% públicas: só resolve domínio personalizado, sem Supabase Auth
   if (isPublicPath(pathname)) {
     if (isCustomDomain(host)) {
       if (!pathname || pathname === "/" || pathname === "/index.html") {
         const slug = await resolveSlugByHostname(host);
+        console.log("[middleware] public path resolution", { host, slug });
         if (slug) {
           const url = request.nextUrl.clone();
           url.pathname = `/${slug}`;
@@ -160,6 +166,7 @@ async function handleMiddleware(request: NextRequest) {
     // Página para domínio ainda não conectado (não reescrever para rotas internas)
     if (!pathname || pathname === "/" || pathname === "/index.html") {
       const slug = await resolveSlugByHostname(host);
+      console.log("[middleware] internal path resolution", { host, slug });
       if (slug) {
         const url = request.nextUrl.clone();
         url.pathname = `/${slug}`;
