@@ -3,7 +3,7 @@ import { AffiliateDashboard } from "@/components/affiliate/AffiliateDashboard";
 
 export default async function AfiliadosPage() {
   const { isDemo, ctx } = await getPainelContext();
-  if (!ctx) return null;
+  if (!ctx || !ctx.profile) return null;
 
   return (
     <AffiliateDashboard
