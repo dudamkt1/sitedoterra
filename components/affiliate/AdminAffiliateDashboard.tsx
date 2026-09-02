@@ -183,7 +183,7 @@ export function AdminAffiliateDashboard({ settings, affiliates, conversions, pay
             <div className="flex items-end">
               <Checkbox
                 checked={formSettings.program_active}
-                onChange={(e) => setFormSettings({ ...formSettings, program_active: e.target.checked })}
+                onChange={(e) => { setFormSettings({ ...formSettings, program_active: e.target.checked }); }}
                 label="Programa ativo"
               />
             </div>
