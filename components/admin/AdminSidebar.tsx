@@ -12,6 +12,7 @@ const LINKS = [
   { href: "/admin/ia", label: "Central de IA", icon: "🤖" },
   { href: "/admin/crm", label: "CRM (geral)", icon: "📇" },
   { href: "/admin/usuarios", label: "Usuários", icon: "👥" },
+  { href: "/admin/afiliados", label: "Programa de Afiliados", icon: "🤝" },
   { href: "/admin/financeiro", label: "Financeiro", icon: "💰" },
   { href: "/admin/midias", label: "Mídias (R2)", icon: "🖼️" },
   { href: "/admin/dominios", label: "Domínios", icon: "🔗" },

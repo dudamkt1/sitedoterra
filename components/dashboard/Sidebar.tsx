@@ -17,6 +17,7 @@ const USER_LINKS = [
   { href: "/painel/dominio", label: "Domínio", icon: "🔗" },
   { href: "/painel/pwa", label: "PWA / Meu Aplicativo", icon: "📱" },
   { href: "/painel/pagamentos", label: "Pagamentos", icon: "🧾" },
+  { href: "/painel/afiliados", label: "Programa de Afiliados", icon: "🤝" },
   { href: "/painel/conta", label: "Minha Conta", icon: "👤" },
 ];
 
