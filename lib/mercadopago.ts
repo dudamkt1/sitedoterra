@@ -94,18 +94,31 @@ export interface ActivationPreferenceInput {
   name: string | null;
   activationAmountCents: number;
   planName: string;
+  /**
+   * Token de visitante do programa de afiliados (cookie `tc_visitor_token`).
+   * Quando presente, é propagado em `metadata` para o webhook de pagamento
+   * conseguir registrar a conversão de afiliado.
+   */
+  visitorToken?: string | null;
 }
 
 /**
  * Cria a Payment Preference (Checkout Pro) para o pagamento ÚNICO de ativação.
  * `external_reference` = "act_<tenantId>" identifica o pagamento no webhook.
- * `metadata` replica tenant/plano/type para fallback de rastreamento.
+ * `metadata` replica tenant/plano/type/visitor_token para rastreamento.
  */
 export async function createActivationPreference(
   input: ActivationPreferenceInput
 ): Promise<{ id: string; initPoint: string }> {
   const appUrl = getPublicBaseUrl();
   const notificationUrl = `${appUrl}/api/webhooks/mercadopago`;
+
+  const metadata: Record<string, unknown> = {
+    tenant_id: input.tenantId,
+    plan_id: input.planId,
+    type: "activation",
+  };
+  if (input.visitorToken) metadata.visitor_token = input.visitorToken;
 
   const body = {
     items: [
@@ -121,11 +134,7 @@ export async function createActivationPreference(
       name: input.name || undefined,
     },
     external_reference: `act_${input.tenantId}`,
-    metadata: {
-      tenant_id: input.tenantId,
-      plan_id: input.planId,
-      type: "activation",
-    },
+    metadata,
     back_urls: {
       success: `${appUrl}/painel/assinatura?sucesso=1`,
       failure: `${appUrl}/painel/assinatura`,

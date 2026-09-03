@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { ResolvedHomeSection } from "@/types";
 import { Header } from "@/components/site/sections/Header";
 import { Hero } from "@/components/site/sections/Hero";
@@ -15,6 +16,7 @@ import { Footer } from "@/components/site/sections/Footer";
 import { SiteEffects } from "@/components/site/sections/SiteEffects";
 import { ThemePickerSection } from "@/components/site/ThemePickerSection";
 import { FloatingWhatsApp } from "@/components/site/FloatingWhatsApp";
+import { AffiliateAttribution } from "@/components/site/AffiliateAttribution";
 import { themeStyleTag, type SiteThemeConfig } from "@/lib/site-theme";
 
 export interface SiteContact {
@@ -80,6 +82,12 @@ export function SiteHome({ slug, sections, contact, logo, extraNav = [], theme, 
       <style dangerouslySetInnerHTML={{ __html: themeStyleTag(theme) }} />
       <SiteEffects />
       <Header logoText={logoText} logoUrl={logoUrl} logoLightUrl={logo?.lightUrl} navItems={navItems} extraNav={extraNav} />
+
+      {/* Captura ?ref= do link de afiliado: dispara o click, persiste visitor_token
+          em cookie first-party e leva o visitante até a seção #planos. */}
+      <Suspense fallback={null}>
+        <AffiliateAttribution />
+      </Suspense>
 
       {visible.map((s) => {
         switch (s.type) {

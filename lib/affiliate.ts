@@ -285,3 +285,43 @@ export async function updateAffiliateSettings(updates: Partial<AffiliateSettings
   affiliateSettingsCache = null; // invalida cache
   return data;
 }
+
+/**
+ * Registra a conversão de afiliado a partir do visitor_token (cookie
+ * `tc_visitor_token`). Usado pelos webhooks de pagamento (Stripe/MP) depois
+ * que o pagamento de ativação é confirmado.
+ *
+ * - Lê a % de comissão ATUAL das configurações (a conversão congela o valor no
+ *   snapshot da venda, refletindo a regra vigente no momento do pagamento).
+ * - Converte centavos → reais antes de chamar a RPC.
+ * - Retorna o `conversion_id` se registrada, `null` se nenhuma atribuição
+ *   pendente para o token (visitante chegou sem `?ref=`).
+ * - Não quebra o webhook se o programa de afiliados estiver inativo.
+ */
+export async function registerAffiliateConversionForVisitor(input: {
+  visitorToken: string;
+  newCustomerUserId: string;
+  saleAmountCents: number;
+}): Promise<string | null> {
+  const settings = await getAffiliateSettings();
+  if (!settings?.program_active) return null;
+
+  const admin = createAdminClient();
+  const commissionPercent = Number(settings.commission_percent) || 0;
+  const saleAmount = (input.saleAmountCents || 0) / 100;
+
+  const { data: conversionId, error } = await admin.rpc("register_affiliate_conversion", {
+    p_visitor_token: input.visitorToken,
+    p_new_customer_user_id: input.newCustomerUserId,
+    p_sale_amount: saleAmount,
+    p_commission_percent: commissionPercent,
+  });
+
+  if (error) {
+    // Não propagamos para não quebrar o webhook de pagamento; o afiliado não
+    // recebe comissão mas a venda é concluída normalmente.
+    console.error("[affiliate] falha ao registrar conversão", error);
+    return null;
+  }
+  return (conversionId as string | null) || null;
+}

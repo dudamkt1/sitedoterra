@@ -27,6 +27,15 @@ interface HeroProps {
 
 function addRefParam(url: string, affiliateUserId?: string): string {
   if (!affiliateUserId) return url;
+  try {
+    // Preserva qualquer `ref` já presente (ex.: link externo) e usa o do afiliado
+    // como fallback — o AffiliateAttribution já registra a atribuição via cookie
+    // first-party, então adicionar `?ref=` redundante aqui não é estritamente
+    // necessário, mas mantém compatibilidade com futuras navegações externas.
+    if (url.includes("ref=")) return url;
+  } catch {
+    // ignore
+  }
   const separator = url.includes("?") ? "&" : "?";
   return `${url}${separator}ref=${affiliateUserId}`;
 }

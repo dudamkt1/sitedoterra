@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { getStripeResolved } from "@/lib/stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser, getProfile } from "@/lib/auth";
@@ -9,6 +10,8 @@ import type { Plan } from "@/types";
 import { getPublicBaseUrl } from "@/lib/public-url";
 import { resolveGateways } from "@/lib/gateway-config";
 import { createActivationPreference } from "@/lib/mercadopago";
+
+const VISITOR_TOKEN_COOKIE = "tc_visitor_token";
 
 export const runtime = "nodejs";
 
@@ -53,6 +56,11 @@ export async function POST(request: Request) {
   if (!plan) return NextResponse.json({ error: "Nenhuma oferta ativa disponível" }, { status: 400 });
 
   // ---- Gateway definido pelo Super Admin (/admin/pagamentos) decide o fluxo ----
+  // visitor_token: persiste a atribuição do afiliado até o webhook de pagamento.
+  // Lido do cookie first-party definido por /api/affiliate/click.
+  const cookieStore = await cookies();
+  const visitorToken = cookieStore.get(VISITOR_TOKEN_COOKIE)?.value || null;
+
   const gateways = await resolveGateways();
   if (gateways.gateway === "mercadopago") {
     if (!gateways.mercadopago.accessToken) {
@@ -68,6 +76,7 @@ export async function POST(request: Request) {
       name: profile.name,
       activationAmountCents: plan.activation_price_cents,
       planName: plan.name,
+      visitorToken,
     });
     // Transparente: devolve initPoint para iframe; fluxo normal devolve url para redirect.
     return NextResponse.json({ url: preference.initPoint, gateway: "mercadopago", preferenceId: preference.id, embedded });
@@ -90,7 +99,13 @@ export async function POST(request: Request) {
     name: profile.name,
   });
 
-  const metadata: Record<string, string> = { tenant_id: tenant.id, type: "activation", plan_id: plan.id };
+  // metadata do Stripe (limite 500 chars por valor; UUIDs cabem sem problemas).
+  const metadata: Record<string, string> = {
+    tenant_id: tenant.id,
+    type: "activation",
+    plan_id: plan.id,
+  };
+  if (visitorToken) metadata.visitor_token = visitorToken;
 
   if (embedded) {
     // Checkout Transparente — Embedded Checkout (sem sair do site)

@@ -6,13 +6,32 @@ import { createAdminClient } from "@/lib/supabase/admin";
 const VISITOR_TOKEN_COOKIE = "tc_visitor_token";
 const VISITOR_TOKEN_MAX_AGE = 180 * 24 * 60 * 60; // 180 dias
 
+// Validação leve de UUID (formato canônico). A validação forte (afiliado
+// existente + ativo) é feita pela RPC `register_affiliate_click` no servidor.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { ref, subdomain } = body;
+    const body = await request.json().catch(() => ({}));
+    let { ref, subdomain } = body as { ref?: string; subdomain?: string };
+
+    // Fallback: aceita `ref` via query string (permite GET opcional abaixo).
+    if (!ref) {
+      try {
+        const url = new URL(request.url);
+        ref = url.searchParams.get("ref") || undefined;
+      } catch {
+        // ignore
+      }
+    }
 
     if (!ref) {
       return NextResponse.json({ error: "Parâmetro ref é obrigatório" }, { status: 400 });
+    }
+
+    if (!UUID_RE.test(ref)) {
+      // Não confiar cegamente no valor recebido — formato deve ser UUID.
+      return NextResponse.json({ error: "ref inválido" }, { status: 400 });
     }
 
     const cookieStore = await cookies();
@@ -31,17 +50,20 @@ export async function POST(request: Request) {
       });
     }
 
-    // Registra o clique via function SQL (first-click wins)
+    // Registra o clique via function SQL (first-click wins).
+    // A RPC já valida: programa ativo, afiliado existente e afiliado ativo.
     const admin = createAdminClient();
     const { data: clickId, error } = await admin.rpc("register_affiliate_click", {
       p_affiliate_user_id: ref,
       p_visitor_token: visitorToken,
-      p_source_subdomain: subdomain || "unknown",
+      p_source_subdomain: (subdomain || "unknown").slice(0, 200),
     });
 
     if (error) {
       console.error("Erro ao registrar clique de afiliado:", error);
-      return NextResponse.json({ error: "Erro ao registrar clique" }, { status: 500 });
+      // Falha silenciosa para o cliente (caller não quebra a página);
+      // o cookie ainda fica registrado se foi gerado nesta chamada.
+      return NextResponse.json({ success: false, visitor_token: visitorToken }, { status: 200 });
     }
 
     return NextResponse.json({

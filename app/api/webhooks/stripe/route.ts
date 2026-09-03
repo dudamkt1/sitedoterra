@@ -9,6 +9,7 @@ import {
   upsertSubscriptionFromStripe,
   activateTenant,
 } from "@/lib/billing";
+import { registerAffiliateConversionForVisitor } from "@/lib/affiliate";
 
 export const runtime = "nodejs";
 
@@ -166,6 +167,23 @@ async function handleEvent(event: Stripe.Event) {
       }
 
       await activateTenant(tenantId, tenant.user_id);
+
+      // ---- Atribuição de afiliado ----
+      // Se a sessão foi iniciada via cookie `tc_visitor_token` (link de afiliado),
+      // o `metadata.visitor_token` chega aqui. A conversão é registrada para
+      // associar a venda ao afiliado correto (first-click wins — função SQL).
+      const visitorToken = (session.metadata?.visitor_token as string | undefined) || null;
+      if (visitorToken && tenant.user_id) {
+        try {
+          await registerAffiliateConversionForVisitor({
+            visitorToken,
+            newCustomerUserId: tenant.user_id,
+            saleAmountCents: session.amount_total || 0,
+          });
+        } catch (convErr) {
+          console.error("[stripe webhook] falha ao registrar conversão de afiliado", convErr);
+        }
+      }
       break;
     }
 

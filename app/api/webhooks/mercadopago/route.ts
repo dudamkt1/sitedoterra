@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { activateTenant } from "@/lib/billing";
 import { getActiveOffer, getPlanById } from "@/lib/commercial";
+import { registerAffiliateConversionForVisitor } from "@/lib/affiliate";
 import {
   createRecurringSubscriptionMp,
   getMpPayment,
@@ -241,6 +242,24 @@ async function handleActivationPayment(payment: MpPayment) {
       .eq("user_id", tenant.user_id);
   } else {
     await activateTenant(tenantId, tenant.user_id);
+  }
+
+  // ---- Atribuição de afiliado ----
+  // Se a preferência foi criada com `metadata.visitor_token` (link de
+  // afiliado), o pagamento carrega esse mesmo token no `metadata`. Aqui
+  // registramos a conversão para que o afiliado responsável receba a
+  // comissão (first-click wins — função SQL `register_affiliate_conversion`).
+  const visitorToken = (payment.metadata?.visitor_token as string | undefined) || null;
+  if (visitorToken && tenant.user_id) {
+    try {
+      await registerAffiliateConversionForVisitor({
+        visitorToken,
+        newCustomerUserId: tenant.user_id,
+        saleAmountCents: amountCents,
+      });
+    } catch (convErr) {
+      console.error("[mercadopago webhook] falha ao registrar conversão de afiliado", convErr);
+    }
   }
 }
 
