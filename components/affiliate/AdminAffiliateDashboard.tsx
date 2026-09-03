@@ -53,11 +53,16 @@ interface AdminAffiliateDashboardProps {
 
 export function AdminAffiliateDashboard({ settings, affiliates, conversions, payouts }: AdminAffiliateDashboardProps) {
   const [editingSettings, setEditingSettings] = useState(false);
-  const [formSettings, setFormSettings] = useState({
-    commission_percent: settings?.commission_percent || 10,
-    min_payout_amount: settings?.min_payout_amount || 50,
-    program_active: settings?.program_active || true,
-    cookie_max_age_days: settings?.cookie_max_age_days || 180,
+  const [formSettings, setFormSettings] = useState<{
+    commission_percent: number;
+    min_payout_amount: number;
+    program_active: boolean;
+    cookie_max_age_days: number;
+  }>({
+    commission_percent: settings?.commission_percent ?? 10,
+    min_payout_amount: settings?.min_payout_amount ?? 50,
+    program_active: settings?.program_active ?? true,
+    cookie_max_age_days: settings?.cookie_max_age_days ?? 180,
   });
   const [savingSettings, setSavingSettings] = useState(false);
 
@@ -202,7 +207,7 @@ export function AdminAffiliateDashboard({ settings, affiliates, conversions, pay
             <Button onClick={saveSettings} disabled={savingSettings} className="flex-1">
               Salvar
             </Button>
-            <Button variant="outline" onClick={() => { setFormSettings({ commission_percent: settings?.commission_percent || 10, min_payout_amount: settings?.min_payout_amount || 50, program_active: settings?.program_active || true, cookie_max_age_days: settings?.cookie_max_age_days || 180 }); setEditingSettings(false); }}>
+            <Button variant="outline" onClick={() => { setFormSettings({ commission_percent: settings?.commission_percent ?? 10, min_payout_amount: settings?.min_payout_amount ?? 50, program_active: settings?.program_active ?? true, cookie_max_age_days: settings?.cookie_max_age_days ?? 180 }); setEditingSettings(false); }}>
               Cancelar
             </Button>
           </div>
@@ -341,7 +346,7 @@ export function AdminAffiliateDashboard({ settings, affiliates, conversions, pay
                             <Button size="sm" variant="outline" onClick={() => handlePayoutAction("reject", p)}>✗ Rejeitar</Button>
                           </>
                         )}
-                        {p.status === "aprovado" && (
+                        {p.status === "em_analise" && (
                           <Button size="sm" variant="outline" onClick={() => handlePayoutAction("pay", p)}>💰 Pagar</Button>
                         )}
                         {p.status === "pago" && <span className="text-xs text-green-600">Pago em {p.paid_at ? formatDate(p.paid_at) : "—"}</span>}

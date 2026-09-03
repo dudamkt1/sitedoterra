@@ -156,7 +156,7 @@ export function AffiliateDashboard({ userId, userEmail, userName, tenantSlug, is
       if (data.success) {
         setShowPayoutModal(false);
         setPayoutAmount("");
-        setPayoutForm({ method: "pix", pix_key: "" });
+        setPayoutForm({ method: "pix", pix_key: "", amount: "" });
         fetchData();
       } else {
         alert(data.error || "Erro ao solicitar saque");
