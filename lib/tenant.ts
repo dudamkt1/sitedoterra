@@ -42,6 +42,24 @@ export async function getPublicTenantByDomain(hostname: string): Promise<PublicT
 }
 
 /**
+ * Resolve um tenant pelo slug SEM exigir que o site esteja público.
+ * Usado exclusivamente pela rota pública /[slug] quando o visitante chega
+ * por um link de afiliado (`?ref=`) e o slug NÃO casa com um site público
+ * ativo. Sem este helper, a rota cai em notFound() e perde a atribuição.
+ *
+ * A RPC `get_tenant_for_affiliate_lookup` retorna o tenant mesmo se
+ * site_status != 'active' ou se a assinatura não estiver ativa.
+ */
+export async function getAffiliateLookupTenantBySlug(slug: string): Promise<PublicTenant | null> {
+  if (!hasSupabaseEnv()) return null;
+  const admin = createAdminClient();
+  const { data, error } = await admin.rpc("get_tenant_for_affiliate_lookup", { p_slug: slug });
+  if (error) return null;
+  if (!data || (Array.isArray(data) && data.length === 0)) return null;
+  return (Array.isArray(data) ? data[0] : data) as PublicTenant;
+}
+
+/**
  * Resolve o tenant e devolve o status de acesso usando a regra central.
  * Retorna { tenant, access } — use para renderizar o site ou a página de suspensão.
  */

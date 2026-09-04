@@ -11,6 +11,7 @@ interface AffiliateSettings {
   program_active: boolean;
   terms_version: number;
   cookie_max_age_days: number;
+  allow_inactive_site_affiliate: boolean;
 }
 
 interface Affiliate {
@@ -58,11 +59,13 @@ export function AdminAffiliateDashboard({ settings, affiliates, conversions, pay
     min_payout_amount: number;
     program_active: boolean;
     cookie_max_age_days: number;
+    allow_inactive_site_affiliate: boolean;
   }>({
     commission_percent: settings?.commission_percent ?? 10,
     min_payout_amount: settings?.min_payout_amount ?? 50,
     program_active: settings?.program_active ?? true,
     cookie_max_age_days: settings?.cookie_max_age_days ?? 180,
+    allow_inactive_site_affiliate: settings?.allow_inactive_site_affiliate ?? true,
   });
   const [savingSettings, setSavingSettings] = useState(false);
 
@@ -153,52 +156,77 @@ export function AdminAffiliateDashboard({ settings, affiliates, conversions, pay
         </div>
 
         {editingSettings ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div>
-              <label className="label">% Comissão por ativação</label>
-              <Input
-                type="number"
-                step="0.1"
-                min="0"
-                max="100"
-                value={formSettings.commission_percent}
-                onChange={(e) => setFormSettings({ ...formSettings, commission_percent: parseFloat(e.target.value) || 0 })}
-              />
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div>
+                <label className="label">% Comissão por ativação</label>
+                <Input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="100"
+                  value={formSettings.commission_percent}
+                  onChange={(e) => setFormSettings({ ...formSettings, commission_percent: parseFloat(e.target.value) || 0 })}
+                />
+              </div>
+              <div>
+                <label className="label">Mínimo para saque (R$)</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formSettings.min_payout_amount}
+                  onChange={(e) => setFormSettings({ ...formSettings, min_payout_amount: parseFloat(e.target.value) || 0 })}
+                />
+              </div>
+              <div>
+                <label className="label">Duração do cookie (dias)</label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="365"
+                  value={formSettings.cookie_max_age_days}
+                  onChange={(e) => setFormSettings({ ...formSettings, cookie_max_age_days: parseInt(e.target.value) || 180 })}
+                />
+              </div>
             </div>
-            <div>
-              <label className="label">Mínimo para saque (R$)</label>
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                value={formSettings.min_payout_amount}
-                onChange={(e) => setFormSettings({ ...formSettings, min_payout_amount: parseFloat(e.target.value) || 0 })}
-              />
-            </div>
-            <div>
-              <label className="label">Duração do cookie (dias)</label>
-              <Input
-                type="number"
-                min="1"
-                max="365"
-                value={formSettings.cookie_max_age_days}
-                onChange={(e) => setFormSettings({ ...formSettings, cookie_max_age_days: parseInt(e.target.value) || 180 })}
-              />
-            </div>
-            <div className="flex items-end">
+
+            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-3">
               <Checkbox
                 checked={formSettings.program_active}
                 onChange={(e) => { setFormSettings({ ...formSettings, program_active: e.target.checked }); }}
-                label="Programa ativo"
+                label="Programa de afiliados ativo (globalmente)"
               />
+              <div className="border-t border-gray-200 pt-3">
+                <Checkbox
+                  checked={formSettings.allow_inactive_site_affiliate}
+                  onChange={(e) => { setFormSettings({ ...formSettings, allow_inactive_site_affiliate: e.target.checked }); }}
+                  label="Permitir indicações de afiliados sem site ativo"
+                />
+                <p className="text-xs text-gray-500 mt-2 leading-relaxed">
+                  Quando <strong>ativado</strong>, usuários afiliados que ainda não possuem site ativo
+                  poderão divulgar seu link de afiliado e indicar novos clientes. O visitante será
+                  direcionado para a página principal preservando a atribuição. Quando
+                  <strong> desativado</strong>, somente afiliados com site ativo poderão realizar
+                  novas indicações — o visitante é redirecionado para o domínio principal sem
+                  gerar atribuição. Não bloqueia o afiliado; apenas impede novas indicações enquanto
+                  não houver site ativo.
+                </p>
+              </div>
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 text-sm">
             <div><p className="text-gray-500">% Comissão</p><p className="font-semibold">{settings?.commission_percent}%</p></div>
             <div><p className="text-gray-500">Mín. saque</p><p className="font-semibold">{formatBRL((settings?.min_payout_amount || 50) * 100)}</p></div>
             <div><p className="text-gray-500">Cookie</p><p className="font-semibold">{settings?.cookie_max_age_days} dias</p></div>
             <div><p className="text-gray-500">Status</p><p className="font-semibold"><StatusBadge status={settings?.program_active ? "active" : "pending"} /></p></div>
+            <div>
+              <p className="text-gray-500">Afiliados sem site</p>
+              <p className="font-semibold">
+                <StatusBadge status={settings?.allow_inactive_site_affiliate ? "active" : "pending"} />
+              </p>
+            </div>
           </div>
         )}
 
@@ -207,7 +235,7 @@ export function AdminAffiliateDashboard({ settings, affiliates, conversions, pay
             <Button onClick={saveSettings} disabled={savingSettings} className="flex-1">
               Salvar
             </Button>
-            <Button variant="outline" onClick={() => { setFormSettings({ commission_percent: settings?.commission_percent ?? 10, min_payout_amount: settings?.min_payout_amount ?? 50, program_active: settings?.program_active ?? true, cookie_max_age_days: settings?.cookie_max_age_days ?? 180 }); setEditingSettings(false); }}>
+            <Button variant="outline" onClick={() => { setFormSettings({ commission_percent: settings?.commission_percent ?? 10, min_payout_amount: settings?.min_payout_amount ?? 50, program_active: settings?.program_active ?? true, cookie_max_age_days: settings?.cookie_max_age_days ?? 180, allow_inactive_site_affiliate: settings?.allow_inactive_site_affiliate ?? true }); setEditingSettings(false); }}>
               Cancelar
             </Button>
           </div>

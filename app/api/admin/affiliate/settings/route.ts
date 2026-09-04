@@ -11,7 +11,13 @@ export async function PATCH(request: Request) {
   }
 
   const body = await request.json();
-  const { commission_percent, min_payout_amount, program_active, cookie_max_age_days } = body;
+  const {
+    commission_percent,
+    min_payout_amount,
+    program_active,
+    cookie_max_age_days,
+    allow_inactive_site_affiliate,
+  } = body;
 
   const admin = createAdminClient();
   const { error } = await admin
@@ -21,6 +27,7 @@ export async function PATCH(request: Request) {
       min_payout_amount,
       program_active,
       cookie_max_age_days,
+      allow_inactive_site_affiliate,
     })
     .eq("id", (await admin.from("affiliate_settings").select("id").limit(1).single()).data?.id);
 

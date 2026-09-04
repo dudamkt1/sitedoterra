@@ -21,6 +21,37 @@ export async function isAffiliateProgramActive(): Promise<boolean> {
   return settings?.program_active === true;
 }
 
+/**
+ * Verifica se o Super Admin permite que afiliados SEM site ativo gerem
+ * indicações. Default seguro: true (preserva o comportamento atual do
+ * programa).
+ */
+export async function isAffiliateInactiveSiteAllowed(): Promise<boolean> {
+  const settings = await getAffiliateSettings();
+  // settings.allow_inactive_site_affiliate pode ser undefined em bancos
+  // antigos (pré-migration 0039) — neste cenário, opt-in pelo comportamento
+  // permissivo para preservar o que existia antes.
+  return settings?.allow_inactive_site_affiliate !== false;
+}
+
+/**
+ * Verifica se o site (tenant) de um afiliado está PUBLICAMENTE ativo.
+ * Usa a mesma regra central do access.ts + monthly_billing_enabled.
+ * Retorna TRUE quando o site está no ar e o afiliado pode ser indicado
+ * normalmente — INDEPENDENTE da flag global allow_inactive_site_affiliate.
+ */
+export async function hasAffiliateSiteActive(userId: string): Promise<boolean> {
+  const admin = createAdminClient();
+  const { data, error } = await admin.rpc("is_affiliate_site_active", {
+    p_user_id: userId,
+  });
+  if (error) {
+    console.error("[affiliate] falha ao checar site ativo", error);
+    return false;
+  }
+  return Boolean(data);
+}
+
 /** Verifica se um usuário tem o programa ativo */
 export async function isUserAffiliateActive(userId: string): Promise<boolean> {
   const admin = createAdminClient();
@@ -310,6 +341,9 @@ export async function registerAffiliateConversionForVisitor(input: {
   const commissionPercent = Number(settings.commission_percent) || 0;
   const saleAmount = (input.saleAmountCents || 0) / 100;
 
+  // A regra completa (afiliado ativo + site ativo OU flag global permitindo)
+  // é revalidada dentro da RPC `register_affiliate_conversion` no momento
+  // da venda. Aqui só protegemos contra programa global pausado.
   const { data: conversionId, error } = await admin.rpc("register_affiliate_conversion", {
     p_visitor_token: input.visitorToken,
     p_new_customer_user_id: input.newCustomerUserId,

@@ -730,6 +730,12 @@ export interface AffiliateSettings {
   program_active: boolean;
   terms_version: number;
   cookie_max_age_days: number;
+  /**
+   * Flag global controlada pelo Super Admin: permite que afiliados sem site
+   * ativo divulguem seu link de afiliado e gerem novas indicações.
+   * Default: true (preserva comportamento do programa).
+   */
+  allow_inactive_site_affiliate: boolean;
   updated_at: string;
 }
 

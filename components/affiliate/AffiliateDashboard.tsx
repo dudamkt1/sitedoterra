@@ -10,6 +10,7 @@ interface AffiliateSettings {
   min_payout_amount: number;
   program_active: boolean;
   cookie_max_age_days: number;
+  allow_inactive_site_affiliate: boolean;
 }
 
 interface AffiliateStatus {
@@ -58,9 +59,11 @@ interface AffiliateDashboardProps {
   userName: string;
   tenantSlug: string;
   isDemo: boolean;
+  /** Status atual do próprio site do afiliado (default: true — modo demo/legado). */
+  siteActive?: boolean;
 }
 
-export function AffiliateDashboard({ userId, userEmail, userName, tenantSlug, isDemo }: AffiliateDashboardProps) {
+export function AffiliateDashboard({ userId, userEmail, userName, tenantSlug, isDemo, siteActive = true }: AffiliateDashboardProps) {
   const [settings, setSettings] = useState<AffiliateSettings | null>(null);
   const [status, setStatus] = useState<AffiliateStatus | null>(null);
   const [summary, setSummary] = useState<AffiliateSummary | null>(null);
@@ -191,6 +194,7 @@ export function AffiliateDashboard({ userId, userEmail, userName, tenantSlug, is
 
   const programActive = settings?.program_active && status?.is_active;
   const notActivated = !status?.is_active;
+  const allowInactiveSite = settings?.allow_inactive_site_affiliate !== false;
 
   return (
     <div className="space-y-6">
@@ -222,7 +226,70 @@ export function AffiliateDashboard({ userId, userEmail, userName, tenantSlug, is
             </p>
           </div>
         )}
-        {programActive && (
+
+        {/* Cenário 1: site do afiliado está inativo E o Super Admin PERMITE
+            indicações sem site ativo. */}
+        {programActive && !siteActive && allowInactiveSite && (
+          <div className="space-y-3">
+            <div className="rounded-lg bg-amber-50 border border-amber-200 p-4">
+              <p className="text-sm text-amber-800">
+                <strong>Seu site ainda não está ativado.</strong> Mas você já pode divulgar
+                seu link de afiliado e indicar novos clientes.
+              </p>
+            </div>
+            <p className="text-sm text-gray-600">
+              Seu link de indicação: <code className="bg-gray-100 px-2 py-1 rounded text-xs">{referralLink}</code>
+            </p>
+            <p className="text-xs text-gray-500">
+              Ative seu site para disponibilizar sua própria página profissional.
+            </p>
+            <div className="flex gap-2 flex-wrap">
+              <Button onClick={copyReferralLink} variant="outline">📋 Copiar Link</Button>
+              <a
+                href={`https://wa.me/?text=${encodeURIComponent(`Conheça a plataforma TopConsultores para consultoras doTERRA: ${referralLink}`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-green flex items-center gap-2"
+              >
+                📱 Compartilhar no WhatsApp
+              </a>
+              <a
+                href="/painel/assinatura"
+                className="btn btn-primary flex items-center gap-2"
+              >
+                🚀 Ativar meu site
+              </a>
+            </div>
+          </div>
+        )}
+
+        {/* Cenário 2: site do afiliado está inativo E o Super Admin BLOQUEOU
+            indicações sem site ativo. */}
+        {programActive && !siteActive && !allowInactiveSite && (
+          <div className="space-y-3">
+            <div className="rounded-lg bg-gray-100 border border-gray-200 p-4">
+              <p className="text-sm text-gray-700 mb-2">
+                <strong>Seu site ainda não está ativado.</strong>
+              </p>
+              <p className="text-sm text-gray-600">
+                No momento, as indicações de afiliados estão disponíveis somente para
+                usuários com site ativo.
+              </p>
+              <p className="text-sm text-gray-600 mt-2">
+                Ative seu site para começar a divulgar seu link de afiliado.
+              </p>
+            </div>
+            <a
+              href="/painel/assinatura"
+              className="btn btn-primary flex items-center gap-2 w-fit"
+            >
+              🚀 Ativar meu site
+            </a>
+          </div>
+        )}
+
+        {/* Cenário 3: site do afiliado está ativo (comportamento padrão). */}
+        {programActive && siteActive && (
           <div className="space-y-3">
             <p className="text-sm text-gray-600">
               Seu link de indicação: <code className="bg-gray-100 px-2 py-1 rounded text-xs">{referralLink}</code>

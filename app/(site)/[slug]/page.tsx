@@ -1,18 +1,19 @@
 import type { Metadata, Viewport } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { SiteHome } from "@/components/site/SiteHome";
 import { LoggedInNotice } from "@/components/site/LoggedInNotice";
 import { SiteUnprepared } from "@/components/site/SiteUnprepared";
 import { DemoPublicSite } from "@/components/demo/DemoPublicSite";
 import { PwaRegister } from "@/components/site/PwaRegister";
-import { resolveTenantAccess } from "@/lib/tenant";
+import { resolveTenantAccess, getAffiliateLookupTenantBySlug } from "@/lib/tenant";
 import { resolveHomeSections } from "@/lib/home";
 import { getCurrentUser } from "@/lib/auth";
 import { resolvePwaForRequest } from "@/lib/pwa/resolver";
 import { pwaUrls } from "@/lib/pwa/config";
 import { themePrimaryColor, type SiteThemeConfig } from "@/lib/site-theme";
 import { resolveAffiliateDestination } from "@/lib/affiliate-destination";
+import { getAffiliateSettings, isAffiliateInactiveSiteAllowed } from "@/lib/affiliate";
 
 // Páginas públicas de tenants — ISR 60s (rápido + reflete edições do painel)
 export const revalidate = 60;
@@ -127,7 +128,13 @@ export async function generateViewport({ params }: { params: { slug: string } })
   return { themeColor };
 }
 
-export default async function TenantSitePage({ params }: { params: { slug: string } }) {
+export default async function TenantSitePage({
+  params,
+  searchParams,
+}: {
+  params: { slug: string };
+  searchParams?: { ref?: string };
+}) {
   // Site público de DEMONSTRAÇÃO: renderiza com os dados locais do visitante
   // (localStorage) sem tocar em nenhum tenant real.
   if (params.slug === "demonstracao") {
@@ -151,6 +158,9 @@ export default async function TenantSitePage({ params }: { params: { slug: strin
     );
   }
 
+  const ref = searchParams?.ref;
+  const hasAffiliateRef = typeof ref === "string" && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(ref);
+
   // Paraleliza tenant + PWA + user para não somar waterfalls
   const [{ tenant, access }, user, pwa] = await Promise.all([
     resolveTenantAccess({ slug: params.slug }),
@@ -158,20 +168,16 @@ export default async function TenantSitePage({ params }: { params: { slug: strin
     resolvePwaForRequest({ slugParam: params.slug }),
   ]);
 
-  if (!tenant) {
-    notFound();
-  }
+  // Caso 1 — site público e ativo: render normal.
+  if (tenant && access === "available") {
+    const headerList = headers();
+    const host = headerList.get("x-forwarded-host") || headerList.get("host") || "";
+    const protocol = headerList.get("x-forwarded-proto") || "https";
+    const isVercelHost = host.endsWith(".vercel.app") || !host;
+    const canonicalUrl = isVercelHost
+      ? `${process.env.NEXT_PUBLIC_APP_URL || `https://${host}`}/${tenant.slug}`
+      : `https://${host}`;
 
-  const headerList = headers();
-  const host = headerList.get("x-forwarded-host") || headerList.get("host") || "";
-  const protocol = headerList.get("x-forwarded-proto") || "https";
-  // Canonical: para domínios personalizados usa o host real; para vercel.app usa o domínio principal + slug
-  const isVercelHost = host.endsWith(".vercel.app") || !host;
-  const canonicalUrl = isVercelHost
-    ? `${process.env.NEXT_PUBLIC_APP_URL || `https://${host}`}/${tenant.slug}`
-    : `https://${host}`;
-
-  if (access === "available") {
     // tenantDataOverridesGlobal=true: os dados do próprio tenant (site_settings,
     // editados em /painel/meu-site) têm prioridade sobre o template global.
     const sections = await resolveHomeSections({ tenant, tenantDataOverridesGlobal: true });
@@ -223,17 +229,94 @@ export default async function TenantSitePage({ params }: { params: { slug: strin
     );
   }
 
-  // Site NÃO está ativo (suspended, pending, billing pendente, etc.).
-  // Renderizamos uma página de fallback profissional PRESERVANDO a
-  // atribuição de afiliado: o AffiliateAttribution continua montado
-  // (com destination "none" → sem scroll) e captura o `?ref=` da URL,
-  // persiste o cookie `tc_visitor_token` e permite que a indicação
-  // chegue até o checkout quando o visitante decidir comprar.
-  return (
-    <>
-      <link rel="canonical" href={canonicalUrl} />
-      {user && <LoggedInNotice email={user.email} />}
-      <SiteUnprepared tenant={tenant} destination={{ kind: "none", label: "site em preparação" }} />
-    </>
-  );
+  // Caso 2 — tenant existe mas está suspenso/pending/etc.
+  // Se tem `?ref=`, renderiza SiteUnprepared (preserva o cookie de atribuição
+  // e a venda pode ainda ser atribuída ao afiliado, caso a flag global permita).
+  if (tenant && access !== "available") {
+    const headerList = headers();
+    const host = headerList.get("x-forwarded-host") || headerList.get("host") || "";
+    const isVercelHost = host.endsWith(".vercel.app") || !host;
+    const canonicalUrl = isVercelHost
+      ? `${process.env.NEXT_PUBLIC_APP_URL || `https://${host}`}/${tenant.slug}`
+      : `https://${host}`;
+
+    if (hasAffiliateRef) {
+      // Verifica se o Super Admin permite indicações sem site ativo.
+      // Se SIM: SiteUnprepared preserva `?ref=` e o cookie.
+      // Se NÃO: redireciona para o domínio principal sem `?ref=`
+      // (visitante não recebe atribuição alguma).
+      const allowed = await isAffiliateInactiveSiteAllowed();
+      if (!allowed) {
+        redirect("/");
+      }
+      return (
+        <>
+          <link rel="canonical" href={canonicalUrl} />
+          {user && <LoggedInNotice email={user.email} />}
+          <SiteUnprepared tenant={tenant} destination={{ kind: "none", label: "site em preparação" }} />
+        </>
+      );
+    }
+
+    // Sem `?ref=`: exibe a página de fallback normalmente (sem atribuição).
+    return (
+      <>
+        <link rel="canonical" href={canonicalUrl} />
+        {user && <LoggedInNotice email={user.email} />}
+        <SiteUnprepared tenant={tenant} destination={{ kind: "none", label: "site em preparação" }} />
+      </>
+    );
+  }
+
+  // Caso 3 — tenant NÃO existe (slug livre ou inexistente).
+  // Se tem `?ref=` válido, procuramos o afiliado por user_id para descobrir
+  // o tenant dele e ainda preservar a atribuição. Isso evita o 404 que
+  // acontecia quando o visitante chegava pelo link `/afiliado1?ref=...`
+  // sem o site estar publicamente ativo.
+  if (!tenant && hasAffiliateRef) {
+    const settings = await getAffiliateSettings();
+    const allowed = settings?.allow_inactive_site_affiliate !== false;
+    if (!allowed) {
+      // Permissão OFF: redireciona para o domínio principal (sem 404).
+      redirect("/");
+    }
+
+    // Tenta resolver o tenant do afiliado (slug do link != slug do tenant
+    // em alguns cenários). A RPC get_tenant_for_affiliate_lookup aceita
+    // QUALQUER slug (mesmo inexistente) e retorna o tenant cujo slug bate.
+    // Aqui o `params.slug` é o slug do LINK que o visitante abriu — pode
+    // ou não bater com o tenant do afiliado. Vamos procurar:
+    const lookup = await getAffiliateLookupTenantBySlug(params.slug);
+
+    if (lookup) {
+      // Renderiza fallback do afiliado (preserva `?ref=` e o cookie).
+      const headerList = headers();
+      const host = headerList.get("x-forwarded-host") || headerList.get("host") || "";
+      const isVercelHost = host.endsWith(".vercel.app") || !host;
+      const canonicalUrl = isVercelHost
+        ? `${process.env.NEXT_PUBLIC_APP_URL || `https://${host}`}/${lookup.slug}`
+        : `https://${host}`;
+      return (
+        <>
+          <link rel="canonical" href={canonicalUrl} />
+          {user && <LoggedInNotice email={user.email} />}
+          <SiteUnprepared
+            tenant={lookup}
+            destination={{ kind: "none", label: "site em preparação" }}
+          />
+        </>
+      );
+    }
+
+    // Slug realmente não existe como afiliado nem como tenant.
+    // Como tem `?ref=` válido, mas o slug do link é totalmente inexistente
+    // e a flag global está ON, ainda assim NÃO queremos 404: direciona
+    // para o domínio principal mantendo o cookie first-party.
+    // (O AffiliateAttribution já foi executado pelo client na HOME do
+    // domínio principal ao redirecionar via middleware/redirect.)
+    redirect("/");
+  }
+
+  // Caso 4 — sem tenant E sem `?ref=`: 404 legítimo.
+  notFound();
 }

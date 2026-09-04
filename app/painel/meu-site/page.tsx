@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getPainelContext } from "@/lib/demo/painel-context";
 import { SectionTitle } from "@/components/dashboard/ui";
 import { getPublicBaseUrl } from "@/lib/public-url";
+import { getAffiliateSettings } from "@/lib/affiliate";
 
 export default async function MeuSitePage() {
   const { isDemo, ctx } = await getPainelContext();
@@ -9,16 +10,75 @@ export default async function MeuSitePage() {
 
   const siteData = (ctx.tenant?.site_data || {}) as Record<string, any>;
   const appUrl = getPublicBaseUrl();
+  const siteActive = ctx.tenant?.site_status === "active";
+  const affiliateSettings = await getAffiliateSettings();
+  const allowInactiveSite = affiliateSettings?.allow_inactive_site_affiliate !== false;
+  const programActive = affiliateSettings?.program_active !== false;
+  const userId = ctx.profile?.user_id || "";
+  const tenantSlug = ctx.tenant?.slug || "";
 
   // Lazy-load dos componentes reais
   const { SiteManager } = await import("@/components/dashboard/SiteManager");
   const { SiteSectionsManager } = await import("@/components/dashboard/SiteSectionsManager");
+
+  const referralLink = tenantSlug && userId
+    ? `${appUrl}/${tenantSlug.startsWith("aguardando-") ? "" : tenantSlug}?ref=${userId}`.replace(/\/\?/, "/?")
+    : "";
 
   return (
     <div className="space-y-8">
       <SectionTitle sub="Configure o nome de usuário, o conteúdo e as seções do seu site.">
         Meu Site
       </SectionTitle>
+
+      {/* Card contextual — só aparece quando o site do próprio afiliado não
+          está ativo. Explica o status do site + como isso impacta o programa
+          de afiliados (link continua ou fica bloqueado conforme a flag
+          global controlada pelo Super Admin). */}
+      {!siteActive && programActive && (
+        <div
+          className={`rounded-2xl border p-5 ${
+            allowInactiveSite
+              ? "bg-amber-50 border-amber-200"
+              : "bg-gray-50 border-gray-200"
+          }`}
+        >
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-gray-800">
+                🌱 Seu site ainda não está ativado
+              </p>
+              {allowInactiveSite ? (
+                <p className="text-sm text-gray-700 mt-1.5">
+                  Mas você já pode divulgar seu link de afiliado e indicar novos clientes.
+                  Ative seu site para disponibilizar sua própria página profissional.
+                </p>
+              ) : (
+                <p className="text-sm text-gray-700 mt-1.5">
+                  No momento, as indicações de afiliados estão disponíveis somente para
+                  usuários com site ativo. Ative seu site para começar a divulgar seu
+                  link de afiliado.
+                </p>
+              )}
+              {referralLink && allowInactiveSite && (
+                <p className="text-xs text-gray-600 mt-3 break-all">
+                  Seu link:{" "}
+                  <code className="bg-white/60 px-2 py-1 rounded border border-amber-200">
+                    {referralLink}
+                  </code>
+                </p>
+              )}
+            </div>
+            <Link
+              href="/painel/assinatura"
+              className="btn btn-primary shrink-0"
+            >
+              🚀 Ativar meu site
+            </Link>
+          </div>
+        </div>
+      )}
+
       <SiteManager
         slug={ctx.tenant?.slug || ""}
         pendingSlug={ctx.tenant?.slug?.startsWith("aguardando-") ?? true}

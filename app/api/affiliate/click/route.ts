@@ -66,11 +66,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, visitor_token: visitorToken }, { status: 200 });
     }
 
+    // A RPC já aplicou TODAS as regras:
+    //   - program_active (Super Admin)
+    //   - affiliate_status.is_active (afiliado aceitou os termos)
+    //   - site_status='active' OU allow_inactive_site_affiliate=true
+    //   - first-click wins (preserva a primeira atribuição)
+    // Quando ela retorna null, indica que o clique NÃO foi registrado
+    // (afiliado inativo, programa pausado, ou site inativo com permissão OFF).
+    // O cookie tc_visitor_token AINDA é gerado/persistido — assim a UI
+    // pode exibir o link normalmente, e a decisão final fica na conversão.
+
     return NextResponse.json({
       success: true,
       click_id: clickId,
       visitor_token: visitorToken,
       already_attributed: clickId === null,
+      // client_attempt reflete: o backend decidiu não registrar (mas o cookie
+      // existe e a UI pode continuar tentando contratar).
+      eligible: clickId !== null,
     });
   } catch (err) {
     console.error("Erro no endpoint de clique de afiliado:", err);
