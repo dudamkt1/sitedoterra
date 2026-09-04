@@ -6,14 +6,17 @@ import { LoggedInNotice } from "@/components/site/LoggedInNotice";
 import { SiteUnprepared } from "@/components/site/SiteUnprepared";
 import { DemoPublicSite } from "@/components/demo/DemoPublicSite";
 import { PwaRegister } from "@/components/site/PwaRegister";
-import { resolveTenantAccess, getAffiliateLookupTenantBySlug } from "@/lib/tenant";
+import { resolveTenantAccess } from "@/lib/tenant";
 import { resolveHomeSections } from "@/lib/home";
 import { getCurrentUser } from "@/lib/auth";
 import { resolvePwaForRequest } from "@/lib/pwa/resolver";
 import { pwaUrls } from "@/lib/pwa/config";
 import { themePrimaryColor, type SiteThemeConfig } from "@/lib/site-theme";
 import { resolveAffiliateDestination } from "@/lib/affiliate-destination";
-import { getAffiliateSettings, isAffiliateInactiveSiteAllowed } from "@/lib/affiliate";
+import {
+  isAffiliateInactiveSiteAllowed,
+  buildAffiliateRedirectTarget,
+} from "@/lib/affiliate";
 
 // Páginas públicas de tenants — ISR 60s (rápido + reflete edições do painel)
 export const revalidate = 60;
@@ -229,9 +232,49 @@ export default async function TenantSitePage({
     );
   }
 
-  // Caso 2 — tenant existe mas está suspenso/pending/etc.
-  // Se tem `?ref=`, renderiza SiteUnprepared (preserva o cookie de atribuição
-  // e a venda pode ainda ser atribuída ao afiliado, caso a flag global permita).
+  // Helper local: executa o redirect server-side para a HOME pública,
+  // preservando o `?ref=` para que o AffiliateAttribution da HOME capture
+  // a atribuição via /api/affiliate/click (que cria o cookie + registra
+  // o click com first-click wins). NÃO seta cookies aqui porque
+  // server components têm limitação conhecida de propagação de cookies
+  // via redirect() — a defesa real acontece no AffiliateAttribution
+  // client-side + endpoint /api/affiliate/click (que é o mesmo já testado
+  // no caminho "site ativo").
+  async function redirectToHomeAffiliate(refValue: string) {
+    const headerList = headers();
+    const host = headerList.get("x-forwarded-host") || headerList.get("host") || "";
+    const protocol = headerList.get("x-forwarded-proto") || "https";
+    const target = buildAffiliateRedirectTarget({ ref: refValue, host, protocol });
+    redirect(target);
+  }
+
+  // Caso 2 — tenant existe mas está suspenso/pending/etc. E visita via
+  // link de afiliado (?ref=): REDIRECIONA DIRETO para a HOME pública na
+  // seção `#planos` (sem página intermediária, sem aviso, sem SiteUnprepared).
+  if (tenant && access !== "available" && hasAffiliateRef) {
+    const allowed = await isAffiliateInactiveSiteAllowed();
+    if (!allowed) {
+      // Permissão OFF: visitante vai para o domínio principal SEM atribuição.
+      redirect("/");
+    }
+    await redirectToHomeAffiliate(ref);
+  }
+
+  // Caso 3 — tenant NÃO existe E visita via link de afiliado (?ref=):
+  // mesmo comportamento: redireciona para a HOME pública preservando a
+  // atribuição (afiliado pode existir mesmo sem tenant público).
+  if (!tenant && hasAffiliateRef) {
+    const allowed = await isAffiliateInactiveSiteAllowed();
+    if (!allowed) {
+      redirect("/");
+    }
+    await redirectToHomeAffiliate(ref);
+  }
+
+  // Caso 2B — tenant existe mas está inativo E SEM `?ref=`.
+  // Visitante comum (não veio por link de afiliado): mostra a página de
+  // fallback profissional SiteUnprepared (sem atribuição). Esse é o caminho
+  // mantido para preservar a UX do site pessoal "em preparação".
   if (tenant && access !== "available") {
     const headerList = headers();
     const host = headerList.get("x-forwarded-host") || headerList.get("host") || "";
@@ -239,26 +282,6 @@ export default async function TenantSitePage({
     const canonicalUrl = isVercelHost
       ? `${process.env.NEXT_PUBLIC_APP_URL || `https://${host}`}/${tenant.slug}`
       : `https://${host}`;
-
-    if (hasAffiliateRef) {
-      // Verifica se o Super Admin permite indicações sem site ativo.
-      // Se SIM: SiteUnprepared preserva `?ref=` e o cookie.
-      // Se NÃO: redireciona para o domínio principal sem `?ref=`
-      // (visitante não recebe atribuição alguma).
-      const allowed = await isAffiliateInactiveSiteAllowed();
-      if (!allowed) {
-        redirect("/");
-      }
-      return (
-        <>
-          <link rel="canonical" href={canonicalUrl} />
-          {user && <LoggedInNotice email={user.email} />}
-          <SiteUnprepared tenant={tenant} destination={{ kind: "none", label: "site em preparação" }} />
-        </>
-      );
-    }
-
-    // Sem `?ref=`: exibe a página de fallback normalmente (sem atribuição).
     return (
       <>
         <link rel="canonical" href={canonicalUrl} />
@@ -266,55 +289,6 @@ export default async function TenantSitePage({
         <SiteUnprepared tenant={tenant} destination={{ kind: "none", label: "site em preparação" }} />
       </>
     );
-  }
-
-  // Caso 3 — tenant NÃO existe (slug livre ou inexistente).
-  // Se tem `?ref=` válido, procuramos o afiliado por user_id para descobrir
-  // o tenant dele e ainda preservar a atribuição. Isso evita o 404 que
-  // acontecia quando o visitante chegava pelo link `/afiliado1?ref=...`
-  // sem o site estar publicamente ativo.
-  if (!tenant && hasAffiliateRef) {
-    const settings = await getAffiliateSettings();
-    const allowed = settings?.allow_inactive_site_affiliate !== false;
-    if (!allowed) {
-      // Permissão OFF: redireciona para o domínio principal (sem 404).
-      redirect("/");
-    }
-
-    // Tenta resolver o tenant do afiliado (slug do link != slug do tenant
-    // em alguns cenários). A RPC get_tenant_for_affiliate_lookup aceita
-    // QUALQUER slug (mesmo inexistente) e retorna o tenant cujo slug bate.
-    // Aqui o `params.slug` é o slug do LINK que o visitante abriu — pode
-    // ou não bater com o tenant do afiliado. Vamos procurar:
-    const lookup = await getAffiliateLookupTenantBySlug(params.slug);
-
-    if (lookup) {
-      // Renderiza fallback do afiliado (preserva `?ref=` e o cookie).
-      const headerList = headers();
-      const host = headerList.get("x-forwarded-host") || headerList.get("host") || "";
-      const isVercelHost = host.endsWith(".vercel.app") || !host;
-      const canonicalUrl = isVercelHost
-        ? `${process.env.NEXT_PUBLIC_APP_URL || `https://${host}`}/${lookup.slug}`
-        : `https://${host}`;
-      return (
-        <>
-          <link rel="canonical" href={canonicalUrl} />
-          {user && <LoggedInNotice email={user.email} />}
-          <SiteUnprepared
-            tenant={lookup}
-            destination={{ kind: "none", label: "site em preparação" }}
-          />
-        </>
-      );
-    }
-
-    // Slug realmente não existe como afiliado nem como tenant.
-    // Como tem `?ref=` válido, mas o slug do link é totalmente inexistente
-    // e a flag global está ON, ainda assim NÃO queremos 404: direciona
-    // para o domínio principal mantendo o cookie first-party.
-    // (O AffiliateAttribution já foi executado pelo client na HOME do
-    // domínio principal ao redirecionar via middleware/redirect.)
-    redirect("/");
   }
 
   // Caso 4 — sem tenant E sem `?ref=`: 404 legítimo.

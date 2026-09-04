@@ -12,6 +12,7 @@ import { pwaUrls } from "@/lib/pwa/config";
 import { themePrimaryColor, type SiteThemeConfig } from "@/lib/site-theme";
 import { getPublicBaseUrl } from "@/lib/public-url";
 import { resolveAffiliateDestination } from "@/lib/affiliate-destination";
+import { AffiliateAttribution } from "@/components/site/AffiliateAttribution";
 import type { PublicTenant } from "@/types";
 import "@/app/(site)/site.css";
 
@@ -158,10 +159,17 @@ export default async function HomePage() {
 
   if (!siteIsActive && !isDemoFallback) {
     // Tenant existe mas não tem site ativo. Renderiza fallback preservando ref.
+    // Importante: AffiliateAttribution continua montado aqui — mesmo que o
+    // scroll para `#planos` falhe silenciosamente (porque esta página não
+    // tem a seção de planos), o cookie `tc_visitor_token` é criado e o
+    // click é registrado, garantindo a atribuição até o checkout.
     return (
       <>
         <link rel="canonical" href={canonicalUrl} />
         {user && <LoggedInNotice email={user.email} />}
+        <AffiliateAttribution
+          destination={{ kind: "anchor", anchor: "planos", label: "planos" }}
+        />
         <SiteUnprepared
           tenant={tenant}
           destination={{ kind: "none", label: "site em preparação" }}

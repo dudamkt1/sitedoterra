@@ -359,3 +359,126 @@ export async function registerAffiliateConversionForVisitor(input: {
   }
   return (conversionId as string | null) || null;
 }
+
+/**
+ * Registra um clique de afiliado SERVER-SIDE (sem precisar do endpoint HTTP
+ * client-side). Usado pela rota pública `/[slug]` quando o afiliado está
+ * SEM site ativo e precisamos redirecionar o visitante direto para a HOME
+ * principal — nesse fluxo NÃO há AffiliateAttribution client-side
+ * executando no caminho do redirect, então o click é registrado aqui.
+ *
+ * Comportamento:
+ *  - Se o cookie `tc_visitor_token` já existir no request, REUSA (preserva
+ *    a atribuição first-click wins).
+ *  - Caso contrário, gera um novo UUID e SET no cookieStore de resposta.
+ *  - Chama a RPC `register_affiliate_click` (que valida todas as regras:
+ *    programa ativo, afiliado ativo, site ativo OU flag global permitindo,
+ *    e aplica first-click wins).
+ *  - Retorna o visitor_token final (novo ou reusado) — quem chamou define
+ *    no cookie de resposta.
+ *
+ * Esta função NÃO faz redirect — apenas prepara o estado. O caller decide
+ * para onde redirecionar.
+ */
+export const VISITOR_TOKEN_COOKIE_NAME = "tc_visitor_token";
+export const VISITOR_TOKEN_MAX_AGE_SECONDS = 180 * 24 * 60 * 60; // 180 dias
+
+export async function registerAffiliateClickServerSide(opts: {
+  affiliateUserId: string;
+  subdomain: string;
+  existingVisitorToken?: string | null;
+}): Promise<{ visitorToken: string | null; clickId: string | null; createdCookie: boolean }> {
+  let visitorToken = opts.existingVisitorToken || null;
+  let createdCookie = false;
+
+  if (!visitorToken) {
+    // Gera novo token (será setado no cookie de resposta pelo caller).
+    visitorToken = (globalThis.crypto?.randomUUID?.() || "").replace(/[^0-9a-f-]/gi, "");
+    if (!visitorToken) {
+      // Fallback improvável (ambientes sem crypto.randomUUID)
+      visitorToken = `xxxxxxxx-xxxx-4xxx-yxxx-${Date.now().toString(16)}`.replace(/[xy]/g, (c) => {
+        const r = (Math.random() * 16) | 0;
+        return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+      });
+    }
+    createdCookie = true;
+  }
+
+  const admin = createAdminClient();
+  const { data: clickId, error } = await admin.rpc("register_affiliate_click", {
+    p_affiliate_user_id: opts.affiliateUserId,
+    p_visitor_token: visitorToken,
+    p_source_subdomain: (opts.subdomain || "unknown").slice(0, 200),
+  });
+
+  if (error) {
+    console.error("[affiliate] falha no registerAffiliateClickServerSide", error);
+    // Mesmo com erro, retornamos o token gerado para o caller setar o cookie
+    // (a UI pode ainda mostrar mensagem amigável e a próxima ação do
+    // visitante não fica sem canal de atribuição).
+    return { visitorToken, clickId: null, createdCookie };
+  }
+
+  return {
+    visitorToken,
+    clickId: (clickId as string | null) || null,
+    createdCookie,
+  };
+}
+
+/**
+ * Constrói a URL absoluta de destino do redirect quando o afiliado NÃO
+ * tem site ativo: o visitante deve ir direto para a HOME pública do
+ * domínio principal, na seção `#planos`, com o `?ref=` preservado.
+ *
+ * Estratégia:
+ *  - Se o host atual é o domínio público configurado (`NEXT_PUBLIC_HOME_URL`
+ *    ou `NEXT_PUBLIC_APP_URL`), retorna URL relativa `/?ref=<uuid>#planos`
+ *    — o Next.js resolve para o host atual.
+ *  - Se o host atual é o subdomínio técnico `.vercel.app` (deploy),
+ *    constrói URL absoluta apontando para o domínio público — garante que
+ *    o visitante chegue no site público real, não no preview.
+ *  - Em outros casos (domínio personalizado de afiliado que está offline,
+ *    por exemplo), também usa o domínio público.
+ *
+ * O hash `#planos` faz com que a HOME principal rolando direto até a
+ * seção de planos, mantendo a UX esperada do link de afiliado.
+ */
+export function buildAffiliateRedirectTarget(opts: {
+  ref: string;
+  host: string;
+  protocol?: string;
+}): string {
+  const publicBase = (
+    process.env.NEXT_PUBLIC_HOME_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    ""
+  ).replace(/\/$/, "");
+  const isVercelHost = /\.vercel\.app$/i.test(opts.host) || opts.host === "localhost" || opts.host.startsWith("localhost:");
+
+  // Se o host atual é o host público (ex.: oleos.topconsultores.com.br) e
+  // não estamos no preview técnico, mantemos URL relativa — o redirect vai
+  // para o mesmo host, que é exatamente o domínio público oficial.
+  if (publicBase) {
+    try {
+      const pub = new URL(publicBase);
+      const currentHost = (opts.host || "").toLowerCase().split(":")[0];
+      const pubHost = pub.host.toLowerCase();
+      if (!isVercelHost && currentHost === pubHost) {
+        // Mesmo host — URL relativa preserva o cookie first-party sem
+        // nenhum hop cross-origin (mais simples e mais seguro).
+        return `/?ref=${encodeURIComponent(opts.ref)}#planos`;
+      }
+    } catch {
+      // ignore
+    }
+
+    // Host diferente (preview técnico, domínio personalizado, etc) —
+    // URL absoluta para o domínio público.
+    return `${publicBase}/?ref=${encodeURIComponent(opts.ref)}#planos`;
+  }
+
+  // Fallback: URL relativa mesmo sem `NEXT_PUBLIC_HOME_URL` definido —
+  // assume que o host atual já é o público (modo dev ou produção sem env).
+  return `/?ref=${encodeURIComponent(opts.ref)}#planos`;
+}
