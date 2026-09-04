@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { getCurrentUser } from "@/lib/auth";
 import { SiteHome } from "@/components/site/SiteHome";
 import { LoggedInNotice } from "@/components/site/LoggedInNotice";
+import { SiteUnprepared } from "@/components/site/SiteUnprepared";
 import { PwaRegister } from "@/components/site/PwaRegister";
 import { DEFAULT_SITE_DATA } from "@/lib/site-data";
 import { resolveHomeSections } from "@/lib/home";
@@ -10,6 +11,7 @@ import { resolvePwaForRequest } from "@/lib/pwa/resolver";
 import { pwaUrls } from "@/lib/pwa/config";
 import { themePrimaryColor, type SiteThemeConfig } from "@/lib/site-theme";
 import { getPublicBaseUrl } from "@/lib/public-url";
+import { resolveAffiliateDestination } from "@/lib/affiliate-destination";
 import type { PublicTenant } from "@/types";
 import "@/app/(site)/site.css";
 
@@ -146,6 +148,32 @@ export default async function HomePage() {
   // Canonical para a HOME: usa a URL pública configurada (NEXT_PUBLIC_HOME_URL > NEXT_PUBLIC_APP_URL)
   const canonicalUrl = getPublicBaseUrl();
 
+  // Verifica se o tenant tem site ativo. Para o DEMO_TENANT (fallback estático
+  // sem Supabase), considera-se sempre "available" para preservar a renderização
+  // padrão da HOME. Para o tenant real (resolvido por slug), usa o mesmo critério
+  // de `lib/access.ts` — se `site_status !== "active"` ou billing pendente,
+  // exibe a página de fallback preservando a atribuição do afiliado.
+  const isDemoFallback = tenant === DEMO_TENANT;
+  const siteIsActive = isDemoFallback || tenant.site_status === "active";
+
+  if (!siteIsActive && !isDemoFallback) {
+    // Tenant existe mas não tem site ativo. Renderiza fallback preservando ref.
+    return (
+      <>
+        <link rel="canonical" href={canonicalUrl} />
+        {user && <LoggedInNotice email={user.email} />}
+        <SiteUnprepared
+          tenant={tenant}
+          destination={{ kind: "none", label: "site em preparação" }}
+        />
+      </>
+    );
+  }
+
+  // Fallback inteligente: o AffiliateAttribution recebe o destino
+  // resolvido pelo servidor a partir da configuração ATUAL da HOME.
+  const destination = resolveAffiliateDestination({ sections, access: "available" });
+
   return (
     <>
       <link rel="canonical" href={canonicalUrl} />
@@ -154,6 +182,8 @@ export default async function HomePage() {
         slug={tenant.slug}
         sections={sections}
         theme={theme}
+        affiliateUserId={tenant.user_id}
+        destination={destination}
         contact={{
           whatsapp: (siteData.whatsapp as string) || undefined,
           email: (siteData.email as string) || tenant.email || undefined,
@@ -174,7 +204,8 @@ export default async function HomePage() {
         manifestUrl={manifestUrl}
         swUrl={swUrl}
         scope={pwa?.basePath || "/"}
-        appName={pwa?.settings.app_name || tenant.site_name || tenant.profile_name || "TopConsultores"}
+        appName={pwa?.settings.app_name || tenant.site_name || tenant.profile_name || "TopConsultores"
+        }
         themeColor={pwa?.settings.theme_color || "#1d5c3a"}
       />
     </>

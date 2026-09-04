@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import { SiteHome } from "@/components/site/SiteHome";
 import { LoggedInNotice } from "@/components/site/LoggedInNotice";
-import { SuspendedSitePage } from "@/components/site/SuspendedSitePage";
+import { SiteUnprepared } from "@/components/site/SiteUnprepared";
 import { DemoPublicSite } from "@/components/demo/DemoPublicSite";
 import { PwaRegister } from "@/components/site/PwaRegister";
 import { resolveTenantAccess } from "@/lib/tenant";
@@ -12,6 +12,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { resolvePwaForRequest } from "@/lib/pwa/resolver";
 import { pwaUrls } from "@/lib/pwa/config";
 import { themePrimaryColor, type SiteThemeConfig } from "@/lib/site-theme";
+import { resolveAffiliateDestination } from "@/lib/affiliate-destination";
 
 // Páginas públicas de tenants — ISR 60s (rápido + reflete edições do painel)
 export const revalidate = 60;
@@ -178,6 +179,12 @@ export default async function TenantSitePage({ params }: { params: { slug: strin
     const theme = (siteData.theme as SiteThemeConfig | undefined) || null;
     const pwaEnabled = Boolean(pwa?.settings.enabled);
     const { manifestUrl, swUrl } = pwaUrls(pwa?.basePath || `/${params.slug}/`);
+    // Fallback inteligente: o AffiliateAttribution recebe o destino
+    // (anchor "planos" ou outro) resolvido pelo servidor a partir da
+    // configuração ATUAL da HOME. Se a seção Planos não estiver
+    // habilitada, ele usa a Trustbar, Hero CTA, primeira seção visível
+    // ou nenhum scroll.
+    const destination = resolveAffiliateDestination({ sections, access });
     return (
       <>
         <link rel="canonical" href={canonicalUrl} />
@@ -187,6 +194,7 @@ export default async function TenantSitePage({ params }: { params: { slug: strin
           sections={sections}
           theme={theme}
           affiliateUserId={tenant.user_id}
+          destination={destination}
           contact={{
             whatsapp: (siteData.whatsapp as string) || undefined,
             whatsapp_floating_enabled: (siteData.whatsapp_floating_enabled as boolean) || false,
@@ -215,11 +223,17 @@ export default async function TenantSitePage({ params }: { params: { slug: strin
     );
   }
 
+  // Site NÃO está ativo (suspended, pending, billing pendente, etc.).
+  // Renderizamos uma página de fallback profissional PRESERVANDO a
+  // atribuição de afiliado: o AffiliateAttribution continua montado
+  // (com destination "none" → sem scroll) e captura o `?ref=` da URL,
+  // persiste o cookie `tc_visitor_token` e permite que a indicação
+  // chegue até o checkout quando o visitante decidir comprar.
   return (
     <>
       <link rel="canonical" href={canonicalUrl} />
       {user && <LoggedInNotice email={user.email} />}
-      <SuspendedSitePage tenant={tenant} host={host} />
+      <SiteUnprepared tenant={tenant} destination={{ kind: "none", label: "site em preparação" }} />
     </>
   );
 }

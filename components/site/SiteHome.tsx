@@ -18,6 +18,7 @@ import { ThemePickerSection } from "@/components/site/ThemePickerSection";
 import { FloatingWhatsApp } from "@/components/site/FloatingWhatsApp";
 import { AffiliateAttribution } from "@/components/site/AffiliateAttribution";
 import { themeStyleTag, type SiteThemeConfig } from "@/lib/site-theme";
+import type { AffiliateDestination } from "@/lib/affiliate-destination";
 
 export interface SiteContact {
   whatsapp?: string;
@@ -44,6 +45,12 @@ interface SiteHomeProps {
   theme?: SiteThemeConfig | null;
   /** ID do usuário afiliado (dono do site) para rastreamento de cliques */
   affiliateUserId?: string;
+  /**
+   * Destino do scroll quando o visitante chega por `?ref=`. Resolvido pelo
+   * servidor via `resolveAffiliateDestination`. Se ausente, default
+   * = `kind: "anchor", anchor: "planos"` (compatibilidade).
+   */
+  destination?: AffiliateDestination;
 }
 
 /**
@@ -52,7 +59,7 @@ interface SiteHomeProps {
  * renderiza cada uma como componente independente, na ordem correta.
  * Seções desativadas são simplesmente ignoradas.
  */
-export function SiteHome({ slug, sections, contact, logo, extraNav = [], theme, affiliateUserId }: SiteHomeProps) {
+export function SiteHome({ slug, sections, contact, logo, extraNav = [], theme, affiliateUserId, destination }: SiteHomeProps) {
   const visible = sections.filter((s) => s.enabled);
 
   const headerSection = visible.find((s) => s.type === "header");
@@ -84,9 +91,13 @@ export function SiteHome({ slug, sections, contact, logo, extraNav = [], theme, 
       <Header logoText={logoText} logoUrl={logoUrl} logoLightUrl={logo?.lightUrl} navItems={navItems} extraNav={extraNav} />
 
       {/* Captura ?ref= do link de afiliado: dispara o click, persiste visitor_token
-          em cookie first-party e leva o visitante até a seção #planos. */}
+          em cookie first-party e leva o visitante até o destino resolvido
+          pelo servidor (anchor "planos" por padrão, ou o melhor disponível
+          se a seção Planos não estiver habilitada). */}
       <Suspense fallback={null}>
-        <AffiliateAttribution />
+        <AffiliateAttribution
+          destination={destination || { kind: "anchor", anchor: "planos", label: "planos" }}
+        />
       </Suspense>
 
       {visible.map((s) => {

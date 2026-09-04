@@ -2,33 +2,44 @@
 
 import { useEffect, useRef } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
+import type { AffiliateDestination } from "@/lib/affiliate-destination";
 
 /**
  * Captura o parâmetro `?ref=<userId>` da URL, dispara o registro de click no
  * sistema de afiliados, persiste o visitor_token em cookie first-party e
- * garante que o visitante seja levado até a seção `#planos`.
+ * garante que o visitante seja levado até o destino correto da HOME.
  *
- * Regras:
- * - Não conflita com fluxos que já têm ref (sempre lê o mais recente).
- * - Primeiro clique vence: a API /api/affiliate/click já implementa first-click
- *   wins via RPC `register_affiliate_click`.
- * - Cookie first-party `tc_visitor_token` é a fonte de verdade entre páginas
- *   e até o checkout (lido pelo /api/checkout e propagado para Stripe/MP).
- * - Validação de afiliado: feita no servidor (a função SQL valida status ativo).
- * - Após o registro, faz `replaceState` para limpar a query e navega para
- *   `#planos` de forma resiliente (espera renderização dinâmica).
- * - Se não houver `?ref=`, é no-op (preserva comportamento atual da HOME).
+ * O destino é resolvido **no servidor** (`resolveAffiliateDestination`) e
+ * passado via prop `destination`:
+ *
+ *   - `kind: "anchor"` → scroll suave até `#${destination.anchor}`
+ *     (caso normal: `#planos`, mas pode ser qualquer outro anchor se a
+ *     seção de planos não existir no momento).
+ *   - `kind: "none"`   → não faz scroll (ex.: site não está ativo e o
+ *     servidor já renderizou uma página de fallback).
+ *
+ * O AffiliateAttribution NÃO decide onde ir; ele APENAS executa o destino
+ * que o servidor escolheu. Isso garante que o sistema use a configuração
+ * REAL do site naquele momento (seções habilitadas, site ativo, etc) e
+ * que o link de afiliado **nunca dependa** de uma seção específica estar
+ * presente.
+ *
+ * Mecanismo de atribuição:
+ *   - Cookie first-party `tc_visitor_token` (180 dias) é a fonte de
+ *     verdade entre páginas e até o checkout.
+ *   - O `POST /api/affiliate/click` é chamado IMEDIATAMENTE após detectar
+ *     `?ref=`, antes mesmo do scroll. Assim, mesmo que o visitante
+ *     feche a aba durante o scroll, a atribuição fica registrada.
+ *   - A função SQL `register_affiliate_click` aplica a regra
+ *     **first-click wins** já existente.
  */
 export function AffiliateAttribution({
+  destination,
   siteHomeSelector = "#tenant-site",
-  pricingAnchor = "planos",
   children,
 }: {
-  /** Seletor do container da HOME pública para detectar renderização. */
+  destination: AffiliateDestination;
   siteHomeSelector?: string;
-  /** Anchor (sem #) para onde o visitante será levado após registrar a atribuição. */
-  pricingAnchor?: string;
-  /** Elementos filhos — renderizados sem modificação. */
   children?: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -39,11 +50,10 @@ export function AffiliateAttribution({
     const ref = searchParams.get("ref");
     if (!ref) return;
 
-    // Evita reprocessar o mesmo `ref` em re-renders
     const key = `${pathname}:${ref}`;
     if (handledRef.current === key) return;
 
-    // Validação leve no cliente (formato UUID); servidor faz a validação forte.
+    // Validação leve no cliente (formato UUID); servidor faz validação forte.
     if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(ref)) {
       return;
     }
@@ -54,6 +64,10 @@ export function AffiliateAttribution({
 
     const subdomain = typeof window !== "undefined" ? window.location.host : "unknown";
 
+    // 1) Registra o click IMEDIATAMENTE — antes de qualquer scroll, navegação
+    //    ou mudança de URL. Isso garante que a atribuição fique preservada
+    //    mesmo se o visitante fechar a aba durante o scroll, ou se o destino
+    //    for "none" (página de fallback).
     fetch("/api/affiliate/click", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -61,40 +75,49 @@ export function AffiliateAttribution({
       credentials: "include",
     })
       .catch(() => {
-        // Falha silenciosa: nunca quebra a HOME; cookie de visitor_token também
-        // é gerado pelo servidor ao processar o clique. Se a chamada falhar, o
-        // link ainda leva para #planos.
+        // Falha silenciosa: nunca quebra a HOME. O cookie de visitor_token
+        // continua sendo gerado pelo servidor no caminho feliz, e o
+        // link do afiliado permanece preservado pelo cookie.
       })
       .finally(() => {
         if (cancelled) return;
 
-        // Limpa a query string para não expor o `ref` ad infinitum, mantendo o hash.
+        // 2) Limpa a query string para não expor o `ref` ad infinitum.
         try {
           const url = new URL(window.location.href);
           url.searchParams.delete("ref");
-          window.history.replaceState(null, "", url.pathname + (url.search ? url.search : "") + url.hash);
+          window.history.replaceState(
+            null,
+            "",
+            url.pathname + (url.search ? url.search : "") + url.hash
+          );
         } catch {
           // ignora
         }
 
-        // Rola até a seção de planos respeitando renderização dinâmica.
-        scrollToPricingSection(pricingAnchor, siteHomeSelector);
+        // 3) Navega para o destino resolvido pelo servidor.
+        if (destination.kind === "anchor") {
+          scrollToAnchor(destination.anchor, siteHomeSelector);
+        }
+        // kind === "none": site indisponível, sem scroll. O servidor já
+        // renderizou a página de fallback apropriada.
       });
 
     return () => {
       cancelled = true;
     };
-  }, [pathname, searchParams, pricingAnchor, siteHomeSelector]);
+  }, [pathname, searchParams, destination, siteHomeSelector]);
 
   return <>{children}</>;
 }
 
 /**
  * Tenta rolar até `#<anchor>` repetidamente até que o elemento exista.
- * Funciona bem com seções renderizadas dinamicamente (pricing aparece
- * depois de carregar oferta comercial).
+ * Aguarda o container principal da HOME aparecer (evita scroll prematuro
+ * em páginas com skeletons / seções com lazy load) e depois faz polling
+ * pelo anchor com timeout de ~6s. Funciona em desktop e mobile.
  */
-function scrollToPricingSection(anchor: string, containerSelector: string): void {
+function scrollToAnchor(anchor: string, containerSelector: string): void {
   const hash = `#${anchor}`;
   let attempts = 0;
   const maxAttempts = 60; // até ~6s
@@ -112,7 +135,6 @@ function scrollToPricingSection(anchor: string, containerSelector: string): void
           window.scrollTo(0, el.offsetTop);
         }
       }
-      // Atualiza o hash para refletir a navegação (sem disparar reload).
       try {
         if (window.location.hash !== hash) {
           window.history.replaceState(null, "", hash);
@@ -127,8 +149,6 @@ function scrollToPricingSection(anchor: string, containerSelector: string): void
     }
   }
 
-  // Aguarda a renderização do container principal da HOME antes de iniciar
-  // a busca pelo anchor — evita scroll prematuro em páginas com skeletons.
   function waitForContainer() {
     const container = document.querySelector(containerSelector);
     if (container || attempts > 5) {
