@@ -722,6 +722,16 @@ export interface CrmExportBundle {
 export type AffiliateConversionStatus = "pendente" | "aprovado" | "pago" | "estornado";
 export type AffiliatePayoutStatus = "solicitado" | "em_analise" | "pago" | "rejeitado";
 export type AffiliatePayoutMethod = "pix" | "mercado_pago";
+export type AffiliatePixKeyType = "cpf_cnpj" | "email" | "phone" | "random";
+
+export interface AffiliatePaymentMethod {
+  user_id: string;
+  method: AffiliatePayoutMethod;
+  pix_key_type: AffiliatePixKeyType | null;
+  pix_key: string | null;
+  mp_email: string | null;
+  updated_at: string;
+}
 
 export interface AffiliateSettings {
   id: string;
@@ -775,8 +785,19 @@ export interface AffiliatePayout {
   affiliate_user_id: string;
   amount: number;
   method: AffiliatePayoutMethod;
+  /** Legado: chave PIX do momento (mantida para compatibilidade). */
   pix_key: string | null;
+  /** Legado: metadata MP (mantida para compatibilidade). */
   mercado_pago_account_info: Record<string, unknown> | null;
+  /**
+   * Snapshot imutável dos dados de pagamento NO MOMENTO do saque.
+   * Preserva os dados mesmo se o afiliado alterar depois.
+   */
+  pix_key_type_snapshot: AffiliatePixKeyType | null;
+  pix_key_snapshot: string | null;
+  mp_email_snapshot: string | null;
+  /** Rótulo legível para UI: ex. "PIX (E-mail)". */
+  payment_method_label: string | null;
   status: AffiliatePayoutStatus;
   requested_at: string;
   paid_at: string | null;

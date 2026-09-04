@@ -4,6 +4,46 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { formatBRL, formatDate } from "@/lib/utils";
 import { StatCard, StatusBadge, Button, Input, Modal } from "@/components/dashboard/ui";
+import type {
+  AffiliatePaymentMethod,
+  AffiliatePayoutMethod,
+  AffiliatePixKeyType,
+} from "@/types";
+
+const PIX_KEY_TYPE_OPTIONS: { value: AffiliatePixKeyType; label: string }[] = [
+  { value: "cpf_cnpj", label: "CPF/CNPJ" },
+  { value: "email", label: "E-mail" },
+  { value: "phone", label: "Telefone" },
+  { value: "random", label: "Chave aleatória" },
+];
+
+const PIX_KEY_TYPE_PLACEHOLDERS: Record<AffiliatePixKeyType, string> = {
+  cpf_cnpj: "000.000.000-00 ou 00.000.000/0001-00",
+  email: "seuemail@exemplo.com",
+  phone: "+55 11 99999-9999",
+  random: "Cole aqui sua chave aleatória (UUID)",
+};
+
+function isValidPixKey(key: string, type: AffiliatePixKeyType): boolean {
+  const trimmed = (key || "").trim();
+  if (!trimmed) return false;
+  switch (type) {
+    case "cpf_cnpj":
+      return trimmed.replace(/\D/g, "").length >= 11;
+    case "email":
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
+    case "phone":
+      return trimmed.replace(/\D/g, "").length >= 10 && trimmed.replace(/\D/g, "").length <= 15;
+    case "random":
+      return /^[A-Za-z0-9-]{32,36}$/.test(trimmed.replace(/\s/g, ""));
+    default:
+      return false;
+  }
+}
+
+function isValidMpEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+}
 
 interface AffiliateSettings {
   commission_percent: number;
@@ -43,6 +83,10 @@ interface AffiliatePayout {
   requested_at: string;
   paid_at: string | null;
   pix_key: string | null;
+  pix_key_snapshot: string | null;
+  pix_key_type_snapshot: AffiliatePixKeyType | null;
+  mp_email_snapshot: string | null;
+  payment_method_label: string | null;
 }
 
 interface AffiliateSummary {
@@ -70,8 +114,25 @@ export function AffiliateDashboard({ userId, userEmail, userName, tenantSlug, is
   const [clicks, setClicks] = useState<AffiliateClick[]>([]);
   const [conversions, setConversions] = useState<AffiliateConversion[]>([]);
   const [payouts, setPayouts] = useState<AffiliatePayout[]>([]);
+  const [paymentMethod, setPaymentMethod] = useState<AffiliatePaymentMethod | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // ====== Estado: Dados de Recebimento ======
+  const [pmForm, setPmForm] = useState<{
+    method: AffiliatePayoutMethod;
+    pixKeyType: AffiliatePixKeyType;
+    pixKey: string;
+    mpEmail: string;
+  }>({
+    method: "pix",
+    pixKeyType: "cpf_cnpj",
+    pixKey: "",
+    mpEmail: "",
+  });
+  const [savingPm, setSavingPm] = useState(false);
+  const [pmMsg, setPmMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [pmEditing, setPmEditing] = useState(false);
 
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [showPayoutModal, setShowPayoutModal] = useState(false);
@@ -86,13 +147,14 @@ export function AffiliateDashboard({ userId, userEmail, userName, tenantSlug, is
       setLoading(true);
       setError(null);
 
-      const [settingsRes, statusRes, summaryRes, clicksRes, conversionsRes, payoutsRes] = await Promise.all([
+      const [settingsRes, statusRes, summaryRes, clicksRes, conversionsRes, payoutsRes, pmRes] = await Promise.all([
         fetch("/api/affiliate/settings").then(r => r.json()),
         fetch("/api/affiliate/status").then(r => r.json()),
         fetch("/api/affiliate/summary").then(r => r.json()),
         fetch("/api/affiliate/clicks").then(r => r.json()),
         fetch("/api/affiliate/conversions").then(r => r.json()),
         fetch("/api/affiliate/payouts").then(r => r.json()),
+        fetch("/api/affiliate/payment-method").then(r => r.json()),
       ]);
 
       if (settingsRes.success) setSettings(settingsRes.data);
@@ -101,6 +163,16 @@ export function AffiliateDashboard({ userId, userEmail, userName, tenantSlug, is
       if (clicksRes.success) setClicks(clicksRes.data);
       if (conversionsRes.success) setConversions(conversionsRes.data);
       if (payoutsRes.success) setPayouts(payoutsRes.data);
+      if (pmRes.success && pmRes.data) {
+        setPaymentMethod(pmRes.data);
+        // Pré-popula o formulário com os dados atuais
+        setPmForm({
+          method: pmRes.data.method || "pix",
+          pixKeyType: pmRes.data.pix_key_type || "cpf_cnpj",
+          pixKey: pmRes.data.pix_key || "",
+          mpEmail: pmRes.data.mp_email || "",
+        });
+      }
     } catch (err) {
       setError("Erro ao carregar dados do programa de afiliados");
       console.error(err);
@@ -130,11 +202,75 @@ export function AffiliateDashboard({ userId, userEmail, userName, tenantSlug, is
     alert("Link copiado!");
   }
 
+  async function savePaymentMethod() {
+    setSavingPm(true);
+    setPmMsg(null);
+    try {
+      // Validação client-side antes de enviar
+      if (pmForm.method === "pix") {
+        if (!pmForm.pixKeyType) {
+          setPmMsg({ ok: false, text: "Selecione o tipo de chave PIX." });
+          setSavingPm(false);
+          return;
+        }
+        if (!isValidPixKey(pmForm.pixKey, pmForm.pixKeyType)) {
+          setPmMsg({ ok: false, text: "Chave PIX inválida para o tipo selecionado." });
+          setSavingPm(false);
+          return;
+        }
+      } else {
+        if (!isValidMpEmail(pmForm.mpEmail)) {
+          setPmMsg({ ok: false, text: "E-mail do Mercado Pago inválido." });
+          setSavingPm(false);
+          return;
+        }
+      }
+
+      const payload: Record<string, unknown> = { method: pmForm.method };
+      if (pmForm.method === "pix") {
+        payload.pixKeyType = pmForm.pixKeyType;
+        payload.pixKey = pmForm.pixKey.trim();
+      } else {
+        payload.mpEmail = pmForm.mpEmail.trim();
+      }
+
+      const res = await fetch("/api/affiliate/payment-method", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPaymentMethod(data.data);
+        setPmEditing(false);
+        setPmMsg({ ok: true, text: "Dados de recebimento salvos com sucesso!" });
+      } else {
+        setPmMsg({ ok: false, text: data.error || "Erro ao salvar." });
+      }
+    } catch {
+      setPmMsg({ ok: false, text: "Erro ao salvar dados de recebimento." });
+    } finally {
+      setSavingPm(false);
+    }
+  }
+
   async function requestPayout() {
-    if (!payoutForm.pix_key || !payoutAmount) {
-      alert("Preencha todos os campos");
+    if (!payoutAmount) {
+      alert("Informe o valor do saque");
       return;
     }
+
+    // Regra: afiliado DEVE ter dados de recebimento cadastrados.
+    if (!paymentMethod) {
+      alert(
+        "Cadastre seus dados de recebimento antes de solicitar um saque."
+      );
+      // Faz scroll para a seção de cadastro
+      const el = document.getElementById("affiliate-payment-method-section");
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+
     const amount = parseFloat(payoutAmount);
     if (isNaN(amount) || amount < (settings?.min_payout_amount || 50)) {
       alert(`Valor mínimo para saque: ${formatBRL((settings?.min_payout_amount || 50) * 100)}`);
@@ -150,9 +286,9 @@ export function AffiliateDashboard({ userId, userEmail, userName, tenantSlug, is
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          method: payoutForm.method,
           amount,
-          pix_key: payoutForm.pix_key,
+          // Não envia mais method/pix_key — o backend usa o payment_method
+          // cadastrado como fonte da verdade + faz snapshot.
         }),
       });
       const data = await res.json();
@@ -326,7 +462,182 @@ export function AffiliateDashboard({ userId, userEmail, userName, tenantSlug, is
           <p className="text-sm text-gray-500 mb-4">
             Saldo disponível: <strong>{formatBRL(summary.available_balance * 100)}</strong> | Mínimo: {formatBRL((settings?.min_payout_amount || 50) * 100)}
           </p>
-          <Button onClick={() => setShowPayoutModal(true)}>Solicitar Saque</Button>
+          {!paymentMethod && (
+            <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 mb-3">
+              <p className="text-sm text-amber-800">
+                <strong>⚠️ Cadastre seus dados de recebimento antes de solicitar um saque.</strong>
+              </p>
+              <p className="text-xs text-amber-700 mt-1">
+                Você pode cadastrar abaixo na seção <em>Dados para recebimento</em>.
+              </p>
+            </div>
+          )}
+          <Button
+            onClick={() => {
+              if (!paymentMethod) {
+                const el = document.getElementById("affiliate-payment-method-section");
+                if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+                return;
+              }
+              setShowPayoutModal(true);
+            }}
+            disabled={!paymentMethod}
+            className={!paymentMethod ? "opacity-50 cursor-not-allowed" : ""}
+          >
+            Solicitar Saque
+          </Button>
+        </div>
+      )}
+
+      {/* ============================================================
+          DADOS PARA RECEBIMENTO — afiliação cadastra PIX ou Mercado Pago
+          ============================================================ */}
+      {programActive && (
+        <div id="affiliate-payment-method-section" className="card">
+          <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+            <div>
+              <h2 className="card-title mb-1">💰 Dados para recebimento</h2>
+              <p className="text-sm text-gray-500">
+                Escolha como deseja receber suas comissões. Esses dados serão
+                utilizados quando você solicitar um saque.
+              </p>
+            </div>
+            {paymentMethod && !pmEditing && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-green-50 text-green-700 text-xs px-2 py-1 border border-green-200">
+                ✓ Dados de recebimento cadastrados
+              </span>
+            )}
+          </div>
+
+          {paymentMethod && !pmEditing && (
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 mt-3">
+              <p className="text-sm text-gray-700">
+                <strong>Método:</strong>{" "}
+                {paymentMethod.method === "pix"
+                  ? `PIX (${PIX_KEY_TYPE_OPTIONS.find((o => o.value === paymentMethod.pix_key_type))?.label || "—"})`
+                  : "Mercado Pago"}
+              </p>
+              {paymentMethod.method === "pix" && (
+                <p className="text-sm text-gray-700 mt-1">
+                  <strong>Chave PIX:</strong>{" "}
+                  <code className="bg-white px-2 py-1 rounded text-xs border border-gray-200 break-all">
+                    {paymentMethod.pix_key}
+                  </code>
+                </p>
+              )}
+              {paymentMethod.method === "mercado_pago" && (
+                <p className="text-sm text-gray-700 mt-1">
+                  <strong>E-mail Mercado Pago:</strong>{" "}
+                  <code className="bg-white px-2 py-1 rounded text-xs border border-gray-200">
+                    {paymentMethod.mp_email}
+                  </code>
+                </p>
+              )}
+              <p className="text-xs text-gray-400 mt-2">
+                Atualizado em {formatDate(paymentMethod.updated_at)}
+              </p>
+              <div className="mt-3 flex gap-2">
+                <Button variant="outline" onClick={() => { setPmEditing(true); setPmMsg(null); }}>
+                  Editar dados
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {(!paymentMethod || pmEditing) && (
+            <div className="mt-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-gray-700">💰 Como você quer receber suas comissões?</h3>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 max-w-md">
+                <button
+                  type="button"
+                  onClick={() => setPmForm({ ...pmForm, method: "pix" })}
+                  className={`btn !py-3 ${pmForm.method === "pix" ? "btn-primary" : "btn-outline"}`}
+                >
+                  PIX
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPmForm({ ...pmForm, method: "mercado_pago" })}
+                  className={`btn !py-3 ${pmForm.method === "mercado_pago" ? "btn-primary" : "btn-outline"}`}
+                >
+                  Mercado Pago
+                </button>
+              </div>
+
+              {pmForm.method === "pix" && (
+                <div className="space-y-3 max-w-md">
+                  <div>
+                    <label className="label">Tipo de chave PIX</label>
+                    <select
+                      className="input"
+                      value={pmForm.pixKeyType}
+                      onChange={(e) => setPmForm({ ...pmForm, pixKeyType: e.target.value as AffiliatePixKeyType, pixKey: "" })}
+                    >
+                      {PIX_KEY_TYPE_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label">Chave PIX</label>
+                    <Input
+                      placeholder={PIX_KEY_TYPE_PLACEHOLDERS[pmForm.pixKeyType]}
+                      value={pmForm.pixKey}
+                      onChange={(e) => setPmForm({ ...pmForm, pixKey: e.target.value })}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {pmForm.method === "mercado_pago" && (
+                <div className="space-y-2 max-w-md">
+                  <label className="label">E-mail da conta Mercado Pago</label>
+                  <Input
+                    type="email"
+                    placeholder="seuemail@exemplo.com"
+                    value={pmForm.mpEmail}
+                    onChange={(e) => setPmForm({ ...pmForm, mpEmail: e.target.value })}
+                  />
+                </div>
+              )}
+
+              <div className="rounded-lg bg-gray-50 border border-gray-200 p-3 text-xs text-gray-600">
+                <strong>Importante:</strong> cadastre uma conta que esteja em seu nome/responsabilidade e revise os dados antes de solicitar um saque.
+              </div>
+
+              {pmMsg && (
+                <p className={`text-sm rounded-lg px-3 py-2 ${pmMsg.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"}`}>
+                  {pmMsg.text}
+                </p>
+              )}
+
+              <div className="flex gap-2">
+                <Button onClick={savePaymentMethod} disabled={savingPm}>
+                  {savingPm ? "Salvando..." : pmEditing ? "Atualizar dados" : "Salvar dados"}
+                </Button>
+                {pmEditing && (
+                  <Button variant="outline" onClick={() => {
+                    setPmEditing(false);
+                    setPmMsg(null);
+                    // Restaura o formulário com os valores atuais
+                    if (paymentMethod) {
+                      setPmForm({
+                        method: paymentMethod.method || "pix",
+                        pixKeyType: paymentMethod.pix_key_type || "cpf_cnpj",
+                        pixKey: paymentMethod.pix_key || "",
+                        mpEmail: paymentMethod.mp_email || "",
+                      });
+                    }
+                  }}>
+                    Cancelar
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -383,20 +694,30 @@ export function AffiliateDashboard({ userId, userEmail, userName, tenantSlug, is
                     <th className="pb-2">Data</th>
                     <th className="pb-2">Valor</th>
                     <th className="pb-2">Método</th>
-                    <th className="pb-2">Chave PIX</th>
+                    <th className="pb-2">Dados de pagamento</th>
                     <th className="pb-2">Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {payouts.map((p) => (
-                    <tr key={p.id} className="border-b border-gray-100">
-                      <td className="py-3 text-gray-600">{formatDate(p.requested_at)}</td>
-                      <td className="py-3 font-medium text-[#1d5c3a]">{formatBRL(p.amount * 100)}</td>
-                      <td className="py-3 text-gray-600 capitalize">{p.method.replace("_", " ")}</td>
-                      <td className="py-3 text-gray-600 text-xs">{p.pix_key || "—"}</td>
-                      <td className="py-3"><StatusBadge status={p.status} /></td>
-                    </tr>
-                  ))}
+                  {payouts.map((p) => {
+                    const label = p.payment_method_label
+                      || (p.method === "pix" ? "PIX" : "Mercado Pago");
+                    const pixKey = p.pix_key_snapshot || p.pix_key;
+                    const mpEmail = p.mp_email_snapshot;
+                    return (
+                      <tr key={p.id} className="border-b border-gray-100">
+                        <td className="py-3 text-gray-600">{formatDate(p.requested_at)}</td>
+                        <td className="py-3 font-medium text-[#1d5c3a]">{formatBRL(p.amount * 100)}</td>
+                        <td className="py-3 text-gray-600">{label}</td>
+                        <td className="py-3 text-gray-600 text-xs">
+                          {p.method === "pix"
+                            ? (pixKey || "—")
+                            : (mpEmail || "—")}
+                        </td>
+                        <td className="py-3"><StatusBadge status={p.status} /></td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -470,27 +791,18 @@ export function AffiliateDashboard({ userId, userEmail, userName, tenantSlug, is
       {showPayoutModal && (
         <Modal open onClose={() => setShowPayoutModal(false)} title="Solicitar Saque">
           <div className="space-y-4">
-            <div>
-              <label className="label">Método de pagamento</label>
-              <div className="flex gap-3">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="radio" name="method" value="pix" checked={payoutForm.method === "pix"} onChange={(e) => setPayoutForm({ ...payoutForm, method: "pix" })} className="radio" />
-                  <span>PIX</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="radio" name="method" value="mercado_pago" checked={payoutForm.method === "mercado_pago"} onChange={(e) => setPayoutForm({ ...payoutForm, method: "mercado_pago" })} className="radio" />
-                  <span>Mercado Pago</span>
-                </label>
-              </div>
-            </div>
-            {payoutForm.method === "pix" && (
-              <div>
-                <label className="label">Chave PIX</label>
-                <Input
-                  placeholder="CPF, e-mail, telefone ou chave aleatória"
-                  value={payoutForm.pix_key}
-                  onChange={(e) => setPayoutForm({ ...payoutForm, pix_key: e.target.value })}
-                />
+            {paymentMethod && (
+              <div className="rounded-lg bg-gray-50 border border-gray-200 p-3 text-sm">
+                <strong>Dados de pagamento cadastrados:</strong>
+                <div className="mt-1 text-gray-700">
+                  {paymentMethod.method === "pix"
+                    ? `PIX (${PIX_KEY_TYPE_OPTIONS.find((o) => o.value === paymentMethod.pix_key_type)?.label || ""}) — ${paymentMethod.pix_key}`
+                    : `Mercado Pago — ${paymentMethod.mp_email}`}
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Estes dados serão utilizados para o pagamento desta solicitação.
+                  O histórico do saque preserva os dados cadastrados no momento do pedido.
+                </p>
               </div>
             )}
             <div>
@@ -504,7 +816,12 @@ export function AffiliateDashboard({ userId, userEmail, userName, tenantSlug, is
                 value={payoutAmount}
                 onChange={(e) => setPayoutAmount(e.target.value)}
               />
-              <p className="text-xs text-gray-400 mt-1">Disponível: {formatBRL((summary?.available_balance || 0) * 100)}</p>
+              <p className="text-xs text-gray-400 mt-1">
+                Disponível: {formatBRL((summary?.available_balance || 0) * 100)}
+                {settings?.min_payout_amount && (
+                  <> · Mínimo: {formatBRL(settings.min_payout_amount * 100)}</>
+                )}
+              </p>
             </div>
             <div className="flex gap-3 pt-4">
               <Button onClick={requestPayout} disabled={submitting} className="flex-1">

@@ -1,5 +1,11 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { AffiliateSettings, AffiliateDashboardSummary } from "@/types";
+import type {
+  AffiliateSettings,
+  AffiliateDashboardSummary,
+  AffiliatePaymentMethod,
+  AffiliatePixKeyType,
+  AffiliatePayoutMethod,
+} from "@/types";
 
 /** Busca configuração global do programa de afiliados (cache 60s) */
 let affiliateSettingsCache: { data: AffiliateSettings | null; ts: number } | null = null;
@@ -164,7 +170,7 @@ export async function getAffiliatePayouts(userId: string, limit = 50, offset = 0
   return data;
 }
 
-/** Solicita saque */
+/** Solicita saque (inclui snapshot dos dados de pagamento atuais) */
 export async function requestAffiliatePayout(
   userId: string,
   amount: number,
@@ -173,6 +179,16 @@ export async function requestAffiliatePayout(
   mercadoPagoInfo?: Record<string, unknown>
 ) {
   const admin = createAdminClient();
+
+  // Snapshot dos dados de pagamento ATUAIS — preserva o histórico mesmo
+  // se o afiliado alterar sua chave PIX/e-mail depois.
+  const snapshot = await buildPayoutSnapshot(userId);
+  if (!snapshot.hasPaymentMethod) {
+    throw new Error(
+      "Cadastre seus dados de recebimento antes de solicitar um saque."
+    );
+  }
+
   const { data, error } = await admin
     .from("affiliate_payouts")
     .insert({
@@ -181,6 +197,10 @@ export async function requestAffiliatePayout(
       method,
       pix_key: pixKey || null,
       mercado_pago_account_info: mercadoPagoInfo || null,
+      pix_key_type_snapshot: snapshot.pix_key_type_snapshot,
+      pix_key_snapshot: snapshot.pix_key_snapshot,
+      mp_email_snapshot: snapshot.mp_email_snapshot,
+      payment_method_label: snapshot.payment_method_label,
       status: "solicitado",
     })
     .select("*")
@@ -380,8 +400,175 @@ export async function registerAffiliateConversionForVisitor(input: {
  * Esta função NÃO faz redirect — apenas prepara o estado. O caller decide
  * para onde redirecionar.
  */
-export const VISITOR_TOKEN_COOKIE_NAME = "tc_visitor_token";
-export const VISITOR_TOKEN_MAX_AGE_SECONDS = 180 * 24 * 60 * 60; // 180 dias
+/**
+ * Rótulos legíveis (pt-BR) para os tipos de chave PIX — exibidos na UI
+ * e armazenados como `payment_method_label` no snapshot do payout.
+ */
+export const PIX_KEY_TYPE_LABELS: Record<AffiliatePixKeyType, string> = {
+  cpf_cnpj: "CPF/CNPJ",
+  email: "E-mail",
+  phone: "Telefone",
+  random: "Chave aleatória",
+};
+
+export const PIX_KEY_TYPE_OPTIONS: { value: AffiliatePixKeyType; label: string }[] = [
+  { value: "cpf_cnpj", label: "CPF/CNPJ" },
+  { value: "email", label: "E-mail" },
+  { value: "phone", label: "Telefone" },
+  { value: "random", label: "Chave aleatória" },
+];
+
+/**
+ * Validação leve de chave PIX (apenas formato; validação final acontece
+ * no momento do pagamento pela instituição financeira).
+ */
+export function isValidPixKey(key: string, type: AffiliatePixKeyType): boolean {
+  const trimmed = (key || "").trim();
+  if (!trimmed) return false;
+  switch (type) {
+    case "cpf_cnpj":
+      return /^[\d.\-/]{11,18}$/.test(trimmed.replace(/\D/g, "")) || trimmed.length >= 11;
+    case "email":
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
+    case "phone":
+      // DDI + DDD + número (10-15 dígitos no total)
+      return trimmed.replace(/\D/g, "").length >= 10 && trimmed.replace(/\D/g, "").length <= 15;
+    case "random":
+      // UUID v4 com ou sem hifens, 32-36 chars
+      return /^[A-Za-z0-9-]{32,36}$/.test(trimmed.replace(/\s/g, ""));
+    default:
+      return false;
+  }
+}
+
+/** Validação de e-mail Mercado Pago. */
+export function isValidMpEmail(email: string): boolean {
+  const trimmed = (email || "").trim();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
+}
+
+/**
+ * Constrói o rótulo legível para o método de pagamento (ex: "PIX (E-mail)"
+ * ou "Mercado Pago"). Usado tanto na UI quanto no snapshot do payout.
+ */
+export function buildPaymentMethodLabel(input: {
+  method: AffiliatePayoutMethod;
+  pixKeyType?: AffiliatePixKeyType | null;
+}): string {
+  if (input.method === "mercado_pago") return "Mercado Pago";
+  const t = input.pixKeyType || "cpf_cnpj";
+  return `PIX (${PIX_KEY_TYPE_LABELS[t]})`;
+}
+
+/** Busca os dados de recebimento do afiliado (null se não cadastrados). */
+export async function getAffiliatePaymentMethod(userId: string): Promise<AffiliatePaymentMethod | null> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("affiliate_payment_methods")
+    .select("*")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) {
+    console.error("[affiliate] falha ao buscar payment method", error);
+    return null;
+  }
+  return (data as AffiliatePaymentMethod | null) || null;
+}
+
+/**
+ * Salva (upsert) os dados de recebimento do afiliado. Esta é a operação
+ * que o afiliado usa para cadastrar/editar PIX ou Mercado Pago.
+ *
+ * Valida os campos antes de gravar e retorna erro descritivo em caso de
+ * dados inválidos. NUNCA expõe dados sensíveis — apenas lê/escreve o
+ * registro do próprio user_id.
+ */
+export async function upsertAffiliatePaymentMethod(input: {
+  userId: string;
+  method: AffiliatePayoutMethod;
+  pixKeyType?: AffiliatePixKeyType | null;
+  pixKey?: string | null;
+  mpEmail?: string | null;
+}): Promise<{ ok: true; data: AffiliatePaymentMethod } | { ok: false; error: string }> {
+  const { userId, method } = input;
+
+  if (!userId) return { ok: false, error: "Usuário não identificado." };
+
+  // Limpa/normaliza campos conforme o método
+  let pixKeyType: AffiliatePixKeyType | null = null;
+  let pixKey: string | null = null;
+  let mpEmail: string | null = null;
+
+  if (method === "pix") {
+    pixKeyType = input.pixKeyType || null;
+    pixKey = (input.pixKey || "").trim() || null;
+    if (!pixKeyType) return { ok: false, error: "Selecione o tipo de chave PIX." };
+    if (!pixKey || !isValidPixKey(pixKey, pixKeyType)) {
+      return { ok: false, error: "Chave PIX inválida para o tipo selecionado." };
+    }
+  } else {
+    mpEmail = (input.mpEmail || "").trim() || null;
+    if (!mpEmail || !isValidMpEmail(mpEmail)) {
+      return { ok: false, error: "E-mail do Mercado Pago inválido." };
+    }
+  }
+
+  const admin = createAdminClient();
+  const payload: Record<string, unknown> = {
+    user_id: userId,
+    method,
+    pix_key_type: method === "pix" ? pixKeyType : null,
+    pix_key: method === "pix" ? pixKey : null,
+    mp_email: method === "mercado_pago" ? mpEmail : null,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { data, error } = await admin
+    .from("affiliate_payment_methods")
+    .upsert(payload, { onConflict: "user_id" })
+    .select("*")
+    .single();
+
+  if (error) {
+    console.error("[affiliate] falha ao salvar payment method", error);
+    return { ok: false, error: error.message || "Erro ao salvar dados de recebimento." };
+  }
+  return { ok: true, data: data as AffiliatePaymentMethod };
+}
+
+/**
+ * Constrói os campos SNAPSHOT do payout a partir dos dados de recebimento
+ * atuais do afiliado. Garante que cada saque preserve os dados de
+ * pagamento vigentes no momento da solicitação.
+ */
+export async function buildPayoutSnapshot(userId: string): Promise<{
+  pix_key_type_snapshot: AffiliatePixKeyType | null;
+  pix_key_snapshot: string | null;
+  mp_email_snapshot: string | null;
+  payment_method_label: string | null;
+  hasPaymentMethod: boolean;
+}> {
+  const pm = await getAffiliatePaymentMethod(userId);
+  if (!pm) {
+    return {
+      pix_key_type_snapshot: null,
+      pix_key_snapshot: null,
+      mp_email_snapshot: null,
+      payment_method_label: null,
+      hasPaymentMethod: false,
+    };
+  }
+  return {
+    pix_key_type_snapshot: pm.pix_key_type ?? null,
+    pix_key_snapshot: pm.method === "pix" ? pm.pix_key : null,
+    mp_email_snapshot: pm.method === "mercado_pago" ? pm.mp_email : null,
+    payment_method_label: buildPaymentMethodLabel({
+      method: pm.method,
+      pixKeyType: pm.pix_key_type ?? null,
+    }),
+    hasPaymentMethod: true,
+  };
+}
 
 export async function registerAffiliateClickServerSide(opts: {
   affiliateUserId: string;

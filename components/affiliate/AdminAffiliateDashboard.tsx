@@ -42,8 +42,19 @@ interface Payout {
   requested_at: string;
   paid_at: string | null;
   pix_key: string | null;
+  pix_key_snapshot: string | null;
+  pix_key_type_snapshot: string | null;
+  mp_email_snapshot: string | null;
+  payment_method_label: string | null;
   profiles: { email: string; name: string };
 }
+
+const PIX_KEY_TYPE_LABEL: Record<string, string> = {
+  cpf_cnpj: "CPF/CNPJ",
+  email: "E-mail",
+  phone: "Telefone",
+  random: "Chave aleatória",
+};
 
 interface AdminAffiliateDashboardProps {
   settings: AffiliateSettings;
@@ -352,37 +363,60 @@ export function AdminAffiliateDashboard({ settings, affiliates, conversions, pay
                   <th className="pb-2">Afiliado</th>
                   <th className="pb-2">Valor</th>
                   <th className="pb-2">Método</th>
-                  <th className="pb-2">Chave PIX</th>
+                  <th className="pb-2">Dados de recebimento</th>
                   <th className="pb-2">Status</th>
                   <th className="pb-2">Ações</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredPayouts.map((p) => (
-                  <tr key={p.id} className="border-b border-gray-100">
-                    <td className="py-3 text-gray-600">{formatDate(p.requested_at)}</td>
-                    <td className="py-3 text-gray-600">{p.profiles.name || p.profiles.email}</td>
-                    <td className="py-3 font-medium text-[#1d5c3a]">{formatBRL(p.amount * 100)}</td>
-                    <td className="py-3 text-gray-600 capitalize">{p.method.replace("_", " ")}</td>
-                    <td className="py-3 text-gray-600 text-xs">{p.pix_key || "—"}</td>
-                    <td className="py-3"><StatusBadge status={p.status} /></td>
-                    <td className="py-3">
-                      <div className="flex gap-1">
-                        {p.status === "solicitado" && (
-                          <>
-                            <Button size="sm" variant="outline" onClick={() => handlePayoutAction("approve", p)}>✓ Aprovar</Button>
-                            <Button size="sm" variant="outline" onClick={() => handlePayoutAction("reject", p)}>✗ Rejeitar</Button>
-                          </>
+                {filteredPayouts.map((p) => {
+                  const label = p.payment_method_label
+                    || (p.method === "pix" ? "PIX" : "Mercado Pago");
+                  const pixKey = p.pix_key_snapshot || p.pix_key;
+                  const pixKeyTypeLabel = p.pix_key_type_snapshot
+                    ? PIX_KEY_TYPE_LABEL[p.pix_key_type_snapshot] || p.pix_key_type_snapshot
+                    : null;
+                  const mpEmail = p.mp_email_snapshot;
+                  return (
+                    <tr key={p.id} className="border-b border-gray-100 align-top">
+                      <td className="py-3 text-gray-600 whitespace-nowrap">{formatDate(p.requested_at)}</td>
+                      <td className="py-3 text-gray-700">
+                        <div className="font-medium">{p.profiles.name || "—"}</div>
+                        <div className="text-xs text-gray-500">{p.profiles.email}</div>
+                      </td>
+                      <td className="py-3 font-medium text-[#1d5c3a] whitespace-nowrap">{formatBRL(p.amount * 100)}</td>
+                      <td className="py-3 text-gray-600">{label}</td>
+                      <td className="py-3 text-gray-600 text-xs">
+                        {p.method === "pix" ? (
+                          <div>
+                            {pixKeyTypeLabel && (
+                              <div className="text-gray-500">Tipo: <strong>{pixKeyTypeLabel}</strong></div>
+                            )}
+                            <div className="break-all">Chave: <code className="bg-gray-100 px-1 py-0.5 rounded">{pixKey || "—"}</code></div>
+                          </div>
+                        ) : (
+                          <div className="break-all">E-mail MP: <code className="bg-gray-100 px-1 py-0.5 rounded">{mpEmail || "—"}</code></div>
                         )}
-                        {p.status === "em_analise" && (
-                          <Button size="sm" variant="outline" onClick={() => handlePayoutAction("pay", p)}>💰 Pagar</Button>
-                        )}
-                        {p.status === "pago" && <span className="text-xs text-green-600">Pago em {p.paid_at ? formatDate(p.paid_at) : "—"}</span>}
-                        {p.status === "rejeitado" && <span className="text-xs text-red-600">Rejeitado</span>}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="py-3"><StatusBadge status={p.status} /></td>
+                      <td className="py-3">
+                        <div className="flex gap-1">
+                          {p.status === "solicitado" && (
+                            <>
+                              <Button size="sm" variant="outline" onClick={() => handlePayoutAction("approve", p)}>✓ Aprovar</Button>
+                              <Button size="sm" variant="outline" onClick={() => handlePayoutAction("reject", p)}>✗ Rejeitar</Button>
+                            </>
+                          )}
+                          {p.status === "em_analise" && (
+                            <Button size="sm" variant="outline" onClick={() => handlePayoutAction("pay", p)}>💰 Pagar</Button>
+                          )}
+                          {p.status === "pago" && <span className="text-xs text-green-600">Pago em {p.paid_at ? formatDate(p.paid_at) : "—"}</span>}
+                          {p.status === "rejeitado" && <span className="text-xs text-red-600">Rejeitado</span>}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -395,12 +429,43 @@ export function AdminAffiliateDashboard({ settings, affiliates, conversions, pay
       {selectedPayout && payoutAction && (
         <Modal open onClose={() => { setSelectedPayout(null); setPayoutAction(null); }} title={payoutAction === "approve" ? "Aprovar Saque" : payoutAction === "reject" ? "Rejeitar Saque" : "Marcar como Pago"}>
           <div className="space-y-4">
-            <p>
-              Afiliado: <strong>{selectedPayout.profiles.name || selectedPayout.profiles.email}</strong><br />
-              Valor: <strong>{formatBRL(selectedPayout.amount * 100)}</strong><br />
-              Método: <strong>{selectedPayout.method.replace("_", " ")}</strong><br />
-              Chave PIX: <code className="bg-gray-100 px-2 py-1 rounded text-xs">{selectedPayout.pix_key || "—"}</code>
-            </p>
+            <div>
+              <p><strong>Afiliado:</strong> {selectedPayout.profiles.name || selectedPayout.profiles.email}</p>
+              <p><strong>Valor solicitado:</strong> {formatBRL(selectedPayout.amount * 100)}</p>
+              <p>
+                <strong>Método de recebimento:</strong>{" "}
+                {selectedPayout.payment_method_label
+                  || (selectedPayout.method === "pix" ? "PIX" : "Mercado Pago")}
+              </p>
+              {selectedPayout.method === "pix" && (
+                <>
+                  <p>
+                    <strong>Tipo de chave:</strong>{" "}
+                    {selectedPayout.pix_key_type_snapshot
+                      ? PIX_KEY_TYPE_LABEL[selectedPayout.pix_key_type_snapshot] || selectedPayout.pix_key_type_snapshot
+                      : "—"}
+                  </p>
+                  <p>
+                    <strong>Chave PIX:</strong>{" "}
+                    <code className="bg-gray-100 px-2 py-1 rounded text-xs break-all">
+                      {selectedPayout.pix_key_snapshot || selectedPayout.pix_key || "—"}
+                    </code>
+                  </p>
+                </>
+              )}
+              {selectedPayout.method === "mercado_pago" && (
+                <p>
+                  <strong>E-mail Mercado Pago:</strong>{" "}
+                  <code className="bg-gray-100 px-2 py-1 rounded text-xs break-all">
+                    {selectedPayout.mp_email_snapshot || "—"}
+                  </code>
+                </p>
+              )}
+              <p className="text-xs text-gray-500 mt-2">
+                Os dados acima foram <strong>congelados no momento da solicitação</strong> e
+                não mudam mesmo se o afiliado alterar suas informações depois.
+              </p>
+            </div>
             {payoutAction !== "pay" && (
               <div>
                 <label className="label">Observação (opcional)</label>
