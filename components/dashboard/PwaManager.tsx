@@ -6,6 +6,7 @@ import {
   computePwaStatus,
   type PwaSettings,
 } from "@/lib/pwa/config";
+import { generateIconVariants, decodeImage } from "@/lib/pwa/icon-variants";
 
 interface LoadResult {
   settings: PwaSettings;
@@ -19,12 +20,14 @@ const LEVEL_STYLES: Record<string, string> = {
   incomplete: "bg-amber-100 text-amber-900 border-amber-300",
 };
 
-// Limites para o ícone PWA. PWA exige imagens quadradas ≥ 192px; Android
-// 512+ é altamente recomendado para a tela inicial. Aceitamos PNG (com ou
-// sem fundo transparente), JPEG e WebP — SVG não (risco de XSS e Chrome não
-// aceita SVG como purpose=any no manifest).
+// Tipos aceitos para upload do ícone do PWA.
+// SVG fica fora: Chrome não aceita SVG como purpose=any no manifest e há
+// risco de XSS se o SVG vier de fonte não confiável.
 const ICON_MIME = /^image\/(png|jpe?g|webp)$/i;
-const ICON_MIN = 192;
+// Android exige PNG ≥ 192px (mínimo histórico do Web App Manifest).
+// Aqui aceitamos QUALQUER proporção — imagens não-quadradas são compostas
+// em canvas quadrado com padding do theme_color (sem distorção).
+const ICON_MIN_DIM = 192;
 const ICON_RECOMMENDED = 512;
 
 async function probeImage(url: string): Promise<{ width: number; height: number } | null> {
@@ -34,6 +37,14 @@ async function probeImage(url: string): Promise<{ width: number; height: number 
     img.onerror = () => resolve(null);
     img.src = url;
   });
+}
+
+interface UrlProbe {
+  ok: boolean;
+  status?: number;
+  contentType?: string;
+  contentLength?: number;
+  error?: string;
 }
 
 export function PwaManager() {
@@ -46,6 +57,7 @@ export function PwaManager() {
   const [copied, setCopied] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [iconInfo, setIconInfo] = useState<{ width: number; height: number; isSquare: boolean; isPngLike: boolean } | null>(null);
+  const [urlProbe, setUrlProbe] = useState<Record<string, UrlProbe>>({});
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -87,6 +99,58 @@ export function PwaManager() {
     })();
     return () => { cancelled = true; };
   }, [iconUrl]);
+
+  // Quando as URLs dos 4 ícones mudarem, valida acessibilidade pública.
+  // Sem isso, um upload bem-sucedido pode falhar em produção (CDN/CORS/R2)
+  // e o usuário só descobre na instalação do PWA.
+  const iconUrlsKey = [
+    form?.icon_180_url,
+    form?.icon_192_url,
+    form?.icon_512_url,
+    form?.icon_maskable_512_url,
+  ].join("|");
+  useEffect(() => {
+    if (!form) return;
+    const urls = [
+      form.icon_180_url,
+      form.icon_192_url,
+      form.icon_512_url,
+      form.icon_maskable_512_url,
+    ].filter(Boolean) as string[];
+    if (!urls.length) {
+      setUrlProbe({});
+      return;
+    }
+    void probeUrls(urls);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [iconUrlsKey]);
+
+  async function probeUrls(urls: string[]) {
+    if (!urls.length) return;
+    try {
+      const res = await fetch("/api/pwa/validate-icon", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ urls }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && Array.isArray(json.results)) {
+        const map: Record<string, UrlProbe> = {};
+        for (const r of json.results) {
+          map[r.url] = {
+            ok: Boolean(r.ok),
+            status: r.status,
+            contentType: r.contentType,
+            contentLength: r.contentLength,
+            error: r.error,
+          };
+        }
+        setUrlProbe(map);
+      }
+    } catch {
+      // silencioso: o botão "Verificar URLs agora" permite re-tentar.
+    }
+  }
 
   const platformUrl = useMemo(() => {
     if (!data?.slug) return "";
@@ -138,8 +202,14 @@ export function PwaManager() {
     setUploading(true);
     setMsg(null);
     try {
-      if (!/^image\/(png|jpe?g|webp)$/i.test(file.type)) {
-        setMsg({ ok: false, text: `Formato "${file.type || "desconhecido"}}" não suportado. Use PNG (com ou sem fundo), JPG ou WebP.` });
+      // 1) Validação de formato/tamanho (categoria "logo" no servidor: até 5MB,
+      //    somente PNG/JPG/WebP). O servidor é quem decide de fato, mas essa
+      //    pré-validação evita uploads desnecessários.
+      if (!ICON_MIME.test(file.type)) {
+        setMsg({
+          ok: false,
+          text: `Formato "${file.type || "desconhecido"}}" não suportado. Use PNG (com ou sem fundo), JPG ou WebP.`,
+        });
         return;
       }
       if (file.size > 5 * 1024 * 1024) {
@@ -147,47 +217,52 @@ export function PwaManager() {
         return;
       }
 
-      // Carrega a imagem em um Image bitmap para processamento no Canvas
-      const localUrl = URL.createObjectURL(file);
-      const img = await createImageBitmap(await fetch(localUrl).then(r => r.blob()));
-      URL.revokeObjectURL(localUrl);
+      // 2) Decodificar imagem. Pode ser não-quadrada — o helper compõe com padding.
+      //    Decodificação via ImageBitmap é a mais robusta em todos os browsers.
+      const bitmap = await decodeImage(file);
+      const width = bitmap.width;
+      const height = bitmap.height;
+      const minSide = Math.min(width, height);
 
-      const width = img.width;
-      const height = img.height;
-
-      if (width < ICON_MIN || height < ICON_MIN) {
+      if (minSide < ICON_MIN_DIM) {
         setMsg({
           ok: false,
-          text: `A imagem tem ${width}×${height}px. O ícone do PWA precisa ter no mínimo ${ICON_MIN}×${ICON_MIN}px. Use uma imagem quadrada maior (recomendado ${ICON_RECOMMENDED}×${ICON_RECOMMENDED}px).`,
+          text: `A imagem tem ${width}×${height}px. Cada lado deve ter no mínimo ${ICON_MIN_DIM}px (recomendado ${ICON_RECOMMENDED}×${ICON_RECOMMENDED}px).`,
         });
         return;
       }
       if (width !== height) {
+        // Não rejeitamos: imagens retangulares (ex.: logo com marca horizontal)
+        // são compostas com padding do theme_color — preservando proporção.
         setMsg({
-          ok: false,
-          text: `A imagem tem ${width}×${height}px (não é quadrada). O ícone do PWA precisa ser quadrado (ex.: 512×512). Recorte a imagem antes de enviar.`,
+          ok: true,
+          text: `Imagem retangular (${width}×${height}px). Vamos compor com fundo do tema para gerar ícones quadrados perfeitos.`,
         });
-        return;
       }
 
-      // Gera as variantes usando Canvas
-      const variants = await generateIconVariants(img);
-      
-      // Upload de todas as variantes em paralelo
+      // 3) Gera as 4 variantes PNG oficiais (180/192/512/maskable) com fundo opaco.
+      setMsg({ ok: true, text: "Gerando variantes do ícone..." });
+      const variants = await generateIconVariants(file, {
+        themeColor: form?.theme_color || "#1d5c3a",
+        backgroundColor: form?.background_color || "#faf8f2",
+        anyMode: "theme",
+      });
+
+      // 4) Upload de todas as variantes em paralelo.
       setMsg({ ok: true, text: "Enviando variantes do ícone..." });
       const uploadedUrls = await Promise.all(
         Object.entries(variants).map(async ([key, blob]) => {
           const fd = new FormData();
-          fd.append("file", blob, `icon-${key}.png`);
-          fd.append("category", "logo"); // categoria "logo" (limite 5 MB, pasta logo)
+          fd.append("file", blob, `pwa-icon-${key}.png`);
+          fd.append("category", "logo");
           const res = await fetch("/api/media/upload", { method: "POST", body: fd });
           const json = await res.json().catch(() => ({}));
           if (!res.ok) throw new Error(json.error || `Erro ao enviar ${key}`);
-          return { key, url: json.file?.public_url };
+          return { key, url: json.media?.public_url || json.file?.public_url };
         })
       );
 
-      // Mapeia URLs de volta para os campos
+      // 5) Mapeia URLs de volta para os campos.
       const urlMap = Object.fromEntries(uploadedUrls.map(({ key, url }) => [key, url]));
       patch({
         icon_192_url: urlMap.icon_192,
@@ -196,68 +271,20 @@ export function PwaManager() {
         icon_maskable_512_url: urlMap.icon_maskable_512,
       });
 
-      setMsg({ ok: true, text: "✓ Ícone enviado e variantes geradas! Clique em \"Salvar configurações\" para aplicar." });
+      setMsg({
+        ok: true,
+        text: "✓ Ícone processado e 4 variantes geradas! Clique em \"Salvar configurações\" para aplicar.",
+      });
     } catch (err) {
       console.error("Erro ao processar/upload ícone:", err);
-      setMsg({ ok: false, text: err instanceof Error ? err.message : "Falha ao processar ou enviar imagem." });
+      setMsg({
+        ok: false,
+        text: err instanceof Error ? err.message : "Falha ao processar ou enviar imagem.",
+      });
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
-  }
-
-  // Gera 4 variantes a partir da imagem original (ImageBitmap):
-  // - 180x180 (apple-touch-icon iOS)
-  // - 192x192 (Android legacy)
-  // - 512x512 (Android splash/home)
-  // - 512x512 maskable (com safe zone ~10% padding, fundo preenchido)
-  async function generateIconVariants(source: ImageBitmap): Promise<Record<string, Blob>> {
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d")!;
-    const variants: Record<string, Blob> = {};
-
-    // Helper: desenha imagem redimensionada mantendo proporção (já é quadrada)
-    async function drawResized(targetSize: number, backgroundColor?: string): Promise<Blob> {
-      canvas.width = targetSize;
-      canvas.height = targetSize;
-      if (backgroundColor) {
-        ctx.fillStyle = backgroundColor;
-        ctx.fillRect(0, 0, targetSize, targetSize);
-      }
-      ctx.drawImage(source, 0, 0, targetSize, targetSize);
-      return await new Promise<Blob>((resolve) => canvas.toBlob((b) => resolve(b!), "image/png"));
-    }
-
-    // Helper: gera versão maskable com safe zone (padding 10% = 10% de cada lado livre)
-    // A máscara do Android corta para squircle/círculo; precisamos que o conteúdo
-    // principal caiba dentro de 80% (safe zone). Desenhamos a imagem original
-    // em 80% do canvas (centralizada) e preenchemos o resto com a cor de fundo.
-    async function drawMaskable(targetSize: number, backgroundColor: string): Promise<Blob> {
-      canvas.width = targetSize;
-      canvas.height = targetSize;
-      ctx.fillStyle = backgroundColor;
-      ctx.fillRect(0, 0, targetSize, targetSize);
-      const safeSize = Math.floor(targetSize * 0.8); // 80% = safe zone
-      const offset = (targetSize - safeSize) / 2;
-      ctx.drawImage(source, offset, offset, safeSize, safeSize);
-      return await new Promise<Blob>((resolve) => canvas.toBlob((b) => resolve(b!), "image/png"));
-    }
-
-    // 1) 180x180 — Apple Touch Icon (iOS)
-    variants.icon_180 = await drawResized(180);
-
-    // 2) 192x192 — Android legacy minimum
-    variants.icon_192 = await drawResized(192);
-
-    // 3) 512x512 — Android splash/home screen (alta densidade)
-    variants.icon_512 = await drawResized(512);
-
-    // 4) 512x512 maskable — com safe zone e fundo da PWA
-    // Usa background_color do formulário (ou tema padrão)
-    const bgColor = form?.background_color || "#faf8f2";
-    variants.icon_maskable_512 = await drawMaskable(512, bgColor);
-
-    return variants;
   }
 
   async function uploadPwaIcon(file: File) {
@@ -460,25 +487,33 @@ export function PwaManager() {
         <p className="text-sm text-gray-500 mb-4">
           <strong>Envie o logotipo que aparecerá no aplicativo instalado no celular.</strong>
           <br />
-          Use uma imagem <b>quadrada</b> (mesma largura e altura) de pelo menos <b>512×512 px</b> para melhor qualidade na tela inicial (mínimo 192×192 px).
-          Aceita <b>PNG com ou sem fundo transparente</b>, JPG ou WebP.
+          Recomendado <b>512×512 px</b> (mínimo 192 px no menor lado). Aceita imagens <b>quadradas ou retangulares</b>: o sistema compõe automaticamente com o fundo do tema, sem distorcer.
+          Formatos: <b>PNG</b> (com ou sem fundo transparente), <b>JPG</b> ou <b>WebP</b>.
         </p>
 
         <div className="space-y-5">
-          {/* Ícone principal do App (1:1) */}
+          {/* Ícone principal do App */}
           <div>
             <div className="flex flex-col sm:flex-row sm:items-end gap-3">
               <div className="flex-1">
-                <label className="label">Ícone do aplicativo <span className="text-xs text-gray-400 font-normal">(quadrado 1:1)</span></label>
+                <label className="label">
+                  URL da imagem (opcional)
+                  <span className="text-xs text-gray-400 font-normal"> — escolha na biblioteca ou cole uma URL pública.</span>
+                </label>
                 <div className="flex items-center gap-2">
-                  <input className="input flex-1" value={form.icon_512_url || ""} placeholder="URL do ícone (envie ou escolha na biblioteca)"
-                    onChange={(e) => patch({ icon_192_url: e.target.value, icon_512_url: e.target.value, icon_180_url: e.target.value, icon_maskable_512_url: e.target.value })} />
+                  <input className="input flex-1" value={form.icon_512_url || ""} placeholder="https://…/logo.png"
+                    onChange={(e) => {
+                      const url = e.target.value;
+                      // Colar URL manualmente: assume que o usuário já tem um PNG pronto
+                      // e usa o MESMO URL em todos os tamanhos. O sistema NÃO re-processa
+                      // (processAndUploadIconVariants só roda no upload de arquivo).
+                      patch({ icon_192_url: url, icon_512_url: url, icon_180_url: url, icon_maskable_512_url: url });
+                    }} />
                   <MediaPicker scope="tenant" value={form.icon_512_url || undefined}
                     onChange={(url) => patch({ icon_192_url: url, icon_512_url: url, icon_180_url: url, icon_maskable_512_url: url })} />
                 </div>
                 <p className="text-xs text-gray-400 mt-1">
-                  Recomendado 512×512 px (mínimo 192×192). PNG transparente é suportado.
-                  <br />Ao enviar, o sistema gera automaticamente: 180×180 (iOS), 192×192, 512×512 e 512×512 maskable.
+                  Ao <b>enviar um arquivo</b>, o sistema gera automaticamente: 180×180 (iOS), 192×192, 512×512 e 512×512 maskable.
                 </p>
               </div>
 
@@ -554,27 +589,45 @@ export function PwaManager() {
                   Variantes geradas automaticamente
                 </summary>
                 <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-[#6a7a72]">
-                  <div className="flex items-center gap-1.5">
-                    <span className={form.icon_180_url ? "text-emerald-600" : "text-slate-400"}>●</span>
-                    <span>180×180 (iOS)</span>
-                    {form.icon_180_url && <span className="text-emerald-600">✓</span>}
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className={form.icon_192_url ? "text-emerald-600" : "text-slate-400"}>●</span>
-                    <span>192×192 (Android)</span>
-                    {form.icon_192_url && <span className="text-emerald-600">✓</span>}
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className={form.icon_512_url ? "text-emerald-600" : "text-slate-400"}>●</span>
-                    <span>512×512 (Android)</span>
-                    {form.icon_512_url && <span className="text-emerald-600">✓</span>}
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className={form.icon_maskable_512_url ? "text-emerald-600" : "text-slate-400"}>●</span>
-                    <span>512×512 maskable</span>
-                    {form.icon_maskable_512_url && <span className="text-emerald-600">✓</span>}
-                  </div>
+                  {([
+                    { key: "icon_180_url", label: "180×180 (iOS)" },
+                    { key: "icon_192_url", label: "192×192 (Android)" },
+                    { key: "icon_512_url", label: "512×512 (Android)" },
+                    { key: "icon_maskable_512_url", label: "512×512 maskable" },
+                  ] as { key: keyof PwaSettings; label: string }[]).map(({ key, label }) => {
+                    const url = form[key] as string | null;
+                    if (!url) return null;
+                    const probe = urlProbe[key];
+                    const ok = probe?.ok === true;
+                    const pending = probe === undefined;
+                    return (
+                      <div key={key} className="flex items-center gap-1.5">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={url}
+                          alt=""
+                          className="w-5 h-5 rounded border border-slate-200 object-cover bg-slate-50"
+                          referrerPolicy="no-referrer"
+                        />
+                        <span className="truncate">{label}</span>
+                        {pending ? (
+                          <span className="text-slate-400" title="Verificando…">…</span>
+                        ) : ok ? (
+                          <span className="text-emerald-600" title={`HTTP ${probe?.status} · ${probe?.contentType}`}>✓</span>
+                        ) : (
+                          <span className="text-red-600" title={probe?.error || "Indisponível"}>⚠</span>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
+                <button
+                  type="button"
+                  onClick={() => void probeUrls([form.icon_180_url, form.icon_192_url, form.icon_512_url, form.icon_maskable_512_url].filter(Boolean) as string[])}
+                  className="mt-2 text-[11px] text-[#1d5c3a] hover:underline"
+                >
+                  🔄 Verificar URLs agora
+                </button>
               </details>
             )}
 

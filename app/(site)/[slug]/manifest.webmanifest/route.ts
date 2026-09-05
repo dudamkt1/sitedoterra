@@ -27,7 +27,9 @@ export async function GET(
     status: 200,
     headers: {
       "Content-Type": "application/manifest+json",
-      "Cache-Control": "public, max-age=300",
+      // No-cache: ao trocar o ícone, o manifest deve refletir IMEDIATAMENTE.
+      // As URLs dos ícones já carregam ?v=<token> para cache-busting no cliente.
+      "Cache-Control": "no-cache, no-store, must-revalidate",
       "Service-Worker-Allowed": resolved.basePath,
     },
   });

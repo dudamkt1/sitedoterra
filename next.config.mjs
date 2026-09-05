@@ -25,6 +25,23 @@ const nextConfig = {
         source: "/_next/static/:path*",
         headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
       },
+      // PWA: manifest e service worker NÃO podem ser cacheados por CDNs/proxies.
+      // Sem isso, o navegador pode servir um manifest antigo e o ícone nunca atualizar.
+      {
+        source: "/manifest.webmanifest",
+        headers: [
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+          { key: "Content-Type", value: "application/manifest+json" },
+        ],
+      },
+      {
+        source: "/sw.js",
+        headers: [
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+          { key: "Content-Type", value: "application/javascript; charset=utf-8" },
+          { key: "Service-Worker-Allowed", value: "/" },
+        ],
+      },
     ];
   },
 };
