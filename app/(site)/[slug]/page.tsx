@@ -9,6 +9,7 @@ import { PwaRegister } from "@/components/site/PwaRegister";
 import { resolveTenantAccess } from "@/lib/tenant";
 import { resolveHomeSections } from "@/lib/home";
 import { getCurrentUser } from "@/lib/auth";
+import { getOfficialHomeTenant, isOfficialHomeTenantById } from "@/lib/site-official";
 import { resolvePwaForRequest } from "@/lib/pwa/resolver";
 import { pwaUrls } from "@/lib/pwa/config";
 import { themePrimaryColor, type SiteThemeConfig } from "@/lib/site-theme";
@@ -17,6 +18,7 @@ import {
   isAffiliateInactiveSiteAllowed,
   buildAffiliateRedirectTarget,
 } from "@/lib/affiliate";
+import type { PublicTenant } from "@/types";
 
 // Páginas públicas de tenants — ISR 60s (rápido + reflete edições do painel)
 export const revalidate = 60;
@@ -44,8 +46,13 @@ export async function generateMetadata({ params }: { params: { slug: string } })
     return meta;
   }
 
-  const { tenant } = await resolveTenantAccess({ slug: params.slug });
-  if (!tenant) return { title: "Site não encontrado" };
+  const { tenant: rawTenant } = await resolveTenantAccess({ slug: params.slug });
+  if (!rawTenant) return { title: "Site não encontrado" };
+
+  // Se o tenant resolvido é o "oficial" (tenant da Home / super admin),
+  // sincroniza metadados com a Home oficial.
+  const isOfficial = await isOfficialHomeTenantById(rawTenant.tenant_id);
+  const tenant: PublicTenant = isOfficial ? await getOfficialHomeTenant() : rawTenant;
 
   const name = tenant.profile_name || tenant.site_name || tenant.slug;
   const siteData = (tenant.site_data || {}) as Record<string, unknown>;
@@ -124,7 +131,9 @@ export async function generateViewport({ params }: { params: { slug: string } })
   const pwa = await resolvePwaForRequest({ slugParam: params.slug });
   let themeColor = pwa?.settings.theme_color || "#1d5c3a";
   try {
-    const { tenant } = await resolveTenantAccess({ slug: params.slug });
+    const { tenant: rawTenant } = await resolveTenantAccess({ slug: params.slug });
+    const isOfficial = rawTenant ? await isOfficialHomeTenantById(rawTenant.tenant_id) : false;
+    const tenant = isOfficial ? await getOfficialHomeTenant() : rawTenant;
     const theme = (tenant?.site_data as Record<string, unknown> | null)?.theme as SiteThemeConfig | undefined;
     if (theme) themeColor = themePrimaryColor(theme);
   } catch {}
@@ -165,14 +174,25 @@ export default async function TenantSitePage({
   const hasAffiliateRef = typeof ref === "string" && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(ref);
 
   // Paraleliza tenant + PWA + user para não somar waterfalls
-  const [{ tenant, access }, user, pwa] = await Promise.all([
+  const [{ tenant: rawTenant, access }, user, pwa] = await Promise.all([
     resolveTenantAccess({ slug: params.slug }),
     getCurrentUser().catch(() => null),
     resolvePwaForRequest({ slugParam: params.slug }),
   ]);
 
+  // SINCRONIZAÇÃO SUPER ADMIN:
+  // Se o tenant resolvido é o "oficial" da plataforma (mesmo tenant cuja
+  // configuração aparece na Home `/`), usa o conteúdo oficial em vez dos
+  // dados do próprio tenant. Isso garante que sites pertencentes ao super
+  // admin herdam o conteúdo configurado em /painel e refletem automaticamente.
+  // Também força access="available" porque a Home oficial nunca pode estar
+  // "suspensa" — senão a Home inteira quebra.
+  const isOfficial = rawTenant ? await isOfficialHomeTenantById(rawTenant.tenant_id) : false;
+  const effectiveAccess: typeof access = isOfficial ? "available" : access;
+  const tenant = isOfficial ? await getOfficialHomeTenant() : rawTenant;
+
   // Caso 1 — site público e ativo: render normal.
-  if (tenant && access === "available") {
+  if (tenant && effectiveAccess === "available") {
     const headerList = headers();
     const host = headerList.get("x-forwarded-host") || headerList.get("host") || "";
     const protocol = headerList.get("x-forwarded-proto") || "https";
@@ -193,7 +213,7 @@ export default async function TenantSitePage({
     // configuração ATUAL da HOME. Se a seção Planos não estiver
     // habilitada, ele usa a Trustbar, Hero CTA, primeira seção visível
     // ou nenhum scroll.
-    const destination = resolveAffiliateDestination({ sections, access });
+    const destination = resolveAffiliateDestination({ sections, access: effectiveAccess });
     return (
       <>
         <link rel="canonical" href={canonicalUrl} />

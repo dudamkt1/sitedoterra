@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { blockIfDemo } from "@/lib/demo/auth";
 import {
   defaultPwaSettings,
   type PwaSettings,
@@ -62,6 +64,10 @@ export async function GET() {
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
 export async function PUT(request: Request) {
+  // BLINDAGEM DEMO: visitante em /demonstracao nunca grava no banco oficial.
+  const demoBlock = await blockIfDemo();
+  if (demoBlock) return demoBlock.response;
+
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
 
@@ -121,6 +127,13 @@ export async function PUT(request: Request) {
     console.error("[api/pwa] upsert:", error.message);
     return NextResponse.json({ error: "Erro ao salvar." }, { status: 500 });
   }
+
+  // Invalida caches para refletir mudança de PWA/favicon imediatamente.
+  try {
+    revalidatePath("/");
+    revalidatePath("/manifest.webmanifest");
+    revalidatePath("/favicon.ico");
+  } catch {}
 
   return NextResponse.json({ success: true, settings: row });
 }

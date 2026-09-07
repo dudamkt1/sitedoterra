@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser, getProfile } from "@/lib/auth";
 import { ensureTenantForUser } from "@/lib/onboarding";
+import { invalidateOfficialHomeCache } from "@/lib/site-official";
+import { blockIfDemo } from "@/lib/demo/auth";
 import { resolveHomeSections } from "@/lib/home";
 import { normalizeSectionPermissions } from "@/lib/site-sections";
 import type { SectionPermissions, SiteSection, TenantSection } from "@/types";
@@ -116,6 +119,10 @@ export async function GET() {
  * Respeita as permissões definidas pelo Super Admin (validação no servidor).
  */
 export async function POST(request: Request) {
+  // BLINDAGEM DEMO: visitante em /demonstracao nunca grava no banco oficial.
+  const demoBlock = await blockIfDemo();
+  if (demoBlock) return demoBlock.response;
+
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
 
@@ -187,6 +194,13 @@ export async function POST(request: Request) {
     entity_id: sectionId,
     metadata: { tenant_id: tenant.id, action, enabled },
   });
+
+  // Invalida caches para refletir mudança na Home e na rota do tenant.
+  invalidateOfficialHomeCache();
+  try {
+    revalidatePath("/");
+    if (tenant.slug) revalidatePath(`/${tenant.slug}`);
+  } catch {}
 
   return NextResponse.json({ success: true });
 }

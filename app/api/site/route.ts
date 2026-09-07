@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/auth";
 import { ensureTenantForUser } from "@/lib/onboarding";
+import { invalidateOfficialHomeCache } from "@/lib/site-official";
+import { blockIfDemo } from "@/lib/demo/auth";
 import type { SiteThemeConfig } from "@/lib/site-theme";
 
 export const runtime = "nodejs";
@@ -22,6 +25,10 @@ function sanitizeTheme(raw: unknown): SiteThemeConfig | undefined {
  * Salva o conteúdo/configurações do site do tenant (site_settings.data).
  */
 export async function POST(request: Request) {
+  // BLINDAGEM DEMO: visitante em /demonstracao nunca grava no banco oficial.
+  const demoBlock = await blockIfDemo();
+  if (demoBlock) return demoBlock.response;
+
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
 
@@ -63,6 +70,16 @@ export async function POST(request: Request) {
 
   if (error) {
     return NextResponse.json({ error: "Não foi possível salvar as configurações." }, { status: 500 });
+  }
+
+  // Invalida caches para que mudanças reflitam imediatamente na Home `/`,
+  // na rota `/[slug]` e em `/demonstracao` (que usa o site oficial como seed).
+  invalidateOfficialHomeCache();
+  try {
+    revalidatePath("/");
+    if (tenant.slug) revalidatePath(`/${tenant.slug}`);
+  } catch {
+    // revalidatePath é best-effort; não bloqueia resposta.
   }
 
   return NextResponse.json({ success: true });

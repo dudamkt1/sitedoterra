@@ -7,6 +7,7 @@ import { PwaRegister } from "@/components/site/PwaRegister";
 import { DEFAULT_SITE_DATA } from "@/lib/site-data";
 import { resolveHomeSections } from "@/lib/home";
 import { getPublicTenantBySlug } from "@/lib/tenant";
+import { getOfficialHomeTenant } from "@/lib/site-official";
 import { resolvePwaForRequest } from "@/lib/pwa/resolver";
 import { pwaUrls } from "@/lib/pwa/config";
 import { themePrimaryColor, type SiteThemeConfig } from "@/lib/site-theme";
@@ -19,49 +20,53 @@ import "@/app/(site)/site.css";
 // HOME é pública — ISR 60s + cache em memória deixam TTFB instantâneo e ainda refletem edições do painel
 export const revalidate = 60;
 
+// Fallback estático FINAL — só usado se Supabase falhar ou nenhum tenant
+// oficial estiver configurado.
 const DEMO_TENANT: PublicTenant = {
   tenant_id: "index",
   slug: "index",
-  site_name: "Ana Beatriz",
+  site_name: "TopConsultores",
   site_status: "active",
   settings: {},
   site_data: DEFAULT_SITE_DATA as Record<string, unknown>,
-  profile_name: "Ana Beatriz",
-  email: "contato@anabeatriz.com.br",
+  profile_name: "TopConsultores",
+  email: "",
   monthly_billing_enabled: true,
   user_id: "demo-user-id",
 };
 
 /**
- * HOME da plataforma (página pública "/").
+ * HOME da plataforma.
  *
- * A HOME é SINCRONIZADA com o usuário de demonstração: resolve o tenant real
- * pelo slug configurado (HOME_TENANT_SLUG, padrão "usuarioteste") e renderiza
- * com tenantDataOverridesGlobal=true — exatamente como a rota pública
- * "/[slug]". Assim, o que é configurado em /painel/meu-site aparece tanto na
- * HOME quanto na URL do usuário, sempre idêntico.
+ * Fonte única de verdade: `lib/site-official.ts#getOfficialHomeTenant` resolve
+ * o tenant oficial a partir de:
+ *   1) `tenants.is_official_home = true`
+ *   2) `platform_config.home_tenant_slug`
+ *   3) Tenant de qualquer super admin (fallback)
+ *   4) DEMO_TENANT estático (último recurso)
  *
- * Se o tenant de demonstração não estiver disponível (ex.: sem Supabase ou
- * suspenso), cai no DEMO_TENANT estático com o conteúdo padrão.
- *
- * PWA: quando o app está ativo, a HOME também convida à instalação — o
- * manifest/service worker são servidos na RAIZ (scope "/") e o app instalado
- * abre direto no domínio principal.
+ * O slug resolvido é exposto via header `x-official-home-slug` para que a
+ * rota `app/(site)/[slug]/page.tsx` possa sincronizar com a Home quando o
+ * visitante acessa um site pertencente ao super admin.
  */
 
 async function resolveHomePwa() {
   return resolvePwaForRequest({ home: true });
 }
 
+async function resolveHomeTenant(): Promise<{ tenant: PublicTenant; slug: string }> {
+  const official = await getOfficialHomeTenant();
+  const slug = (official as { slug?: string }).slug || "";
+  return { tenant: official, slug };
+}
+
 export async function generateMetadata(): Promise<Metadata> {
   try {
-    const homeSlug = process.env.HOME_TENANT_SLUG || "usuarioteste";
-    const tenant = await getPublicTenantBySlug(homeSlug).catch(() => null);
+    const { tenant } = await resolveHomeTenant();
     const siteData = (tenant?.site_data as Record<string, unknown> | null) || {};
     const faviconUrl = (siteData.faviconUrl as string) || undefined;
 
     const pwa = await resolveHomePwa();
-    // FAVICON PNG transparente do painel — HTML usa só ele (não SVG) para não sobrepor o PNG
     const iconList: { url: string; type?: string; sizes?: string; rel?: string }[] = [];
     if (faviconUrl) {
       const bust = faviconUrl.includes("?") ? faviconUrl : `${faviconUrl}?v=2`;
@@ -73,21 +78,18 @@ export async function generateMetadata(): Promise<Metadata> {
       const ts = pwa.settings.updated_at ? new Date(pwa.settings.updated_at).getTime() : Date.now();
       const v = Number.isNaN(ts) ? Date.now().toString(36) : ts.toString(36);
 
-      // apple-touch-icon 180x180 (iOS "Adicionar à Tela de Início")
       if (pwa.settings.icon_180_url) {
         const bust = pwa.settings.icon_180_url.includes("?")
           ? `${pwa.settings.icon_180_url}&v=${v}`
           : `${pwa.settings.icon_180_url}?v=${v}`;
         iconList.push({ url: bust, type: "image/png", sizes: "180x180", rel: "apple-touch-icon" });
       }
-      // 192x192 (Android legacy)
       if (pwa.settings.icon_192_url) {
         const bust = pwa.settings.icon_192_url.includes("?")
           ? `${pwa.settings.icon_192_url}&v=${v}`
           : `${pwa.settings.icon_192_url}?v=${v}`;
         iconList.push({ url: bust, type: "image/png", sizes: "192x192" });
       }
-      // 512x512 (Android splash/home)
       if (pwa.settings.icon_512_url) {
         const bust = pwa.settings.icon_512_url.includes("?")
           ? `${pwa.settings.icon_512_url}&v=${v}`
@@ -95,7 +97,6 @@ export async function generateMetadata(): Promise<Metadata> {
         iconList.push({ url: bust, type: "image/png", sizes: "512x512" });
       }
 
-      // Manifest já contém os PNGs 192/512 + SVG maskable; no HTML deixamos só o favicon PNG transparente
       return {
         manifest: manifestUrl,
         icons: iconList.length ? iconList : undefined,
@@ -119,8 +120,7 @@ export async function generateViewport(): Promise<Viewport> {
     const pwa = await resolveHomePwa();
     let themeColor = pwa?.settings.theme_color || "#1d5c3a";
     try {
-      const homeSlug = process.env.HOME_TENANT_SLUG || "usuarioteste";
-      const tenant = await getPublicTenantBySlug(homeSlug);
+      const { tenant } = await resolveHomeTenant();
       const theme = (tenant?.site_data as Record<string, unknown> | null)?.theme as SiteThemeConfig | undefined;
       if (theme) themeColor = themePrimaryColor(theme);
     } catch {}
@@ -131,13 +131,11 @@ export async function generateViewport(): Promise<Viewport> {
 }
 
 export default async function HomePage() {
-  // getCurrentUser é opcional na HOME (só mostra "Logado como"); não bloqueia render se Supabase estiver lento
   const userPromise = getCurrentUser().catch(() => null);
 
-  const homeSlug = process.env.HOME_TENANT_SLUG || "usuarioteste";
-  // Paraleliza tenant + PWA para cortar ~300ms de waterfall
-  const [tenantRaw, pwa] = await Promise.all([getPublicTenantBySlug(homeSlug), resolveHomePwa()]);
-  const tenant = tenantRaw || DEMO_TENANT;
+  const [homeResolved, pwa] = await Promise.all([resolveHomeTenant(), resolveHomePwa()]);
+  const tenant = homeResolved.tenant;
+  const homeSlug = homeResolved.slug;
   const pwaEnabled = Boolean(pwa?.settings.enabled);
   const { manifestUrl, swUrl } = pwaUrls(pwa?.basePath || "/");
 
@@ -146,23 +144,12 @@ export default async function HomePage() {
   const theme = (siteData.theme as SiteThemeConfig | undefined) || null;
   const user = await userPromise;
 
-  // Canonical para a HOME: usa a URL pública configurada (NEXT_PUBLIC_HOME_URL > NEXT_PUBLIC_APP_URL)
   const canonicalUrl = getPublicBaseUrl();
 
-  // Verifica se o tenant tem site ativo. Para o DEMO_TENANT (fallback estático
-  // sem Supabase), considera-se sempre "available" para preservar a renderização
-  // padrão da HOME. Para o tenant real (resolvido por slug), usa o mesmo critério
-  // de `lib/access.ts` — se `site_status !== "active"` ou billing pendente,
-  // exibe a página de fallback preservando a atribuição do afiliado.
   const isDemoFallback = tenant === DEMO_TENANT;
   const siteIsActive = isDemoFallback || tenant.site_status === "active";
 
   if (!siteIsActive && !isDemoFallback) {
-    // Tenant existe mas não tem site ativo. Renderiza fallback preservando ref.
-    // Importante: AffiliateAttribution continua montado aqui — mesmo que o
-    // scroll para `#planos` falhe silenciosamente (porque esta página não
-    // tem a seção de planos), o cookie `tc_visitor_token` é criado e o
-    // click é registrado, garantindo a atribuição até o checkout.
     return (
       <>
         <link rel="canonical" href={canonicalUrl} />
@@ -178,8 +165,6 @@ export default async function HomePage() {
     );
   }
 
-  // Fallback inteligente: o AffiliateAttribution recebe o destino
-  // resolvido pelo servidor a partir da configuração ATUAL da HOME.
   const destination = resolveAffiliateDestination({ sections, access: "available" });
 
   return (
@@ -208,7 +193,7 @@ export default async function HomePage() {
       />
       <PwaRegister
         enabled={pwaEnabled}
-        slug={homeSlug}
+        slug={homeSlug || "home"}
         manifestUrl={manifestUrl}
         swUrl={swUrl}
         scope={pwa?.basePath || "/"}
