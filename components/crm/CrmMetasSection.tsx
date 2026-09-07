@@ -65,6 +65,7 @@ function GoalCard({ title, entry }: { title: string; entry: GoalEntry }) {
 
 export default function CrmMetasSection() {
   const [data, setData] = useState<MetasPayload | null>(null);
+  const [needsSetup, setNeedsSetup] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showConfig, setShowConfig] = useState(false);
@@ -78,10 +79,16 @@ export default function CrmMetasSection() {
   async function load() {
     setLoading(true);
     setError(null);
+    setNeedsSetup(false);
     try {
       const res = await fetch("/api/crm/metas");
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Erro ao carregar metas.");
+      if (json.needsSetup || !json.goals) {
+        setNeedsSetup(true);
+        setData(null);
+        return;
+      }
       setData(json);
       const g = json.goals;
       if (g) {
@@ -157,19 +164,29 @@ export default function CrmMetasSection() {
           <h2 className="card-title mb-0">🎯 Minhas Metas</h2>
           <p className="text-xs text-gray-500 mt-1">Progresso calculado com suas vendas reais (exclui canceladas e reembolsadas).</p>
         </div>
-        <button className="btn btn-outline text-xs" onClick={() => setShowConfig(true)} disabled={loading}>
+        <button className="btn btn-outline text-xs" onClick={() => setShowConfig(true)} disabled={loading || needsSetup || !data}>
           ⚙️ Configurar minhas metas
         </button>
       </div>
 
       {loading && <LoadingState label="Carregando metas..." />}
+      {!loading && needsSetup && (
+        <div className="rounded-lg bg-amber-50 border border-amber-200 p-4 text-sm text-amber-800">
+          <p className="font-semibold">⚠️ Banco ainda não preparado para Metas</p>
+          <p className="mt-1 text-xs">
+            Rode o arquivo <code>supabase/migrations/0042_crm_metas.sql</code> no SQL Editor do Supabase
+            (ou chame <code>POST /api/admin/apply-migration-0042</code> como superadmin) e recarregue a página.
+          </p>
+          <button className="btn btn-outline text-xs mt-3" onClick={load}>Recarregar</button>
+        </div>
+      )}
       {!loading && error && (
         <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700 flex items-center justify-between gap-2">
           <span>{error}</span>
           <button className="btn btn-outline text-xs" onClick={load}>Tentar de novo</button>
         </div>
       )}
-      {!loading && !error && data && (
+      {!loading && !error && !needsSetup && data?.goals && (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <GoalCard title="Meta mensal" entry={data.goals.monthly} />
@@ -179,7 +196,7 @@ export default function CrmMetasSection() {
 
           <div className="mt-5">
             <h3 className="text-sm font-semibold text-gray-700 mb-2">📌 Ações prioritárias</h3>
-            {data.recommendations.length === 0 ? (
+            {(data.recommendations || []).length === 0 ? (
               <p className="text-sm text-gray-400">Nenhuma ação pendente. 🎉</p>
             ) : (
               <ul className="divide-y divide-gray-100 rounded-xl border border-[#ece7da]">
@@ -204,7 +221,7 @@ export default function CrmMetasSection() {
             )}
           </div>
 
-          {data.history.some((h) => h.target_cents > 0) && (
+          {(data.history || []).some((h) => h.target_cents > 0) && (
             <div className="mt-5">
               <h3 className="text-sm font-semibold text-gray-700 mb-2">📊 Histórico (últimos 6 meses)</h3>
               <div className="overflow-x-auto">
