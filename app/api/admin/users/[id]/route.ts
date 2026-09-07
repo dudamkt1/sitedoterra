@@ -125,7 +125,8 @@ export async function PATCH(
 
   // ------------------------------------------------ ativação do site ----
   if (action === "activate_site") {
-    const billing: "monthly" | "none" = body.billing === "none" ? "none" : "monthly";
+    const billing: "monthly" | "none" | "trial" =
+      body.billing === "none" ? "none" : body.billing === "trial" ? "trial" : "monthly";
 
     const { data: tenant } = await admin
       .from("tenants")
@@ -140,10 +141,31 @@ export async function PATCH(
       .eq("user_id", userId)
       .maybeSingle();
 
-    const now = new Date().toISOString();
+    // Duração do trial: usa trial_months do plano se houver plano, senão 3 meses.
+    const planId = (await admin
+      .from("subscriptions")
+      .select("plan_id")
+      .eq("tenant_id", tenant.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle())?.data?.plan_id as string | null;
+    const { data: planRow } = planId
+      ? await admin.from("plans").select("trial_months").eq("id", planId).maybeSingle()
+      : { data: null };
+    const trialMonths = Number((planRow as { trial_months?: number } | null)?.trial_months) || 3;
+
+    const now = new Date();
+    const trialEnd = new Date(now);
+    trialEnd.setMonth(trialEnd.getMonth() + trialMonths);
+
+    const profileStatus =
+      billing === "trial" ? "active" : "active";
+    const subStatus =
+      billing === "trial" ? "trialing" : billing === "monthly" ? "active" : "active";
+
     await admin.from("profiles").update({
-      status: "active",
-      activated_at: now,
+      status: profileStatus,
+      activated_at: now.toISOString(),
       suspended_at: null,
       blocked_at: null,
       unblocked_at: null,
@@ -152,11 +174,12 @@ export async function PATCH(
 
     await admin.from("tenants").update({
       site_status: "active",
-      monthly_billing_enabled: billing === "monthly",
-      activated_at: now,
+      // trial E monthly mantêm billing habilitado; só "none" desliga.
+      monthly_billing_enabled: billing !== "none",
+      activated_at: now.toISOString(),
       suspended_at: null,
       cancelled_at: null,
-      reactivated_at: billing === "monthly" ? null : now,
+      reactivated_at: billing === "none" || billing === "trial" ? now.toISOString() : null,
     }).eq("id", tenant.id);
 
     // Assinatura local: garante um registro ativo (sem recorrência obrigatória).
@@ -168,13 +191,18 @@ export async function PATCH(
       .limit(1)
       .maybeSingle();
 
-    const subBase = {
+    const subBase: Record<string, unknown> = {
       tenant_id: tenant.id,
-      status: "active",
+      status: subStatus,
       cancel_at_period_end: false,
-      activated_at: now,
+      activated_at: now.toISOString(),
       canceled_at: null,
     };
+    if (billing === "trial") {
+      subBase.trial_end = trialEnd.toISOString();
+      // Durante o trial, próxima cobrança = trial_end (quando vence o trial).
+      subBase.next_billing_at = trialEnd.toISOString();
+    }
 
     let subId = existingSub?.id || null;
     if (subId) {
@@ -194,9 +222,10 @@ export async function PATCH(
       subId = created?.id || null;
     }
 
-    // Com mensalidade: tenta criar a recorrência real no Stripe (best-effort).
+    // Com mensalidade imediata: tenta criar a recorrência real no Stripe (best-effort).
     // Sem customer/pagamento válido, o site ainda fica ativo; a recorrência
     // poderá ser criada pelo usuário em /painel/assinatura.
+    // Em modo "trial", NÃO criamos recorrência ainda — só após trial_end.
     if (billing === "monthly" && profile?.email) {
       try {
         const customer = await getOrCreateCustomer({
@@ -220,7 +249,7 @@ export async function PATCH(
           current_period_start: stripeSub.current_period_start ? new Date(stripeSub.current_period_start * 1000).toISOString() : null,
           current_period_end: stripeSub.current_period_end ? new Date(stripeSub.current_period_end * 1000).toISOString() : null,
           next_billing_at: stripeSub.current_period_end ? new Date(stripeSub.current_period_end * 1000).toISOString() : null,
-          activated_at: now,
+          activated_at: now.toISOString(),
         };
         if (subId) {
           await admin.from("subscriptions").update(stripePayload).eq("id", subId);
@@ -235,10 +264,21 @@ export async function PATCH(
     await admin.from("audit_logs").insert({
       actor_id: actor.id,
       actor_role: "superadmin",
-      action: billing === "monthly" ? "user.site_activated_billing" : "user.site_activated_no_billing",
+      action:
+        billing === "trial"
+          ? "user.site_activated_trial"
+          : billing === "monthly"
+          ? "user.site_activated_billing"
+          : "user.site_activated_no_billing",
       entity_type: "profile",
       entity_id: userId,
-      metadata: { target_user_id: userId, billing, monthly_billing_enabled: billing === "monthly" },
+      metadata: {
+        target_user_id: userId,
+        billing,
+        monthly_billing_enabled: billing !== "none",
+        trial_months: billing === "trial" ? trialMonths : null,
+        trial_end: billing === "trial" ? trialEnd.toISOString() : null,
+      },
     });
 
     return NextResponse.json({ success: true });

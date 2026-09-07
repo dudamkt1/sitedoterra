@@ -19,16 +19,32 @@ interface Row {
 const SUB_STATUSES = [
   { value: "awaiting_activation", label: "Aguardando ativação" },
   { value: "active", label: "Ativa" },
+  { value: "trialing", label: "Em trial" },
   { value: "paused", label: "Pausada" },
   { value: "past_due", label: "Pagamento atrasado" },
   { value: "canceled", label: "Cancelada" },
 ];
+
+const USERS_PER_PAGE = 20;
+
+/** Ordena alfabeticamente por nome (case-insensitive). Usuários sem nome vão para o fim. */
+function sortByName(rows: Row[]): Row[] {
+  return [...rows].sort((a, b) => {
+    const an = (a.profile.name || "").trim();
+    const bn = (b.profile.name || "").trim();
+    if (!an && !bn) return 0;
+    if (!an) return 1;
+    if (!bn) return -1;
+    return an.localeCompare(bn, "pt-BR", { sensitivity: "base" });
+  });
+}
 
 export function AdminUsers({ rows, plans }: { rows: Row[]; plans: any[] }) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [roleFilter, setRoleFilter] = useState("all");
   const [busy, setBusy] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
 
   // ---- Modal de edição completa ----
   const [editing, setEditing] = useState<Row | null>(null);
@@ -43,6 +59,9 @@ export function AdminUsers({ rows, plans }: { rows: Row[]; plans: any[] }) {
   const [createForm, setCreateForm] = useState({ name: "", email: "", password: "", role: "user" });
   const [createMsg, setCreateMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [creatingUser, setCreatingUser] = useState(false);
+
+  // ---- Modal de ativação com escolha de billing ----
+  const [activateFor, setActivateFor] = useState<{ row: Row; mode: "trial" | "monthly" | "none" } | null>(null);
 
   function openEdit(r: Row) {
     setEditing(r);
@@ -66,6 +85,7 @@ export function AdminUsers({ rows, plans }: { rows: Row[]; plans: any[] }) {
   /** Ações rápidas da tabela: executam e recarregam a página. */
   async function runAction(userId: string, action: string, extra: Record<string, unknown> = {}) {
     if (action === "block" && !window.confirm("Bloquear este usuário? Ele perderá o acesso ao painel e o site sai do ar.")) return;
+    if (action === "suspend" && !window.confirm("Bloquear o site deste usuário?\n\nO site ficará invisível ao público mas o histórico (CRM, conteúdo, mídias) será preservado.")) return;
     setBusy(userId);
     const { ok, json } = await api(`/api/admin/users/${userId}`, { action, ...extra });
     setBusy(null);
@@ -100,6 +120,22 @@ export function AdminUsers({ rows, plans }: { rows: Row[]; plans: any[] }) {
       body: JSON.stringify({ planId }),
     });
     setBusy(null);
+    window.location.reload();
+  }
+
+  async function confirmActivation() {
+    if (!activateFor) return;
+    setBusy(activateFor.row.profile.user_id);
+    const { ok, json } = await api(`/api/admin/users/${activateFor.row.profile.user_id}`, {
+      action: "activate_site",
+      billing: activateFor.mode,
+    });
+    setBusy(null);
+    if (!ok) {
+      window.alert(json.error || "Erro ao ativar.");
+      return;
+    }
+    setActivateFor(null);
     window.location.reload();
   }
 
@@ -141,13 +177,30 @@ export function AdminUsers({ rows, plans }: { rows: Row[]; plans: any[] }) {
           r.profile.email.toLowerCase().includes(q) ||
           (r.profile.name || "").toLowerCase().includes(q) ||
           (r.tenant?.slug || "").includes(q) ||
-          r.domains.some((d) => d.domain.includes(q));
+          r.domains.some((d: any) => d.domain.includes(q));
         const matchS = statusFilter === "all" || r.profile.status === statusFilter;
         const matchR = roleFilter === "all" || (r.profile.role || "user") === roleFilter;
         return matchQ && matchS && matchR;
       }),
     [rows, query, statusFilter, roleFilter]
   );
+
+  // Ordenação alfabética por nome — aplicada após filtros.
+  const sorted = useMemo(() => sortByName(filtered), [filtered]);
+
+  // Paginação (20 por página).
+  const totalPages = Math.max(1, Math.ceil(sorted.length / USERS_PER_PAGE));
+  const safePage = Math.min(page, totalPages);
+  const startIdx = (safePage - 1) * USERS_PER_PAGE;
+  const pageRows = sorted.slice(startIdx, startIdx + USERS_PER_PAGE);
+
+  // Quando filtro muda, volta para página 1.
+  function changeFilter<T>(setter: (v: T) => void) {
+    return (v: T) => {
+      setter(v);
+      setPage(1);
+    };
+  }
 
   return (
     <div className="space-y-4">
@@ -157,9 +210,9 @@ export function AdminUsers({ rows, plans }: { rows: Row[]; plans: any[] }) {
           className="input max-w-xs"
           placeholder="Buscar por nome, e-mail, slug ou domínio..."
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => changeFilter(setQuery)(e.target.value)}
         />
-        <select className="input max-w-[180px]" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+        <select className="input max-w-[180px]" value={statusFilter} onChange={(e) => changeFilter(setStatusFilter)(e.target.value)}>
           <option value="all">Todos os status</option>
           <option value="active">Ativo</option>
           <option value="pending_activation">Aguardando ativação</option>
@@ -167,12 +220,16 @@ export function AdminUsers({ rows, plans }: { rows: Row[]; plans: any[] }) {
           <option value="blocked">Bloqueado</option>
           <option value="cancelled">Cancelado</option>
         </select>
-        <select className="input max-w-[180px]" value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}>
+        <select className="input max-w-[180px]" value={roleFilter} onChange={(e) => changeFilter(setRoleFilter)(e.target.value)}>
           <option value="all">Todos os papéis</option>
           <option value="user">Usuários comuns</option>
           <option value="superadmin">Super admins</option>
         </select>
-        <button className="btn btn-primary ml-auto" onClick={() => { setCreating(true); setCreateForm({ name: "", email: "", password: "", role: "user" }); setCreateMsg(null); }}>
+        <span className="text-xs text-gray-400 ml-auto">
+          {sorted.length} usuário{sorted.length === 1 ? "" : "s"}
+          {sorted.length > USERS_PER_PAGE && ` · página ${safePage} de ${totalPages}`}
+        </span>
+        <button className="btn btn-primary" onClick={() => { setCreating(true); setCreateForm({ name: "", email: "", password: "", role: "user" }); setCreateMsg(null); }}>
           ＋ Novo usuário
         </button>
       </div>
@@ -195,9 +252,12 @@ export function AdminUsers({ rows, plans }: { rows: Row[]; plans: any[] }) {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((r) => {
+              {pageRows.map((r) => {
                 const p = r.profile;
                 const s = r.subscription;
+                const isActive = r.tenant?.site_status === "active";
+                const isSuspended = r.tenant?.site_status === "suspended";
+                const isBlockedUser = p.status === "blocked";
                 return (
                   <tr key={p.user_id}>
                     <td>
@@ -249,20 +309,44 @@ export function AdminUsers({ rows, plans }: { rows: Row[]; plans: any[] }) {
                     </td>
                     <td className="text-xs text-gray-500">{r.registeredAt}</td>
                     <td>
-                      <div className="flex flex-col gap-1 min-w-[150px]">
+                      <div className="flex flex-col gap-1 min-w-[180px]">
                         <button className="btn btn-outline !py-1 !px-2 text-xs" onClick={() => openEdit(r)}>
-                          ✎ Editar completo
+                          ✎ Editar / Bloquear / Excluir
                         </button>
-                        <div className="flex gap-1">
-                          {p.status !== "blocked" ? (
-                            <button className="btn btn-danger !py-1 !px-2 text-xs" onClick={() => runAction(p.user_id, "block")} disabled={busy === p.user_id}>Bloquear</button>
+                        <div className="flex gap-1 flex-wrap">
+                          {!isActive && !isBlockedUser && r.tenant ? (
+                            <button
+                              className="btn btn-primary !py-1 !px-2 text-xs"
+                              onClick={() => setActivateFor({ row: r, mode: "trial" })}
+                              disabled={busy === p.user_id}
+                              title="Ativar site. Após 3 meses inicia cobrança mensal."
+                            >
+                              ▶ Ativar site
+                            </button>
+                          ) : isActive ? (
+                            <button
+                              className="btn btn-outline !py-1 !px-2 text-xs"
+                              onClick={() => runAction(p.user_id, "suspend")}
+                              disabled={busy === p.user_id}
+                              title="Bloquear site: fica invisível ao público mas o histórico é preservado."
+                            >
+                              🔒 Bloquear site
+                            </button>
+                          ) : null}
+                          {isSuspended && !isBlockedUser ? (
+                            <button
+                              className="btn btn-outline !py-1 !px-2 text-xs"
+                              onClick={() => runAction(p.user_id, "unsuspend")}
+                              disabled={busy === p.user_id}
+                              title="Reativar site (mantém histórico)."
+                            >
+                              🔓 Desbloquear site
+                            </button>
+                          ) : null}
+                          {isBlockedUser ? (
+                            <button className="btn btn-primary !py-1 !px-2 text-xs" onClick={() => runAction(p.user_id, "unblock")} disabled={busy === p.user_id}>Desbloquear usuário</button>
                           ) : (
-                            <button className="btn btn-primary !py-1 !px-2 text-xs" onClick={() => runAction(p.user_id, "unblock")} disabled={busy === p.user_id}>Desbloquear</button>
-                          )}
-                          {!r.tenant ? null : r.tenant.site_status !== "active" && p.status !== "blocked" ? (
-                            <button className="btn btn-gold !py-1 !px-2 text-xs" onClick={() => runAction(p.user_id, "activate_site", { billing: "none" })} disabled={busy === p.user_id}>Ativar site</button>
-                          ) : (
-                            <button className="btn btn-outline !py-1 !px-2 text-xs" onClick={() => runAction(p.user_id, "suspend")} disabled={busy === p.user_id}>Suspender site</button>
+                            <button className="btn btn-danger !py-1 !px-2 text-xs" onClick={() => runAction(p.user_id, "block")} disabled={busy === p.user_id}>Bloquear usuário</button>
                           )}
                         </div>
                       </div>
@@ -270,13 +354,105 @@ export function AdminUsers({ rows, plans }: { rows: Row[]; plans: any[] }) {
                   </tr>
                 );
               })}
-              {filtered.length === 0 && (
+              {pageRows.length === 0 && (
                 <tr><td colSpan={9} className="text-center text-gray-400 py-8">Nenhum usuário encontrado.</td></tr>
               )}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* ---------- Paginação ---------- */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-3">
+          <p className="text-xs text-gray-500">
+            Mostrando {startIdx + 1}–{Math.min(startIdx + USERS_PER_PAGE, sorted.length)} de {sorted.length}
+          </p>
+          <div className="flex gap-2">
+            <button
+              className="btn btn-outline !py-1.5 !px-4 text-xs"
+              disabled={safePage <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+            >
+              ← Voltar
+            </button>
+            <button
+              className="btn btn-outline !py-1.5 !px-4 text-xs"
+              disabled={safePage >= totalPages}
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            >
+              Avançar →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ---------- MODAL: ativar site com escolha de billing ---------- */}
+      {activateFor && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-start justify-center p-4 overflow-y-auto">
+          <div className="card w-full max-w-lg my-8">
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="card-title">Ativar site</h2>
+              <button className="text-gray-400 text-xl" onClick={() => setActivateFor(null)}>✕</button>
+            </div>
+            <p className="text-xs text-gray-400 mb-4">
+              {activateFor.row.profile.email} · /{activateFor.row.tenant?.slug || "—"}
+            </p>
+
+            <div className="space-y-2">
+              <button
+                className="w-full text-left rounded-xl border-2 border-[#1d5c3a] bg-[#f1f7f3] p-4 hover:bg-[#e7f0ea]"
+                onClick={() => setActivateFor({ ...activateFor, mode: "trial" })}
+              >
+                <div className="flex items-center gap-2">
+                  <span className={`h-4 w-4 rounded-full border-2 ${activateFor.mode === "trial" ? "border-[#1d5c3a] bg-[#1d5c3a]" : "border-gray-300"}`} />
+                  <p className="font-semibold text-[#1d5c3a]">A) Ativar com 3 meses grátis</p>
+                </div>
+                <p className="text-xs text-gray-500 mt-1 pl-6">
+                  Site entra no ar imediatamente. A cobrança mensal inicia automaticamente após 3 meses.
+                </p>
+              </button>
+
+              <button
+                className="w-full text-left rounded-xl border-2 border-[#b8881c] bg-[#fdf7e3] p-4 hover:bg-[#f8eecb]"
+                onClick={() => setActivateFor({ ...activateFor, mode: "monthly" })}
+              >
+                <div className="flex items-center gap-2">
+                  <span className={`h-4 w-4 rounded-full border-2 ${activateFor.mode === "monthly" ? "border-[#b8881c] bg-[#b8881c]" : "border-gray-300"}`} />
+                  <p className="font-semibold text-[#8a6a1f]">B) Ativar e cobrar mensalidade agora</p>
+                </div>
+                <p className="text-xs text-gray-500 mt-1 pl-6">
+                  Site entra no ar e a recorrência mensal é criada imediatamente no gateway.
+                </p>
+              </button>
+
+              <button
+                className="w-full text-left rounded-xl border-2 border-gray-300 bg-gray-50 p-4 hover:bg-gray-100"
+                onClick={() => setActivateFor({ ...activateFor, mode: "none" })}
+              >
+                <div className="flex items-center gap-2">
+                  <span className={`h-4 w-4 rounded-full border-2 ${activateFor.mode === "none" ? "border-gray-600 bg-gray-600" : "border-gray-300"}`} />
+                  <p className="font-semibold text-gray-700">C) Ativar sem cobrança mensal</p>
+                </div>
+                <p className="text-xs text-gray-500 mt-1 pl-6">
+                  Site entra no ar mas fica isento da mensalidade (free vitalício).
+                </p>
+              </button>
+            </div>
+
+            <div className="mt-5 flex items-center gap-3">
+              <button
+                className="btn btn-primary"
+                disabled={busy === activateFor.row.profile.user_id}
+                onClick={confirmActivation}
+              >
+                {busy === activateFor.row.profile.user_id ? "Ativando..." : "Confirmar ativação"}
+              </button>
+              <button className="btn btn-outline" onClick={() => setActivateFor(null)}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ---------- MODAL: editar usuário completo ---------- */}
       {editing && (
@@ -452,19 +628,24 @@ export function AdminUsers({ rows, plans }: { rows: Row[]; plans: any[] }) {
                         {editing.tenant ? <StatusBadge status={editing.tenant.site_status} /> : "—"}
                       </p>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
                       {editing.tenant?.site_status !== "active" ? (
                         <>
-                          <button className="btn btn-primary !py-1.5 !px-3 text-xs" disabled={busy === editing.profile.user_id} onClick={() => runAction(editing.profile.user_id, "activate_site", { billing: "monthly" })}>
-                            Ativar (mensal)
+                          <button className="btn btn-primary !py-1.5 !px-3 text-xs" disabled={busy === editing.profile.user_id} onClick={() => setActivateFor({ row: editing, mode: "trial" })}>
+                            ▶ Ativar (3 meses grátis)
                           </button>
-                          <button className="btn btn-gold !py-1.5 !px-3 text-xs" disabled={busy === editing.profile.user_id} onClick={() => runAction(editing.profile.user_id, "activate_site", { billing: "none" })}>
+                          <button className="btn btn-gold !py-1.5 !px-3 text-xs" disabled={busy === editing.profile.user_id} onClick={() => setActivateFor({ row: editing, mode: "none" })}>
                             Ativar (sem mensal)
                           </button>
                         </>
                       ) : (
                         <button className="btn btn-outline !py-1.5 !px-3 text-xs" disabled={busy === editing.profile.user_id} onClick={() => runAction(editing.profile.user_id, "suspend")}>
-                          Suspender site
+                          🔒 Bloquear site
+                        </button>
+                      )}
+                      {editing.tenant?.site_status === "suspended" && (
+                        <button className="btn btn-outline !py-1.5 !px-3 text-xs" disabled={busy === editing.profile.user_id} onClick={() => runAction(editing.profile.user_id, "unsuspend")}>
+                          🔓 Desbloquear site
                         </button>
                       )}
                       {editing.profile.status === "blocked" ? (
@@ -479,7 +660,7 @@ export function AdminUsers({ rows, plans }: { rows: Row[]; plans: any[] }) {
                     </div>
                   </div>
                   <p className="text-[0.7rem] text-gray-400">
-                    Bloquear impede o login imediatamente (banimento real na conta de autenticação) e tira o site do ar.
+                    Bloquear usuário impede o login (banimento real). Bloquear site só esconde o site do público e preserva todo o histórico (CRM, conteúdo, mídias).
                   </p>
 
                   <hr className="border-gray-200/60" />

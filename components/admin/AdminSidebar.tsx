@@ -6,12 +6,11 @@ import { useEffect, useState } from "react";
 
 const LINKS = [
   { href: "/admin", label: "Visão geral", icon: "📊" },
-  { href: "/admin/conta", label: "Contas", icon: "👤" },
+  { href: "/admin/usuarios", label: "Usuários", icon: "👥" },
   { href: "/admin/editor-home", label: "Editor da Home", icon: "🏗️" },
   { href: "/admin/editor-ia", label: "Provedores de IA", icon: "🔑" },
   { href: "/admin/ia", label: "Central de IA", icon: "🤖" },
   { href: "/admin/crm", label: "CRM (geral)", icon: "📇" },
-  { href: "/admin/usuarios", label: "Usuários", icon: "👥" },
   { href: "/admin/afiliados", label: "Programa de Afiliados", icon: "🤝" },
   { href: "/admin/financeiro", label: "Financeiro", icon: "💰" },
   { href: "/admin/midias", label: "Mídias (R2)", icon: "🖼️" },
