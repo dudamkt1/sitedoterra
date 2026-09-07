@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { StatCard } from "@/components/dashboard/ui";
 import { LoadingState, ErrorState, Toast, confirmDialog } from "@/components/crm/crm-ui";
+import CrmMetasSection from "@/components/crm/CrmMetasSection";
 import { formatBRL } from "@/lib/utils";
 import { exportPdfAll, exportCsvAll, fetchCrmBundle } from "@/lib/crm-export";
 import type { CrmDashboardStats, CrmSettings, CrmWhatsAppConfig } from "@/types";
@@ -115,6 +116,9 @@ export default function CrmDashboard({ initialStats, initialSettings, initialWha
         <StatCard label="Próximos aniversários" value={stats.upcomingBirthdays.length} icon="🎂" />
         <StatCard label="Próximas tarefas" value={stats.upcomingTasks.filter((t) => t.status !== "Concluída").length} icon="✅" />
       </div>
+
+      {/* Minhas Metas — progresso com vendas reais + ações */}
+      <CrmMetasSection />
 
       {/* Gráfico de faturamento */}
       <div className="card mt-6">

@@ -22,6 +22,15 @@ import {
 import type { SectionType } from "@/types";
 import { TOOL_SCHEMAS } from "@/lib/ai-tools";
 import { DEMO_AI_TOOLS, DEMO_AI_TEMPLATES, DEMO_AI_PROVIDERS } from "./ai-catalog";
+import {
+  currentPeriod,
+  getMonthWindow,
+  getSemesterWindow,
+  getYearWindow,
+  computeGoalProgress,
+  generateRecommendations,
+  sumSalesInWindow,
+} from "@/lib/crm-metas";
 
 export interface DemoApiResult {
   status: number;
@@ -136,6 +145,148 @@ function handleCrm(pathname: string, sp: URLSearchParams, method: string, body: 
         settings: db.settings,
       },
     };
+  }
+
+  // ---------- metas (demonstração) ----------
+  function ensureDemoGoals(db: DemoCrmData) {
+    if (!Array.isArray((db as any).goals) || !(db as any).goals.length) {
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = now.getMonth() + 1;
+      const s = m <= 6 ? 1 : 2;
+      (db as any).goals = [
+        { id: "goal_monthly", type: "monthly", year: y, month: m, semester: null, target_cents: 200000, target_sales: 0, name: "Meta mensal", created_at: now.toISOString() },
+        { id: "goal_semiannual", type: "semiannual", year: y, month: null, semester: s, target_cents: 1200000, target_sales: 0, name: "Meta semestral", created_at: now.toISOString() },
+        { id: "goal_annual", type: "annual", year: y, month: null, semester: null, target_cents: 2400000, target_sales: 0, name: "Meta anual", created_at: now.toISOString() },
+      ];
+    }
+    if (!Array.isArray((db as any).goalChecks)) (db as any).goalChecks = [];
+  }
+
+  if (pathname === "/api/crm/metas") {
+    ensureDemoGoals(db);
+    const cp = currentPeriod();
+    const todayISO = today();
+    const monthWindow = getMonthWindow(cp.year, cp.month);
+    const semesterWindow = getSemesterWindow(cp.year, cp.semester);
+    const yearWindow = getYearWindow(cp.year);
+    const flatSales = db.sales.map((s) => ({
+      status: s.status,
+      total_cents: s.items.reduce((a, i) => a + i.total_cents, 0),
+      sale_date: s.sale_date,
+    }));
+
+    if (method === "GET") {
+      const findMeta = (type: string) =>
+        (db as any).goals.find((g: any) =>
+          type === "monthly" ? g.type === "monthly" && g.year === cp.year && g.month === cp.month
+          : type === "semiannual" ? g.type === "semiannual" && g.year === cp.year && g.semester === cp.semester
+          : g.type === "annual" && g.year === cp.year
+        );
+      const buildEntry = (type: "monthly" | "semiannual" | "annual", window: { start: string; end: string; label: string; periodKey: string }) => {
+        const meta = findMeta(type);
+        const { realized_cents, realized_sales } = sumSalesInWindow(flatSales, window);
+        const p = computeGoalProgress(realized_cents, realized_sales, meta?.target_cents || 0, window, todayISO);
+        return {
+          id: meta?.id || null, tenant_id: "demo", type,
+          year: cp.year, month: type === "monthly" ? cp.month : null, semester: type === "semiannual" ? cp.semester : null,
+          target_cents: meta?.target_cents || 0, target_sales: 0,
+          realized_cents: p.realized_cents, realized_sales: p.realized_sales,
+          missing_cents: p.missing_cents, percent: p.percent, projected_cents: p.projected_cents, pace: p.pace,
+          period_start: window.start, period_end: window.end, period_label: window.label, period_key: window.periodKey,
+          diagnosis: p.diagnosis, remaining_days: p.remaining_days, daily_needed_cents: p.daily_needed_cents,
+        };
+      };
+      const monthly = buildEntry("monthly", monthWindow);
+      const semiannual = buildEntry("semiannual", semesterWindow);
+      const annual = buildEntry("annual", yearWindow);
+
+      const noContact = db.clients.filter((c) => !c.last_contact_at || Date.now() - new Date(c.last_contact_at).getTime() > 30 * 86400000);
+      const leads = db.clients.filter((c) => c.category === "Lead");
+      const pending = db.tasks.filter((t) => t.status !== "Concluída");
+      const monthSales = flatSales.filter((s) => s.sale_date >= monthWindow.start && s.sale_date <= monthWindow.end && s.status !== "Cancelado" && s.status !== "Reembolsado");
+      const ticketAvg = monthSales.length ? Math.round(monthSales.reduce((a, s) => a + s.total_cents, 0) / monthSales.length) : 15000;
+      const recs = generateRecommendations({
+        noContactCount: noContact.length, leadsCount: leads.length, pendingTasksCount: pending.length,
+        monthSalesCount: monthSales.length, ticketAvgCents: ticketAvg, percent: monthly.percent, missing_cents: monthly.missing_cents,
+      });
+      const checkByKey = new Map(((db as any).goalChecks as any[]).map((c) => [`${c.meta_id}:${c.action_key}`, c]));
+      const monthlyId = findMeta("monthly")?.id || null;
+      const recommendations = recs.map((r) => ({ ...r, status: (monthlyId ? checkByKey.get(`${monthlyId}:${r.action_key}`)?.status : undefined) || "pending" }));
+
+      const history: { key: string; label: string; realized_cents: number; target_cents: number; percent: number }[] = [];
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(cp.year, cp.month - 1 - i, 1);
+        const w = getMonthWindow(d.getFullYear(), d.getMonth() + 1);
+        const { realized_cents } = sumSalesInWindow(flatSales, w);
+        const past = (db as any).goals.find((g: any) => g.type === "monthly" && g.year === d.getFullYear() && g.month === d.getMonth() + 1);
+        const target = past?.target_cents || (i === 0 ? monthly.target_cents : 0);
+        history.push({ key: w.periodKey, label: w.label, realized_cents, target_cents: target, percent: target > 0 ? Math.round((realized_cents / target) * 100) : 0 });
+      }
+
+      return {
+        status: 200,
+        json: {
+          now: cp,
+          goals: { monthly, semiannual, annual },
+          recommendations,
+          checks: monthlyId ? (db as any).goalChecks.filter((c: any) => c.meta_id === monthlyId) : [],
+          history,
+          counts: { noContact: noContact.length, leads: leads.length, pendingTasks: pending.length, monthSales: monthSales.length, ticketAvgCents: ticketAvg },
+        },
+      };
+    }
+    if (method === "POST") {
+      const type = String(body.type || "monthly");
+      const target_cents = Math.max(0, Math.round(Number(body.target_cents || 0)));
+      if (!["monthly", "semiannual", "annual"].includes(type) || !target_cents) {
+        return { status: 400, json: { error: "Informe o valor da meta (maior que zero)." } };
+      }
+      const year = Number(body.year || cp.year);
+      const month = type === "monthly" ? Number(body.month || cp.month) : null;
+      const semester = type === "semiannual" ? Number(body.semester || cp.semester) : null;
+      const list = (db as any).goals as any[];
+      let found = list.find((g) => g.type === type && g.year === year && (g.month || null) === month && (g.semester || null) === semester);
+      if (found) found.target_cents = target_cents;
+      else {
+        found = { id: genId("goal"), type, year, month, semester, target_cents, target_sales: 0, name: `Meta ${type}`, created_at: new Date().toISOString() };
+        list.push(found);
+      }
+      saveDemoCrm(db);
+      return { status: 200, json: { success: true, goal: found } };
+    }
+  }
+
+  if (pathname === "/api/crm/metas/checks" && method === "POST") {
+    ensureDemoGoals(db);
+    const cp = currentPeriod();
+    let metaId = typeof body.meta_id === "string" && body.meta_id ? body.meta_id : null;
+    if (!metaId) {
+      let found = (db as any).goals.find((g: any) => g.type === "monthly" && g.year === cp.year && g.month === cp.month);
+      if (!found) {
+        found = { id: genId("goal"), type: "monthly", year: cp.year, month: cp.month, semester: null, target_cents: 0, target_sales: 0, name: "Meta mensal", created_at: new Date().toISOString() };
+        (db as any).goals.push(found);
+      }
+      metaId = found.id;
+    }
+    const action_key = String(body.action_key || "").trim();
+    if (!action_key) return { status: 400, json: { error: "action_key é obrigatório." } };
+    const status = ["pending", "done", "skipped"].includes(body.status) ? body.status : "done";
+    const list = (db as any).goalChecks as any[];
+    let check = list.find((c) => c.meta_id === metaId && c.action_key === action_key);
+    if (check) {
+      check.status = status;
+      check.done_at = status === "done" ? new Date().toISOString() : null;
+    } else {
+      check = {
+        id: genId("chk"), meta_id: metaId, action_key, title: String(body.title || action_key),
+        status, priority: 2, period_key: `${cp.year}-${String(cp.month).padStart(2, "0")}`,
+        done_at: status === "done" ? new Date().toISOString() : null, created_at: new Date().toISOString(),
+      };
+      list.push(check);
+    }
+    saveDemoCrm(db);
+    return { status: 200, json: { success: true, meta_id: metaId } };
   }
 
   // ---------- clients ----------

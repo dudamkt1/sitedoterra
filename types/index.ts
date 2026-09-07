@@ -717,6 +717,61 @@ export interface CrmExportBundle {
   loyaltyPoints: CrmLoyaltyPoint[];
 }
 
+// ============================ CRM METAS ============================
+
+export type CrmGoalType = "monthly" | "semiannual" | "annual";
+export type CrmGoalPace = "no-target" | "behind" | "on-track" | "ahead" | "achieved";
+
+export interface CrmGoal {
+  id: string;
+  tenant_id: string;
+  user_id: string;
+  type: CrmGoalType;
+  year: number;
+  month: number | null;
+  semester: number | null;
+  target_cents: number;
+  target_sales: number;
+  name: string | null;
+  created_at: string;
+  updated_at: string;
+  /** Progresso calculado (somente leitura). */
+  realized_cents?: number;
+  realized_sales?: number;
+  missing_cents?: number;
+  percent?: number;
+  projected_cents?: number;
+  pace?: CrmGoalPace;
+  period_start?: string;
+  period_end?: string;
+  period_label?: string;
+  period_key?: string;
+}
+
+export interface CrmGoalCheck {
+  id: string;
+  tenant_id: string;
+  meta_id: string;
+  action_key: string;
+  title: string;
+  status: "pending" | "done" | "skipped";
+  priority: number;
+  period_key: string;
+  done_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CrmGoalRecommendation {
+  action_key: string;
+  title: string;
+  detail: string;
+  href: string;
+  priority: number;
+  count: number;
+  status?: "pending" | "done" | "skipped";
+}
+
 // ============================ AFILIADOS ============================
 
 export type AffiliateConversionStatus = "pendente" | "aprovado" | "pago" | "estornado";

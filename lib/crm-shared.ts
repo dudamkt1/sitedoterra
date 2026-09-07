@@ -138,6 +138,18 @@ export const VIP_DEFAULT_RULES = {
   reorderMonths: 6,
 };
 
+export const META_TYPES = [
+  { code: "monthly", label: "Mensal" },
+  { code: "semiannual", label: "Semestral" },
+  { code: "annual", label: "Anual" },
+] as const;
+
+export const META_TYPE_LABELS: Record<string, string> = {
+  monthly: "Mensal",
+  semiannual: "Semestral",
+  annual: "Anual",
+};
+
 export const DEFAULT_LEVELS = [
   { name: "Bronze", min_points: 0 },
   { name: "Prata", min_points: 100 },

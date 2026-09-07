@@ -82,6 +82,30 @@ export interface DemoCrmTask {
   created_at: string;
 }
 
+export interface DemoCrmGoal {
+  id: string;
+  type: "monthly" | "semiannual" | "annual";
+  year: number;
+  month: number | null;
+  semester: number | null;
+  target_cents: number;
+  target_sales: number;
+  name: string | null;
+  created_at: string;
+}
+
+export interface DemoCrmGoalCheck {
+  id: string;
+  meta_id: string;
+  action_key: string;
+  title: string;
+  status: "pending" | "done" | "skipped";
+  priority: number;
+  period_key: string;
+  done_at: string | null;
+  created_at: string;
+}
+
 export interface DemoCrmFinancialEntry {
   id: string;
   type: "income" | "expense";
@@ -231,6 +255,8 @@ export interface DemoCrmData {
   loyalty: DemoCrmLoyaltySettings;
   whatsappConfig: DemoCrmWhatsAppConfig;
   settings: DemoCrmSettings;
+  goals: DemoCrmGoal[];
+  goalChecks: DemoCrmGoalCheck[];
   media: DemoMediaFile[];
   domains: DemoDomain[];
   aiHistory: DemoAiHistoryItem[];
@@ -349,6 +375,16 @@ export function buildDemoCrmSeed(): DemoCrmData {
     { id: "pt_3", client_id: "cli_5", amount: 190, type: "indicacao", description: "Indicação de amiga", created_at: monthsAgoDate(2) },
   ];
 
+  const now = new Date();
+  const curYear = now.getFullYear();
+  const curMonth = now.getMonth() + 1;
+  const curSemester = curMonth <= 6 ? 1 : 2;
+  const goals: DemoCrmGoal[] = [
+    { id: "goal_monthly", type: "monthly", year: curYear, month: curMonth, semester: null, target_cents: 200000, target_sales: 0, name: "Meta mensal", created_at: nowIso() },
+    { id: "goal_semiannual", type: "semiannual", year: curYear, month: null, semester: curSemester, target_cents: 1200000, target_sales: 0, name: "Meta semestral", created_at: nowIso() },
+    { id: "goal_annual", type: "annual", year: curYear, month: null, semester: null, target_cents: 2400000, target_sales: 0, name: "Meta anual", created_at: nowIso() },
+  ];
+
   return {
     clients,
     products,
@@ -360,6 +396,8 @@ export function buildDemoCrmSeed(): DemoCrmData {
     notes: [],
     timeline: [],
     points,
+    goals,
+    goalChecks: [],
     messages: [],
     automations: [
       { id: "auto_1", type: "cobranca_antes", enabled: true, days: 3, schedule_time: "09:00", message: "Oi! Passando para lembrar que sua cobrança vence em breve. Qualquer dúvida, me chame! 💚" },
