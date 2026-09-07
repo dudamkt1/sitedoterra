@@ -296,12 +296,12 @@ begin
 
   -- funções (re-create é seguro)
   create or replace function public.get_platform_config(p_key text) returns jsonb
-    language sql security definer set search_path = public stable as $$
+    language sql security definer set search_path = public stable as $func$
       select value from public.platform_config where key = p_key limit 1;
-    $$;
+    $func$;
 
   create or replace function public.set_platform_config(p_key text, p_value jsonb) returns void
-    language plpgsql security definer set search_path = public as $$
+    language plpgsql security definer set search_path = public as $func$
     begin
       if not public.is_superadmin() then
         raise exception 'not_authorized';
@@ -309,15 +309,15 @@ begin
       insert into public.platform_config (key, value) values (p_key, p_value)
         on conflict (key) do update set value = excluded.value, updated_at = now();
     end;
-    $$;
+    $func$;
 
   create or replace function public.is_official_home_tenant(p_tenant_id uuid) returns boolean
-    language sql security definer set search_path = public stable as $$
+    language sql security definer set search_path = public stable as $func$
       select exists(select 1 from public.tenants where id = p_tenant_id and is_official_home = true);
-    $$;
+    $func$;
 
   create or replace function public.resolve_official_home_tenant() returns public.tenants
-    language plpgsql security definer set search_path = public stable as $$
+    language plpgsql security definer set search_path = public stable as $func$
     declare v_tenant public.tenants; v_slug text;
     begin
       select * into v_tenant from public.tenants where is_official_home = true limit 1;
@@ -331,10 +331,10 @@ begin
         where p.role = 'superadmin' order by t.created_at asc limit 1;
       return v_tenant;
     end;
-    $$;
+    $func$;
 
   create or replace function public.ensure_official_tenant_for_superadmin() returns trigger
-    language plpgsql security definer set search_path = public as $$
+    language plpgsql security definer set search_path = public as $func$
     declare v_tenant_id uuid; v_existing_tenant uuid;
     begin
       if (TG_OP = 'UPDATE' and OLD.role is not distinct from NEW.role) then return NEW; end if;
@@ -356,7 +356,7 @@ begin
       end;
       return NEW;
     end;
-    $$;
+    $func$;
 
   if not exists (select 1 from pg_trigger where tgname = 'profiles_ensure_official_tenant') then
     create trigger profiles_ensure_official_tenant
