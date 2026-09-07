@@ -117,6 +117,43 @@ function whatsappLink(whatsapp: string | null, name: string, date: string, time:
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
 
+const DEMO_SETTINGS_KEY = "sitedoterra_demo_booking_settings_v1";
+const DEMO_SENT_KEY = "sitedoterra_demo_reminders_sent_v1";
+
+function loadDemoSettings(): { enabled: boolean; minutes: number } {
+  if (typeof window === "undefined") return { enabled: true, minutes: 30 };
+  try {
+    const raw = localStorage.getItem(DEMO_SETTINGS_KEY);
+    if (!raw) return { enabled: true, minutes: 30 };
+    const json = JSON.parse(raw);
+    const minutes = Math.min(1440, Math.max(5, Math.round(Number(json.minutes) || 30)));
+    return { enabled: json.enabled !== false, minutes };
+  } catch {
+    return { enabled: true, minutes: 30 };
+  }
+}
+
+function loadDemoSent(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(DEMO_SENT_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr.filter((x) => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function reminderMessage(name: string, date: string, time: string) {
+  const today = todayIso();
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  const tomorrow = d.toISOString().slice(0, 10);
+  const dbr = date.split("-").reverse().join("/");
+  const when = date === today ? "hoje" : date === tomorrow ? "amanhã" : `no dia ${dbr}`;
+  return `Olá ${name}! 🌿 Passando para lembrar da nossa consulta ${when} às ${time}. Qualquer imprevisto, me avise por aqui!`;
+}
+
 export function BookingAppointmentsManager() {
   const [bookings, setBookings] = useState<TenantBooking[]>([]);
   const [loading, setLoading] = useState(true);
@@ -128,6 +165,37 @@ export function BookingAppointmentsManager() {
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [form, setForm] = useState({ client_name: "", client_whatsapp: "", client_email: "", booking_date: todayIso(), booking_time: "09:00", notes: "" });
   const [saving, setSaving] = useState(false);
+  const [reminderSettings, setReminderSettings] = useState({ enabled: true, minutes: 30 });
+  const [settingsNeedsSetup, setSettingsNeedsSetup] = useState(false);
+  const [minutesDraft, setMinutesDraft] = useState("30");
+  const [enabledDraft, setEnabledDraft] = useState(true);
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [sendingId, setSendingId] = useState<string | null>(null);
+  const [demoSent, setDemoSent] = useState<string[]>(() => loadDemoSent());
+
+  async function loadReminderSettings(isDemo: boolean) {
+    if (isDemo) {
+      const s = loadDemoSettings();
+      setReminderSettings(s);
+      setMinutesDraft(String(s.minutes));
+      setEnabledDraft(s.enabled);
+      return;
+    }
+    try {
+      const res = await fetch("/api/bookings/settings");
+      const json = await res.json();
+      if (res.ok && json.settings) {
+        const minutes = Math.min(1440, Math.max(5, Math.round(Number(json.settings.reminder_minutes) || 30)));
+        const enabled = json.settings.reminder_enabled !== false;
+        setReminderSettings({ enabled, minutes });
+        setMinutesDraft(String(minutes));
+        setEnabledDraft(enabled);
+        setSettingsNeedsSetup(!!json.needsSetup);
+      }
+    } catch {
+      // mantém padrão local (30 min)
+    }
+  }
 
   async function load() {
     setLoading(true);
@@ -137,6 +205,7 @@ export function BookingAppointmentsManager() {
         // fallback demo
         setIsDemoFallback(true);
         setBookings(loadDemo());
+        await loadReminderSettings(true);
         setLoading(false);
         return;
       }
@@ -144,11 +213,13 @@ export function BookingAppointmentsManager() {
       if (res.ok) {
         setBookings(json.bookings || []);
         setIsDemoFallback(false);
+        await loadReminderSettings(false);
       } else {
         // se tabela não existe, cai no demo
         if (json.error?.includes("Tabela") || json.error?.includes("migration")) {
           setIsDemoFallback(true);
           setBookings(loadDemo());
+          await loadReminderSettings(true);
         } else {
           setMessage({ ok: false, text: json.error || "Erro ao carregar agendamentos." });
         }
@@ -156,6 +227,7 @@ export function BookingAppointmentsManager() {
     } catch {
       setIsDemoFallback(true);
       setBookings(loadDemo());
+      await loadReminderSettings(true);
     }
     setLoading(false);
   }
@@ -182,6 +254,11 @@ export function BookingAppointmentsManager() {
         const next = bookings.map((b) => b.id === editing.id ? updated : b);
         setBookings(next);
         saveDemo(next);
+        if (editing.booking_date !== form.booking_date || editing.booking_time !== form.booking_time) {
+          const sentNext = demoSent.filter((id) => id !== editing.id);
+          setDemoSent(sentNext);
+          localStorage.setItem(DEMO_SENT_KEY, JSON.stringify(sentNext));
+        }
         setMessage({ ok: true, text: "Agendamento atualizado (demonstração — salvo neste navegador)." });
       } else {
         const nb: TenantBooking = {
@@ -271,6 +348,119 @@ export function BookingAppointmentsManager() {
     setShowForm(true);
   }
 
+  function isReminderSent(b: TenantBooking): boolean {
+    if (b.reminder_sent_at) return true;
+    return demoSent.includes(b.id);
+  }
+
+  /** Compromissos que entram na janela do lembrete e ainda não foram avisados. */
+  const dueReminders = useMemo(() => {
+    if (!reminderSettings.enabled) return [];
+    const windowMs = reminderSettings.minutes * 60_000;
+    const now = Date.now();
+    return bookings.filter((b) => {
+      if (!["pendente", "confirmado"].includes(b.status)) return false;
+      if (!b.client_whatsapp) return false;
+      if (isReminderSent(b)) return false;
+      const start = new Date(`${b.booking_date}T${b.booking_time}:00`).getTime();
+      const diff = start - now;
+      return diff > 0 && diff <= windowMs;
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    });
+  }, [bookings, reminderSettings, demoSent]);
+
+  async function saveReminderSettings(e: React.FormEvent) {
+    e.preventDefault();
+    const minutes = Math.round(Number(minutesDraft));
+    if (!minutes || minutes < 5 || minutes > 1440) {
+      setMessage({ ok: false, text: "Tempo inválido. Use entre 5 e 1440 minutos." });
+      return;
+    }
+    setSavingSettings(true);
+    setMessage(null);
+    if (isDemoFallback) {
+      const s = { enabled: enabledDraft, minutes };
+      localStorage.setItem(DEMO_SETTINGS_KEY, JSON.stringify(s));
+      setReminderSettings(s);
+      setMessage({ ok: true, text: `Lembretes configurados: ${minutes} min antes. (demonstração)` });
+      setSavingSettings(false);
+      return;
+    }
+    try {
+      const res = await fetch("/api/bookings/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reminder_enabled: enabledDraft, reminder_minutes: minutes }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Erro ao salvar.");
+      setReminderSettings({ enabled: enabledDraft, minutes });
+      setSettingsNeedsSetup(false);
+      setMessage({ ok: true, text: `Lembretes configurados: ${minutes} min antes do compromisso.` });
+    } catch (err) {
+      setMessage({ ok: false, text: err instanceof Error ? err.message : "Erro ao salvar." });
+    }
+    setSavingSettings(false);
+  }
+
+  async function markSent(b: TenantBooking) {
+    if (isDemoFallback) {
+      const next = [...demoSent, b.id];
+      setDemoSent(next);
+      localStorage.setItem(DEMO_SENT_KEY, JSON.stringify(next));
+      return;
+    }
+    await fetch(`/api/bookings/${b.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reminder_sent_at: new Date().toISOString() }),
+    });
+  }
+
+  async function sendReminder(b: TenantBooking) {
+    if (!b.client_whatsapp) return;
+    setSendingId(b.id);
+    setMessage(null);
+    const text = reminderMessage(b.client_name, b.booking_date, b.booking_time);
+    const digits = b.client_whatsapp.replace(/\D/g, "");
+    const waLink = `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
+
+    if (isDemoFallback) {
+      window.open(waLink, "_blank", "noopener,noreferrer");
+      const next = [...demoSent, b.id];
+      setDemoSent(next);
+      localStorage.setItem(DEMO_SENT_KEY, JSON.stringify(next));
+      setMessage({ ok: true, text: "Lembrete aberto no WhatsApp (demonstração)." });
+      setSendingId(null);
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/crm/whatsapp/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: digits, message: text }),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        await markSent(b);
+        setMessage({ ok: true, text: `Lembrete enviado para ${b.client_name}!` });
+        await load();
+      } else if (json.error === "WhatsApp não configurado.") {
+        // Sem provedor: abre o link direto (modo simples, gratuito).
+        window.open(waLink, "_blank", "noopener,noreferrer");
+        await markSent(b);
+        setMessage({ ok: true, text: "WhatsApp API não configurado — abri o link direto para envio." });
+        await load();
+      } else {
+        throw new Error(json.error || "Erro ao enviar.");
+      }
+    } catch (err) {
+      setMessage({ ok: false, text: err instanceof Error ? err.message : "Erro ao enviar lembrete." });
+    }
+    setSendingId(null);
+  }
+
   const filtered = useMemo(() => {
     let list = [...bookings];
     if (filter === "hoje") list = list.filter((b) => isToday(b.booking_date));
@@ -315,6 +505,71 @@ export function BookingAppointmentsManager() {
         </div>
 
         {message && <p className={`rounded-lg px-4 py-3 text-sm ${message.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"}`}>{message.text}</p>}
+
+        {dueReminders.length > 0 && (
+          <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3">
+            <p className="text-sm font-semibold text-green-900">
+              ⏰ {dueReminders.length} compromisso(s) começando em até {reminderSettings.minutes} min — envie o lembrete:
+            </p>
+            <ul className="mt-2 space-y-2">
+              {dueReminders.map((b) => (
+                <li key={b.id} className="flex flex-wrap items-center gap-2 rounded-lg bg-white border border-green-100 px-3 py-2">
+                  <span className="text-sm font-medium text-gray-800 flex-1 min-w-[140px]">
+                    {b.client_name} · {b.booking_date.split("-").reverse().join("/")} às {b.booking_time}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={sendingId === b.id}
+                    onClick={() => sendReminder(b)}
+                    className="btn !py-1.5 !px-3 !text-xs text-white"
+                    style={{ background: "#25D366" }}
+                  >
+                    {sendingId === b.id ? "Enviando..." : "📲 Enviar lembrete"}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <details className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+          <summary className="text-sm font-semibold text-gray-700 cursor-pointer">⚙️ Lembretes no WhatsApp</summary>
+          <form onSubmit={saveReminderSettings} className="mt-3 flex flex-col sm:flex-row sm:items-end gap-3">
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={enabledDraft}
+                onChange={(e) => setEnabledDraft(e.target.checked)}
+                className="h-4 w-4 accent-[#1d5c3a]"
+              />
+              Avisar antes dos compromissos
+            </label>
+            <div>
+              <label className="label">Minutos antes (5–1440)</label>
+              <input
+                className="input !py-2 w-32"
+                type="number"
+                min={5}
+                max={1440}
+                value={minutesDraft}
+                onChange={(e) => setMinutesDraft(e.target.value)}
+              />
+            </div>
+            <button type="submit" className="btn btn-primary !py-2 !px-4 text-xs shrink-0" disabled={savingSettings}>
+              {savingSettings ? "Salvando..." : "Salvar"}
+            </button>
+          </form>
+          {settingsNeedsSetup && (
+            <p className="text-xs text-amber-700 mt-2">
+              ⚠️ Banco ainda sem a tabela de configuração (migration 0043). Rode{" "}
+              <code>supabase/migrations/0043_booking_reminders.sql</code> no SQL Editor do Supabase.
+            </p>
+          )}
+          <p className="text-xs text-gray-400 mt-2">
+            O lembrete vai para o WhatsApp da cliente. Se o provedor WhatsApp do CRM estiver configurado, o envio é direto;
+            caso contrário, abrimos o link do WhatsApp para você enviar em 1 clique.
+          </p>
+        </details>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <div className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2.5">
@@ -375,6 +630,7 @@ export function BookingAppointmentsManager() {
                       <span className="font-semibold text-sm text-gray-900 truncate">{b.client_name}</span>
                       <span className={`badge border text-[0.7rem] ${STATUS_CLASS[b.status]}`}>{STATUS_LABEL[b.status]}</span>
                       {isToday(b.booking_date) && <span className="badge badge-yellow">Hoje</span>}
+                      {isReminderSent(b) && <span className="badge badge-green">✓ lembrete enviado</span>}
                     </div>
                     <div className="flex flex-wrap gap-2 mt-1 text-xs text-gray-500">
                       {b.client_whatsapp && <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500" />{b.client_whatsapp}</span>}

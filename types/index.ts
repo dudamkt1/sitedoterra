@@ -681,6 +681,8 @@ export interface TenantBooking {
   notes: string | null;
   status: BookingStatus;
   source: "painel" | "site" | "whatsapp" | "importado";
+  /** Quando o lembrete de WhatsApp foi enviado (null/ausente = ainda não enviado). */
+  reminder_sent_at?: string | null;
   created_at: string;
   updated_at: string;
 }

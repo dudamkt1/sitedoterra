@@ -20,6 +20,13 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   if (typeof body.booking_time === "string" && /^\d{2}:\d{2}$/.test(body.booking_time)) patch.booking_time = body.booking_time;
   if (typeof body.notes === "string") patch.notes = body.notes.trim() || null;
   if (typeof body.status === "string" && (ALLOWED as readonly string[]).includes(body.status)) patch.status = body.status;
+  if ("reminder_sent_at" in body) {
+    patch.reminder_sent_at =
+      typeof body.reminder_sent_at === "string" && body.reminder_sent_at ? body.reminder_sent_at : null;
+  } else if (patch.booking_date || patch.booking_time) {
+    // Reagendou para outra data/hora: permite novo lembrete.
+    patch.reminder_sent_at = null;
+  }
 
   if (Object.keys(patch).length === 0) return NextResponse.json({ error: "Nenhum campo para atualizar." }, { status: 400 });
 
