@@ -213,6 +213,18 @@ export default function CrmMetasSection() {
                     <div className="min-w-0 flex-1">
                       <p className={`text-sm font-medium ${r.status === "done" ? "line-through text-gray-400" : "text-gray-800"}`}>{r.title}</p>
                       <p className="text-xs text-gray-400">{r.detail}</p>
+                      {r.steps && r.steps.length > 0 && (
+                        <details className="mt-1.5 rounded-lg bg-[#faf8f2] border border-[#ece7da] px-2.5 py-1.5">
+                          <summary className="text-xs font-semibold text-[#1d5c3a] cursor-pointer">
+                            📖 {r.playbook_headline || "Ver roteiro"}
+                          </summary>
+                          <ol className="mt-1.5 space-y-1 list-decimal list-inside text-xs text-gray-600">
+                            {r.steps.map((s, i) => (
+                              <li key={i}>{s}</li>
+                            ))}
+                          </ol>
+                        </details>
+                      )}
                     </div>
                     <Link href={r.href} className="text-xs text-[#1d5c3a] underline whitespace-nowrap">Ver</Link>
                   </li>

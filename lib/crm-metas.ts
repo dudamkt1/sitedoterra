@@ -3,6 +3,8 @@
  * Mesma regra de saleEffectiveCents() em lib/crm.ts.
  */
 
+import { playbookFor } from "@/lib/crm-metas-playbook";
+
 export type GoalType = "monthly" | "semiannual" | "annual";
 export type GoalPace = "no-target" | "behind" | "on-track" | "ahead" | "achieved";
 
@@ -149,6 +151,9 @@ export interface Recommendation {
   href: string;
   priority: 1 | 2 | 3;
   count: number;
+  /** Roteiro do playbook (caminho 1). */
+  playbook_headline?: string;
+  steps?: string[];
 }
 
 export function generateRecommendations(input: RecommendationInput): Recommendation[] {
@@ -218,7 +223,13 @@ export function generateRecommendations(input: RecommendationInput): Recommendat
     });
   }
 
-  return out.sort((a, b) => a.priority - b.priority).slice(0, 5);
+  return out
+    .sort((a, b) => a.priority - b.priority)
+    .slice(0, 5)
+    .map((r) => {
+      const playbook = playbookFor(r.action_key);
+      return playbook ? { ...r, playbook_headline: playbook.headline, steps: playbook.steps } : r;
+    });
 }
 
 /** Soma vendas efetivas (exclui Cancelado/Reembolsado) dentro da janela. */

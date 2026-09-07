@@ -770,6 +770,8 @@ export interface CrmGoalRecommendation {
   priority: number;
   count: number;
   status?: "pending" | "done" | "skipped";
+  playbook_headline?: string;
+  steps?: string[];
 }
 
 // ============================ AFILIADOS ============================
