@@ -85,8 +85,68 @@ export default async function AdminAfiliadosPage() {
     }
   }
 
+  // 3) Contagem de cliques por afiliado (tabela affiliate_clicks)
+  const clicksCount = new Map<string, number>();
+  if (affUserIds.length > 0) {
+    const { data: clickRows, error: clickErr } = await admin
+      .from("affiliate_clicks")
+      .select("affiliate_user_id")
+      .in("affiliate_user_id", affUserIds);
+    if (clickErr) {
+      console.error("[admin/afiliados] affiliate_clicks:", clickErr.message);
+    }
+    for (const c of (clickRows as Array<{ affiliate_user_id: string }>) || []) {
+      if (!c?.affiliate_user_id) continue;
+      clicksCount.set(c.affiliate_user_id, (clicksCount.get(c.affiliate_user_id) || 0) + 1);
+    }
+  }
+
+  // 4) Contagem de conversões e saldo disponível por afiliado
+  //    Saldo disponível = soma(comissões aprovadas) - soma(saques pagos)
+  const conversionsCount = new Map<string, number>();
+  const approvedCommission = new Map<string, number>();
+  const paidPayouts = new Map<string, number>();
+  if (affUserIds.length > 0) {
+    const { data: convRowsCount, error: convCountErr } = await admin
+      .from("affiliate_conversions")
+      .select("affiliate_user_id, commission_amount, status")
+      .in("affiliate_user_id", affUserIds);
+    if (convCountErr) {
+      console.error("[admin/afiliados] affiliate_conversions (count):", convCountErr.message);
+    }
+    for (const c of (convRowsCount as Array<{ affiliate_user_id: string; commission_amount: number; status: string }>) || []) {
+      if (!c?.affiliate_user_id) continue;
+      conversionsCount.set(c.affiliate_user_id, (conversionsCount.get(c.affiliate_user_id) || 0) + 1);
+      if (c.status === "aprovado" || c.status === "pago") {
+        approvedCommission.set(
+          c.affiliate_user_id,
+          (approvedCommission.get(c.affiliate_user_id) || 0) + Number(c.commission_amount || 0),
+        );
+      }
+    }
+
+    const { data: payRowsCount, error: payCountErr } = await admin
+      .from("affiliate_payouts")
+      .select("affiliate_user_id, amount, status")
+      .in("affiliate_user_id", affUserIds);
+    if (payCountErr) {
+      console.error("[admin/afiliados] affiliate_payouts (count):", payCountErr.message);
+    }
+    for (const p of (payRowsCount as Array<{ affiliate_user_id: string; amount: number; status: string }>) || []) {
+      if (!p?.affiliate_user_id) continue;
+      if (p.status === "pago") {
+        paidPayouts.set(
+          p.affiliate_user_id,
+          (paidPayouts.get(p.affiliate_user_id) || 0) + Number(p.amount || 0),
+        );
+      }
+    }
+  }
+
   const affiliatesData = affRowsArr.map((a) => {
     const p = profilesMap.get(a.user_id);
+    const balance =
+      (approvedCommission.get(a.user_id) || 0) - (paidPayouts.get(a.user_id) || 0);
     return {
       id: a.id,
       user_id: a.user_id,
@@ -98,10 +158,13 @@ export default async function AdminAfiliadosPage() {
         user_id: a.user_id,
         created_at: p?.created_at || a.created_at,
       },
+      clicks_count: clicksCount.get(a.user_id) || 0,
+      conversions_count: conversionsCount.get(a.user_id) || 0,
+      available_balance: balance,
     };
   });
 
-  // 3) Conversões — mesma técnica de duas etapas
+  // 5) Conversões — mesma técnica de duas etapas (lista detalhada)
   const { data: convRows, error: convErr } = await admin
     .from("affiliate_conversions")
     .select("id, sale_amount, commission_amount, commission_percent_at_time, status, created_at, new_customer_user_id, affiliate_user_id")
@@ -144,7 +207,7 @@ export default async function AdminAfiliadosPage() {
     };
   });
 
-  // 4) Payouts — mesma técnica
+  // 6) Payouts — mesma técnica
   const { data: payoutRows, error: payErr } = await admin
     .from("affiliate_payouts")
     .select("id, amount, method, status, requested_at, paid_at, pix_key, pix_key_snapshot, pix_key_type_snapshot, mp_email_snapshot, payment_method_label, affiliate_user_id")

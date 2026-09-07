@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { formatBRL, formatDate } from "@/lib/utils";
 import { Button, Input, Modal, StatusBadge, Select, Checkbox } from "@/components/dashboard/ui";
 
@@ -20,6 +20,9 @@ interface Affiliate {
   is_active: boolean;
   accepted_terms_at: string | null;
   profiles: { email: string; name: string; user_id: string; created_at: string };
+  clicks_count: number;
+  conversions_count: number;
+  available_balance: number;
 }
 
 interface Conversion {
@@ -87,8 +90,32 @@ export function AdminAffiliateDashboard({ settings, affiliates, conversions, pay
   const [payoutAction, setPayoutAction] = useState<"approve" | "reject" | "pay" | null>(null);
   const [payoutNote, setPayoutNote] = useState("");
 
+  // Filtros e paginação da seção "Afiliados Ativos"
+  const [affiliateSearch, setAffiliateSearch] = useState("");
+  const [affiliatePage, setAffiliatePage] = useState(1);
+  const AFFILIATES_PER_PAGE = 20;
+
   const filteredConversions = conversionFilter === "all" ? conversions : conversions.filter(c => c.status === conversionFilter);
   const filteredPayouts = payoutFilter === "all" ? payouts : payouts.filter(p => p.status === payoutFilter);
+
+  const filteredAffiliates = useMemo(() => {
+    const term = affiliateSearch.trim().toLowerCase();
+    if (!term) return affiliates;
+    return affiliates.filter((a) => {
+      const name = (a.profiles.name || "").toLowerCase();
+      const email = (a.profiles.email || "").toLowerCase();
+      return name.includes(term) || email.includes(term);
+    });
+  }, [affiliates, affiliateSearch]);
+
+  const totalAffiliatesFiltered = filteredAffiliates.length;
+  const totalAffiliatePages = Math.max(1, Math.ceil(totalAffiliatesFiltered / AFFILIATES_PER_PAGE));
+  const safeAffiliatePage = Math.min(affiliatePage, totalAffiliatePages);
+  const affiliatesPageStart = (safeAffiliatePage - 1) * AFFILIATES_PER_PAGE;
+  const paginatedAffiliates = filteredAffiliates.slice(
+    affiliatesPageStart,
+    affiliatesPageStart + AFFILIATES_PER_PAGE,
+  );
 
   async function saveSettings() {
     setSavingSettings(true);
@@ -265,32 +292,88 @@ export function AdminAffiliateDashboard({ settings, affiliates, conversions, pay
 
       {/* Afiliados */}
       <div className="card">
-        <h2 className="card-title mb-4">Afiliados Ativos ({totalAffiliates})</h2>
-        {affiliates.length === 0 ? (
-          <p className="text-gray-400 text-center py-8">Nenhum afiliado ativo.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-200 text-left text-gray-500">
-                  <th className="pb-2">Usuário</th>
-                  <th className="pb-2">E-mail</th>
-                  <th className="pb-2">Cadastro</th>
-                  <th className="pb-2">Termos aceitos</th>
-                </tr>
-              </thead>
-              <tbody>
-                {affiliates.map((a) => (
-                  <tr key={a.id} className="border-b border-gray-100">
-                    <td className="py-3 font-medium">{a.profiles.name || "—"}</td>
-                    <td className="py-3 text-gray-600">{a.profiles.email}</td>
-                    <td className="py-3 text-gray-600">{formatDate(a.profiles.created_at)}</td>
-                    <td className="py-3 text-gray-600">{a.accepted_terms_at ? formatDate(a.accepted_terms_at) : "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+          <h2 className="card-title">
+            Afiliados Ativos ({totalAffiliatesFiltered}
+            {affiliateSearch.trim() && totalAffiliatesFiltered !== totalAffiliates ? ` de ${totalAffiliates}` : ""})
+          </h2>
+          <div className="w-full sm:w-72">
+            <Input
+              type="text"
+              placeholder="Buscar por nome ou e-mail..."
+              value={affiliateSearch}
+              onChange={(e) => {
+                setAffiliateSearch(e.target.value);
+                setAffiliatePage(1);
+              }}
+            />
           </div>
+        </div>
+        {totalAffiliatesFiltered === 0 ? (
+          <p className="text-gray-400 text-center py-8">
+            {affiliateSearch.trim()
+              ? "Nenhum afiliado encontrado para a busca."
+              : "Nenhum afiliado ativo."}
+          </p>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200 text-left text-gray-500">
+                    <th className="pb-2">Usuário</th>
+                    <th className="pb-2">E-mail</th>
+                    <th className="pb-2">Cadastro</th>
+                    <th className="pb-2">Termos aceitos</th>
+                    <th className="pb-2 text-right">Cliques no link</th>
+                    <th className="pb-2 text-right">Conversões</th>
+                    <th className="pb-2 text-right">Saldo disponível</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedAffiliates.map((a) => (
+                    <tr key={a.id} className="border-b border-gray-100">
+                      <td className="py-3 font-medium">{a.profiles.name || "—"}</td>
+                      <td className="py-3 text-gray-600">{a.profiles.email}</td>
+                      <td className="py-3 text-gray-600">{formatDate(a.profiles.created_at)}</td>
+                      <td className="py-3 text-gray-600">{a.accepted_terms_at ? formatDate(a.accepted_terms_at) : "—"}</td>
+                      <td className="py-3 text-gray-700 text-right tabular-nums">{a.clicks_count}</td>
+                      <td className="py-3 text-gray-700 text-right tabular-nums">{a.conversions_count}</td>
+                      <td className="py-3 text-right tabular-nums font-medium text-[#1d5c3a]">
+                        {formatBRL(Math.max(a.available_balance, 0) * 100)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {totalAffiliatePages > 1 && (
+              <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
+                <p className="text-xs text-gray-500">
+                  Página {safeAffiliatePage} de {totalAffiliatePages} · mostrando{" "}
+                  {paginatedAffiliates.length} de {totalAffiliatesFiltered} afiliados
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={safeAffiliatePage <= 1}
+                    onClick={() => setAffiliatePage((p) => Math.max(1, p - 1))}
+                  >
+                    ← Voltar
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={safeAffiliatePage >= totalAffiliatePages}
+                    onClick={() => setAffiliatePage((p) => Math.min(totalAffiliatePages, p + 1))}
+                  >
+                    Avançar →
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 
