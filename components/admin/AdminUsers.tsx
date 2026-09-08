@@ -30,8 +30,8 @@ const USERS_PER_PAGE = 20;
 /** Ordena alfabeticamente por nome (case-insensitive). Usuários sem nome vão para o fim. */
 function sortByName(rows: Row[]): Row[] {
   return [...rows].sort((a, b) => {
-    const an = (a.profile.name || "").trim();
-    const bn = (b.profile.name || "").trim();
+    const an = (a?.profile?.name || "").trim();
+    const bn = (b?.profile?.name || "").trim();
     if (!an && !bn) return 0;
     if (!an) return 1;
     if (!bn) return -1;
@@ -39,7 +39,7 @@ function sortByName(rows: Row[]): Row[] {
   });
 }
 
-export function AdminUsers({ rows, plans }: { rows: Row[]; plans: any[] }) {
+export function AdminUsers({ rows, plans, currentUserId }: { rows: Row[]; plans: any[]; currentUserId?: string | null }) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [roleFilter, setRoleFilter] = useState("all");
@@ -82,8 +82,16 @@ export function AdminUsers({ rows, plans }: { rows: Row[]; plans: any[] }) {
     return { ok: res.ok, json };
   }
 
-  /** Ações rápidas da tabela: executam e recarregam a página. */
+  /** Ações rápidas da tabela: executam e recarregam a página (lista sempre re-sincronizada com o banco). */
   async function runAction(userId: string, action: string, extra: Record<string, unknown> = {}) {
+    if (!userId) {
+      window.alert("Usuário sem identificador — recarregue a página.");
+      return;
+    }
+    if (currentUserId && userId === currentUserId && (action === "block" || action === "suspend")) {
+      window.alert("Você não pode bloquear sua própria conta de super admin.");
+      return;
+    }
     if (action === "block" && !window.confirm("Bloquear este usuário? Ele perderá o acesso ao painel e o site sai do ar.")) return;
     if (action === "suspend" && !window.confirm("Bloquear o site deste usuário?\n\nO site ficará invisível ao público mas o histórico (CRM, conteúdo, mídias) será preservado.")) return;
     setBusy(userId);
@@ -97,6 +105,14 @@ export function AdminUsers({ rows, plans }: { rows: Row[]; plans: any[] }) {
   }
 
   async function deleteUser(userId: string, email: string) {
+    if (!userId) {
+      window.alert("Usuário sem identificador — recarregue a página.");
+      return;
+    }
+    if (currentUserId && userId === currentUserId) {
+      window.alert("Você não pode excluir sua própria conta.");
+      return;
+    }
     if (!window.confirm(`Excluir PERMANENTEMENTE a conta ${email}?\n\nSite, assinatura e CRM serão apagados. Não há como desfazer.`)) return;
     if (!window.confirm("Confirma pela SEGUNDA vez? Esta ação é irreversível.")) return;
     setBusy(userId);
@@ -104,7 +120,10 @@ export function AdminUsers({ rows, plans }: { rows: Row[]; plans: any[] }) {
     const json = await res.json().catch(() => ({}));
     setBusy(null);
     if (!res.ok) {
-      setMsg({ ok: false, text: json.error || "Erro ao excluir." });
+      const err = json.error || "Erro ao excluir.";
+      // Se o modal de edição estiver aberto o erro aparece nele; senão, alerta.
+      if (editing) setMsg({ ok: false, text: err });
+      else window.alert(err);
       return;
     }
     setEditing(null);
@@ -170,16 +189,20 @@ export function AdminUsers({ rows, plans }: { rows: Row[]; plans: any[] }) {
 
   const filtered = useMemo(
     () =>
-      rows.filter((r) => {
-        const q = query.toLowerCase();
+      (rows || []).filter((r) => {
+        const q = (query || "").toLowerCase().trim();
+        const email = (r?.profile?.email || "").toLowerCase();
+        const name = (r?.profile?.name || "").toLowerCase();
+        const slug = (r?.tenant?.slug || "").toLowerCase();
+        const domains: any[] = Array.isArray(r?.domains) ? r.domains : [];
         const matchQ =
           !q ||
-          r.profile.email.toLowerCase().includes(q) ||
-          (r.profile.name || "").toLowerCase().includes(q) ||
-          (r.tenant?.slug || "").includes(q) ||
-          r.domains.some((d: any) => d.domain.includes(q));
-        const matchS = statusFilter === "all" || r.profile.status === statusFilter;
-        const matchR = roleFilter === "all" || (r.profile.role || "user") === roleFilter;
+          email.includes(q) ||
+          name.includes(q) ||
+          slug.includes(q) ||
+          domains.some((d: any) => String(d?.domain || "").toLowerCase().includes(q));
+        const matchS = statusFilter === "all" || (r?.profile?.status || "") === statusFilter;
+        const matchR = roleFilter === "all" || ((r?.profile?.role || "user") as string) === roleFilter;
         return matchQ && matchS && matchR;
       }),
     [rows, query, statusFilter, roleFilter]
@@ -248,7 +271,7 @@ export function AdminUsers({ rows, plans }: { rows: Row[]; plans: any[] }) {
                 <th>Assinatura</th>
                 <th>Site / URL</th>
                 <th>Cadastro</th>
-                <th>Ações</th>
+                <th className="sticky right-0 bg-[#faf8f2]">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -308,45 +331,82 @@ export function AdminUsers({ rows, plans }: { rows: Row[]; plans: any[] }) {
                       )}
                     </td>
                     <td className="text-xs text-gray-500">{r.registeredAt}</td>
-                    <td>
-                      <div className="flex flex-col gap-1 min-w-[180px]">
-                        <button className="btn btn-outline !py-1 !px-2 text-xs" onClick={() => openEdit(r)}>
-                          ✎ Editar / Bloquear / Excluir
-                        </button>
-                        <div className="flex gap-1 flex-wrap">
-                          {!isActive && !isBlockedUser && r.tenant ? (
+                    <td className="sticky right-0 bg-white shadow-[-8px_0_12px_-8px_rgba(0,0,0,0.15)]">
+                      {/* Ações sempre visíveis e sincronizadas com o estado atual da linha. */}
+                      <div className="flex flex-col gap-1 min-w-[190px]">
+                        <div className="flex gap-1">
+                          <button
+                            className="btn btn-outline !py-1 !px-2 text-xs flex-1"
+                            onClick={() => openEdit(r)}
+                            title="Abrir editor completo (dados, papel, senha, assinatura, site)"
+                            data-testid={`edit-user-${p.user_id}`}
+                          >
+                            ✎ Editar
+                          </button>
+                          {isBlockedUser ? (
                             <button
-                              className="btn btn-primary !py-1 !px-2 text-xs"
-                              onClick={() => setActivateFor({ row: r, mode: "trial" })}
+                              className="btn btn-primary !py-1 !px-2 text-xs flex-1"
+                              onClick={() => runAction(p.user_id, "unblock")}
                               disabled={busy === p.user_id}
-                              title="Ativar site. Após 3 meses inicia cobrança mensal."
+                              title="Desbloquear acesso do usuário"
+                              data-testid={`unblock-user-${p.user_id}`}
                             >
-                              ▶ Ativar site
+                              {busy === p.user_id ? "…" : "🔓 Desbloquear"}
                             </button>
+                          ) : (
+                            <button
+                              className="btn btn-danger !py-1 !px-2 text-xs flex-1"
+                              onClick={() => runAction(p.user_id, "block")}
+                              disabled={busy === p.user_id || (currentUserId != null && p.user_id === currentUserId)}
+                              title={p.user_id === currentUserId ? "Você não pode bloquear sua própria conta" : "Bloquear acesso do usuário (banimento real)"}
+                              data-testid={`block-user-${p.user_id}`}
+                            >
+                              {busy === p.user_id ? "…" : "🚫 Bloquear"}
+                            </button>
+                          )}
+                          <button
+                            className="btn btn-outline !py-1 !px-2 text-xs"
+                            onClick={() => deleteUser(p.user_id, p.email || "")}
+                            disabled={busy === p.user_id || (currentUserId != null && p.user_id === currentUserId)}
+                            title={p.user_id === currentUserId ? "Você não pode excluir sua própria conta" : "Excluir conta permanentemente"}
+                            data-testid={`delete-user-${p.user_id}`}
+                          >
+                            🗑
+                          </button>
+                        </div>
+                        <div className="flex gap-1">
+                          {/* Slot do site: SEMPRE renderiza algo para a coluna nunca ficar vazia. */}
+                          {!r.tenant ? (
+                            <span className="badge badge-gray w-full justify-center" title="Conta ainda sem site provisionado">sem site</span>
                           ) : isActive ? (
                             <button
-                              className="btn btn-outline !py-1 !px-2 text-xs"
+                              className="btn btn-outline !py-1 !px-2 text-xs w-full"
                               onClick={() => runAction(p.user_id, "suspend")}
                               disabled={busy === p.user_id}
                               title="Bloquear site: fica invisível ao público mas o histórico é preservado."
                             >
                               🔒 Bloquear site
                             </button>
-                          ) : null}
-                          {isSuspended && !isBlockedUser ? (
+                          ) : isSuspended && !isBlockedUser ? (
                             <button
-                              className="btn btn-outline !py-1 !px-2 text-xs"
+                              className="btn btn-outline !py-1 !px-2 text-xs w-full"
                               onClick={() => runAction(p.user_id, "unsuspend")}
                               disabled={busy === p.user_id}
                               title="Reativar site (mantém histórico)."
                             >
                               🔓 Desbloquear site
                             </button>
-                          ) : null}
-                          {isBlockedUser ? (
-                            <button className="btn btn-primary !py-1 !px-2 text-xs" onClick={() => runAction(p.user_id, "unblock")} disabled={busy === p.user_id}>Desbloquear usuário</button>
+                          ) : !isBlockedUser ? (
+                            <button
+                              className="btn btn-primary !py-1 !px-2 text-xs w-full"
+                              onClick={() => setActivateFor({ row: r, mode: "trial" })}
+                              disabled={busy === p.user_id}
+                              title="Ativar site. Após o trial inicia cobrança mensal."
+                            >
+                              ▶ Ativar site
+                            </button>
                           ) : (
-                            <button className="btn btn-danger !py-1 !px-2 text-xs" onClick={() => runAction(p.user_id, "block")} disabled={busy === p.user_id}>Bloquear usuário</button>
+                            <span className="badge badge-gray w-full justify-center" title="Site indisponível enquanto o usuário estiver bloqueado">site pausado</span>
                           )}
                         </div>
                       </div>
