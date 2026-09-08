@@ -202,6 +202,24 @@ export function AffiliateDashboard({ userId, userEmail, userName, tenantSlug, is
     alert("Link copiado!");
   }
 
+  async function shareReferralLink() {
+    if (!referralLink) return;
+    const shareText = `Conheça a plataforma TopConsultores para consultoras doTERRA: ${referralLink}`;
+    const nav = navigator as Navigator & {
+      share?: (data: { title?: string; text?: string; url?: string }) => Promise<void>;
+    };
+    if (typeof nav.share === "function") {
+      try {
+        await nav.share({ title: "TopConsultores", text: shareText, url: referralLink });
+      } catch {
+        // Usuário cancelou o compartilhamento — não faz nada.
+      }
+      return;
+    }
+    await navigator.clipboard.writeText(referralLink);
+    alert("Link copiado! Cole nos seus Stories ou onde preferir.");
+  }
+
   async function savePaymentMethod() {
     setSavingPm(true);
     setPmMsg(null);
@@ -444,6 +462,47 @@ export function AffiliateDashboard({ userId, userEmail, userName, tenantSlug, is
           </div>
         )}
       </div>
+
+      {/* Dicas para divulgar seu link */}
+      {programActive && (
+        <div className="card !border-[#e3d3a1] !bg-[#fffdf5]">
+          <h2 className="card-title">📣 Dicas para divulgar seu link</h2>
+          <p className="text-sm text-gray-500 mt-1 mb-4">
+            Transforme seu link de afiliado em uma oportunidade de novas indicações.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="rounded-xl border border-gray-100 bg-white p-4 flex flex-col gap-2">
+              <span className="text-2xl" aria-hidden>💬</span>
+              <p className="font-semibold text-sm text-gray-800">1 — WhatsApp</p>
+              <p className="text-xs text-gray-500 flex-1">
+                Copie seu link de afiliado e envie para sua equipe e seus contatos pelo WhatsApp.
+              </p>
+              <Button onClick={copyReferralLink} variant="outline" className="w-full !py-2.5">📋 Copiar meu link</Button>
+            </div>
+            <div className="rounded-xl border border-gray-100 bg-white p-4 flex flex-col gap-2">
+              <span className="text-2xl" aria-hidden>📱</span>
+              <p className="font-semibold text-sm text-gray-800">2 — Stories</p>
+              <p className="text-xs text-gray-500 flex-1">
+                Publique seu link nos Stories do Instagram, Facebook ou outras redes sociais.
+              </p>
+              <Button onClick={shareReferralLink} variant="outline" className="w-full !py-2.5">📤 Compartilhar link</Button>
+            </div>
+            <div className="rounded-xl border border-gray-100 bg-white p-4 flex flex-col gap-2">
+              <span className="text-2xl" aria-hidden>🌟</span>
+              <p className="font-semibold text-sm text-gray-800">3 — Barra de destaque</p>
+              <p className="text-xs text-gray-500 flex-1">
+                Em “Meu site” → “Minha Home”, edite a <strong>Barra de destaque</strong> e coloque
+                seu link de afiliado em evidência no seu site.
+              </p>
+              <Link href="/painel/meu-site" className="btn btn-outline w-full !py-2.5 text-xs">Ir para Meu site →</Link>
+            </div>
+          </div>
+          <p className="text-xs text-gray-500 mt-4 rounded-lg bg-gray-50 border border-gray-100 px-3 py-2">
+            💡 <strong>Dica:</strong> quanto mais lugares relevantes você utilizar para divulgar
+            seu link, maiores serão suas oportunidades de gerar indicações.
+          </p>
+        </div>
+      )}
 
       {/* Resumo */}
       {programActive && summary && (
@@ -771,13 +830,35 @@ export function AffiliateDashboard({ userId, userEmail, userName, tenantSlug, is
             <p className="text-sm text-gray-600">
               Ao ativar sua participação no Programa de Afiliados TopConsultores, você concorda com:
             </p>
-            <ul className="text-sm text-gray-600 space-y-2 list-disc list-inside">
-              <li>Comissão de <strong>{settings?.commission_percent || 10}%</strong> sobre o valor da ativação de cada novo usuário indicado.</li>
-              <li>Atribuição por <strong>first-click</strong> (primeiro clique vence) com cookie de <strong>{settings?.cookie_max_age_days || 180} dias</strong>.</li>
-              <li>Saque mínimo de <strong>{formatBRL((settings?.min_payout_amount || 50) * 100)}</strong> via PIX ou Mercado Pago.</li>
-              <li>Conversões ficam <strong>pendentes por 30 dias</strong> antes de serem aprovadas automaticamente.</li>
-              <li>O programa pode ser alterado ou encerrado a qualquer momento pela administração.</li>
-            </ul>
+            <div className="space-y-3 text-sm text-gray-600">
+              <div className="rounded-lg bg-gray-50 border border-gray-100 p-3">
+                <p className="font-semibold text-gray-800">💰 Comissão</p>
+                <p className="mt-1"><strong>{settings?.commission_percent || 10}%</strong> sobre o valor da ativação de cada novo usuário indicado.</p>
+              </div>
+              <div className="rounded-lg bg-gray-50 border border-gray-100 p-3">
+                <p className="font-semibold text-gray-800">🔗 Atribuição</p>
+                <p className="mt-1"><strong>First-click</strong> (primeiro clique vence), com cookie de <strong>{settings?.cookie_max_age_days || 180} dias</strong>.</p>
+              </div>
+              <div className="rounded-lg bg-gray-50 border border-gray-100 p-3">
+                <p className="font-semibold text-gray-800">💳 Saque</p>
+                <p className="mt-1">Valor mínimo de <strong>{formatBRL((settings?.min_payout_amount || 50) * 100)}</strong> via PIX ou Mercado Pago.</p>
+              </div>
+              <div className="rounded-lg bg-gray-50 border border-gray-100 p-3">
+                <p className="font-semibold text-gray-800">⏳ Aprovação</p>
+                <p className="mt-1">Conversões permanecem <strong>pendentes por 30 dias</strong> antes da aprovação automática.</p>
+              </div>
+              <div className="rounded-lg bg-green-50 border border-green-200 p-3">
+                <p className="font-semibold text-gray-800">🛡️ Proteção do seu histórico</p>
+                <p className="mt-1">
+                  As condições do programa podem ser atualizadas pela administração. Eventuais alterações
+                  passam a valer somente para as novas indicações realizadas após sua entrada em vigor,
+                  preservando integralmente os valores já registrados na sua conta — comissões aprovadas,
+                  conversões registradas, histórico de indicações, histórico financeiro e solicitações
+                  de saque, conforme as regras vigentes no momento de cada conversão. Nenhuma alteração
+                  futura reduz retroativamente valores já registrados.
+                </p>
+              </div>
+            </div>
             <p className="text-xs text-gray-500">Versão dos termos: 1.0</p>
             <div className="flex gap-3 pt-4">
               <Button onClick={activateAffiliate} className="flex-1">Aceito e Ativo Minha Participação</Button>
