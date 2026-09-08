@@ -22,7 +22,7 @@ interface SubManagerProps {
   billingEnabled?: boolean;
   /** Gateway ativo definido pelo Super Admin (/admin/pagamentos). */
   activeGateway?: "stripe" | "mercadopago";
-  /** Site do usuário já está ativo (tenants.site_status === "active"). */
+  /** Site do usuário já está ativo (tenants.site_status === "active"). Reservado para regras de exibição. */
   siteActive?: boolean;
   /** Condições do Mercado Pago configuradas pelo Super Admin (/admin/pagamentos). */
   pixDiscountPercent?: number;
@@ -59,9 +59,6 @@ export function SubscriptionManager({
 
   const activationPaid = activation?.status === "succeeded";
 
-  /** Banner de ativação: só para quem nunca contratou e está sem site ativo. */
-  const showActivationBanner = billingEnabled && !siteActive && !subscription && !activationPaid;
-
   const pixCents = pixDiscountPercent > 0
     ? Math.round((activationPriceCents * (100 - pixDiscountPercent)) / 100)
     : activationPriceCents;
@@ -87,10 +84,6 @@ export function SubscriptionManager({
     }
     await recordTermsAcceptance();
     checkout(planId);
-  }
-
-  function scrollToActions() {
-    document.getElementById("assinatura-acoes")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   async function checkout(planId: string) {
@@ -160,66 +153,9 @@ export function SubscriptionManager({
         </div>
       )}
 
-      {/* Banner de ativação — somente quando o site ainda não está ativo */}
-      {showActivationBanner && (
-        <div className="overflow-hidden rounded-2xl border border-[#e3d3a1] bg-gradient-to-br from-[#1d5c3a] via-[#17502f] to-[#0f3a22] text-white">
-          <div className="p-6 sm:p-8">
-            <p className="text-xs font-semibold uppercase tracking-widest text-[#f3e3b3]">Ativação do site profissional</p>
-            <h2 className="mt-2 text-2xl sm:text-3xl font-semibold" style={{ fontFamily: "var(--font-display)" }}>
-              🚀 Seu site profissional está pronto para ser ativado!
-            </h2>
-            <p className="mt-3 text-sm sm:text-base text-white/85 max-w-2xl">
-              Ative agora por apenas <strong className="text-white">{formatBRL(activationPriceCents)}</strong> e
-              aproveite <strong className="text-white">{trialMonths} {trialMonths === 1 ? "mês sem mensalidade" : "meses sem mensalidade"}</strong>.
-              Organize sua presença digital, divulgue seus produtos e serviços, fortaleça o
-              relacionamento com seus clientes e aproveite as ferramentas do seu painel.
-            </p>
+      {/* Banner de ativação removido — a ativação vive na seção "Ações" abaixo. */}
 
-            <div className="mt-5 flex flex-wrap items-end gap-x-8 gap-y-3">
-              <div>
-                <p className="text-xs uppercase tracking-wider text-white/60 font-semibold">Ativação (pagamento único)</p>
-                <p className="text-3xl sm:text-4xl font-bold" style={{ fontFamily: "var(--font-display)" }}>
-                  {formatBRL(activationPriceCents)}
-                </p>
-              </div>
-              <div className="rounded-xl bg-white/10 border border-white/20 px-4 py-2.5">
-                <p className="text-sm font-bold text-[#ffe9a8]">🎁 {trialMonths} {trialMonths === 1 ? "MÊS SEM MENSALIDADE" : "MESES SEM MENSALIDADE"}</p>
-                <p className="text-xs text-white/75 mt-0.5">
-                  Depois: {formatBRL(monthlyPriceCents)}/mês · Sem fidelidade — cancele quando quiser
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-5 flex flex-col sm:flex-row gap-3">
-              <button className="btn btn-gold !py-3.5 !px-8 !text-base w-full sm:w-auto" onClick={scrollToActions} disabled={loading}>
-                ⚡ Ativar meu site agora
-              </button>
-              <button
-                className="w-full sm:w-auto rounded-lg border border-white/30 px-6 py-3 text-sm font-semibold text-white hover:bg-white/10 transition"
-                onClick={() => setShowTerms(true)}
-              >
-                Ler Termos e compromisso
-              </button>
-            </div>
-
-            <div className="mt-6 rounded-xl bg-black/20 border border-white/10 p-4 sm:p-5">
-              <p className="text-sm font-semibold text-[#ffe9a8] mb-3">O que você terá ao ativar</p>
-              <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm text-white/85">
-                <li>🌐 Site profissional personalizado</li>
-                <li>📱 Site responsivo para celular</li>
-                <li>🛍️ Ferramentas para divulgação de produtos e serviços</li>
-                <li>📣 Recursos para divulgação e marketing</li>
-                <li>👥 CRM para organização dos clientes</li>
-                <li>📊 Recursos de acompanhamento e gestão</li>
-                <li>🤖 Ferramentas de IA disponíveis no painel</li>
-                <li>💬 Recursos de relacionamento e comunicação</li>
-                <li>🔗 Seu próprio endereço/site</li>
-                <li>⚙️ Painel completo para administrar sua presença digital</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Estado atual */}
 
       {/* Estado atual */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
