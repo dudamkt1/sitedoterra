@@ -100,6 +100,11 @@ export interface ActivationPreferenceInput {
    * conseguir registrar a conversão de afiliado.
    */
   visitorToken?: string | null;
+  /**
+   * Caminho interno (whitelist no chamador) para onde o Mercado Pago redireciona
+   * após pagamento aprovado. Default: /painel/assinatura?sucesso=1.
+   */
+  successPath?: string | null;
 }
 
 /**
@@ -136,7 +141,7 @@ export async function createActivationPreference(
     external_reference: `act_${input.tenantId}`,
     metadata,
     back_urls: {
-      success: `${appUrl}/painel/assinatura?sucesso=1`,
+      success: `${appUrl}${input.successPath || "/painel/assinatura?sucesso=1"}`,
       failure: `${appUrl}/painel/assinatura`,
       pending: `${appUrl}/painel/assinatura`,
     },

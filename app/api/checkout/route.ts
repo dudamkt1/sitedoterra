@@ -32,6 +32,11 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const planId = body.planId as string | undefined;
   const embedded = Boolean(body.embedded);
+  // Destino pós-pagamento (whitelist interna — evita open redirect).
+  const rawSuccessPath = typeof body.successPath === "string" ? body.successPath : "";
+  const successPath = /^\/painel\/meu-site(\?.*)?$/.test(rawSuccessPath)
+    ? rawSuccessPath
+    : "/painel/assinatura?sucesso=1";
 
   const admin = createAdminClient();
   const profile = await getProfile(user.id);
@@ -77,6 +82,7 @@ export async function POST(request: Request) {
       activationAmountCents: plan.activation_price_cents,
       planName: plan.name,
       visitorToken,
+      successPath,
     });
     // Transparente: devolve initPoint para iframe; fluxo normal devolve url para redirect.
     return NextResponse.json({ url: preference.initPoint, gateway: "mercadopago", preferenceId: preference.id, embedded });
@@ -119,7 +125,7 @@ export async function POST(request: Request) {
       payment_intent_data: {
         setup_future_usage: "off_session",
       },
-      return_url: `${appUrl}/painel/assinatura?sucesso=1`,
+      return_url: `${appUrl}${successPath}`,
     } as any);
     return NextResponse.json({ gateway: "stripe", clientSecret: (session as any).client_secret, url: session.url, embedded: true });
   }
@@ -135,7 +141,7 @@ export async function POST(request: Request) {
       // a ativação (primeira cobrança apenas no período configurado).
       setup_future_usage: "off_session",
     },
-    success_url: `${appUrl}/painel/assinatura?sucesso=1`,
+    success_url: `${appUrl}${successPath}`,
     cancel_url: `${appUrl}/painel/assinatura`,
   });
 

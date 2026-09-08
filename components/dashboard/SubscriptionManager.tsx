@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { StatusBadge, Modal } from "@/components/dashboard/ui";
 import { formatBRL, formatDate } from "@/lib/utils";
@@ -59,6 +59,20 @@ export function SubscriptionManager({
 
   const activationPaid = activation?.status === "succeeded";
 
+  const [checking, setChecking] = useState(false);
+  /** Checkout iniciado em outra aba e ainda sem confirmação (localStorage). */
+  const [checkoutPending, setCheckoutPending] = useState(false);
+
+  useEffect(() => {
+    try {
+      if (!activationPaid && window.localStorage.getItem("site_activation_checkout") === "1") {
+        setCheckoutPending(true);
+      }
+    } catch {
+      // localStorage indisponível — segue sem o aviso de pendência.
+    }
+  }, [activationPaid]);
+
   const pixCents = pixDiscountPercent > 0
     ? Math.round((activationPriceCents * (100 - pixDiscountPercent)) / 100)
     : activationPriceCents;
@@ -93,14 +107,42 @@ export function SubscriptionManager({
     const res = await fetch("/api/checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ planId }),
+      body: JSON.stringify({ planId, successPath: "/painel/meu-site?ativado=1" }),
     });
     const data = await res.json();
     if (data.url) {
-      window.location.href = data.url;
+      // Abre o pagamento em nova aba; ao concluir, o usuário volta para /painel/meu-site.
+      try {
+        window.localStorage.setItem("site_activation_checkout", "1");
+      } catch {}
+      setCheckoutPending(true);
+      window.open(data.url, "_blank", "noopener");
+      setLoading(false);
+      setMsg({ ok: true, text: "Pagamento aberto em nova aba. Após concluir, você voltará para o Meu site com tudo ativado." });
     } else {
       setMsg({ ok: false, text: data.error || "Não foi possível iniciar o pagamento." });
       setLoading(false);
+    }
+  }
+
+  /** Verifica se o pagamento já foi confirmado (para liberar a tela). */
+  async function checkPayment() {
+    setChecking(true);
+    try {
+      const res = await fetch("/api/subscription/status");
+      const data = await res.json();
+      if (data.activated || data.hasActivationPayment) {
+        try {
+          window.localStorage.removeItem("site_activation_checkout");
+        } catch {}
+        window.location.reload();
+      } else {
+        setMsg({ ok: false, text: "Pagamento ainda não confirmado. Conclua na aba de pagamento ou gere um novo link abaixo." });
+      }
+    } catch {
+      setMsg({ ok: false, text: "Não foi possível verificar agora. Tente novamente em instantes." });
+    } finally {
+      setChecking(false);
     }
   }
 
@@ -311,11 +353,24 @@ export function SubscriptionManager({
                 </label>
               </div>
 
+              {checkoutPending && !activationPaid && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                  <p className="font-semibold text-sm text-amber-900">⏳ Pagamento pendente</p>
+                  <p className="text-xs text-amber-800 mt-1">
+                    Você iniciou a ativação mas o pagamento ainda não foi concluído.
+                    Finalize na aba de pagamento ou use as opções abaixo quando quiser.
+                  </p>
+                  <div className="mt-3 flex flex-col sm:flex-row gap-2">
+                    <button type="button" className="btn btn-outline !py-2.5 text-xs" onClick={checkPayment} disabled={checking}>
+                      {checking ? "Verificando..." : "🔄 Já paguei — verificar"}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {plans.map((p) => (
-                <button key={p.id} className="btn btn-gold !py-3 w-full sm:w-auto" onClick={() => handleActivate(p.id)} disabled={loading}>
-                  {loading ? "Processando..." : (
-                    <>{activeGateway === "mercadopago" ? "⚡ Ativar via PIX/cartão" : "⚡ Ativar site"} ({p.name}) — {formatBRL(monthlyPriceCents)}/mês + ativação {formatBRL(activationPriceCents)}</>
-                  )}
+                <button key={p.id} className="btn btn-gold !py-3 w-full sm:w-auto !text-base" onClick={() => handleActivate(p.id)} disabled={loading}>
+                  {loading ? "Processando..." : "⚡ Ativar Site Profissional"}
                 </button>
               ))}
             </div>

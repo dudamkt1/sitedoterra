@@ -4,7 +4,7 @@ import { SectionTitle } from "@/components/dashboard/ui";
 import { getPublicBaseUrl } from "@/lib/public-url";
 import { getAffiliateSettings } from "@/lib/affiliate";
 
-export default async function MeuSitePage() {
+export default async function MeuSitePage({ searchParams }: { searchParams?: { ativado?: string } }) {
   const { isDemo, ctx } = await getPainelContext();
   if (!ctx) return null;
 
@@ -20,6 +20,7 @@ export default async function MeuSitePage() {
   // Lazy-load dos componentes reais
   const { SiteManager } = await import("@/components/dashboard/SiteManager");
   const { SiteSectionsManager } = await import("@/components/dashboard/SiteSectionsManager");
+  const { ActivationReturnNotice } = await import("@/components/dashboard/ActivationReturnNotice");
 
   const referralLink = tenantSlug && userId
     ? `${appUrl}/${tenantSlug.startsWith("aguardando-") ? "" : tenantSlug}?ref=${userId}`.replace(/\/\?/, "/?")
@@ -30,6 +31,11 @@ export default async function MeuSitePage() {
       <SectionTitle sub="Configure o nome de usuário, o conteúdo e as seções do seu site.">
         Meu Site
       </SectionTitle>
+
+      {/* Retorno do pagamento de ativação (nova aba) */}
+      {searchParams?.ativado === "1" && (
+        <ActivationReturnNotice siteActive={siteActive} />
+      )}
 
       {/* Card contextual — só aparece quando o site do próprio afiliado não
           está ativo. Explica o status do site + como isso impacta o programa
