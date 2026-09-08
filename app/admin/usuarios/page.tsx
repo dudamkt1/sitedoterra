@@ -89,7 +89,7 @@ export default async function AdminUsuariosPage() {
 
   // Garante tenant para todo profile (contas sem site ainda exibem ações).
   const tenantByUser = new Map(((tenants || []) as any[]).map((t: any) => [t.user_id, t]));
-  for (const [userId] of profileByUser) {
+  for (const userId of Array.from(profileByUser.keys())) {
     if (tenantByUser.has(userId)) continue;
     const prefix = String(userId).replace(/-/g, "").slice(0, 10);
     let slug = `aguardando-${prefix}`;
@@ -116,7 +116,7 @@ export default async function AdminUsuariosPage() {
     if (!activationByTenant.has(pay.tenant_id)) activationByTenant.set(pay.tenant_id, pay);
   }
 
-  const rows = [...profileByUser.values()].map((p: any) => {
+  const rows = Array.from(profileByUser.values()).map((p: any) => {
     const t = tenantByUser.get(p.user_id) || null;
     const sub = t ? subByTenant.get(t.id) : null;
     const doms = t ? domainsByTenant.get(t.id) || [] : [];
