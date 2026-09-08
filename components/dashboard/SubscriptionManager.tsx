@@ -2,8 +2,11 @@
 
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { StatusBadge } from "@/components/dashboard/ui";
+import { StatusBadge, Modal } from "@/components/dashboard/ui";
 import { formatBRL, formatDate } from "@/lib/utils";
+
+/** Versão dos Termos e compromisso exibidos nesta tela. */
+const SITE_TERMS_VERSION = "1.0";
 
 interface SubManagerProps {
   subscription: any;
@@ -19,6 +22,12 @@ interface SubManagerProps {
   billingEnabled?: boolean;
   /** Gateway ativo definido pelo Super Admin (/admin/pagamentos). */
   activeGateway?: "stripe" | "mercadopago";
+  /** Site do usuário já está ativo (tenants.site_status === "active"). */
+  siteActive?: boolean;
+  /** Condições do Mercado Pago configuradas pelo Super Admin (/admin/pagamentos). */
+  pixDiscountPercent?: number;
+  installments?: number;
+  installmentsWithoutInterest?: boolean;
 }
 
 export function SubscriptionManager({
@@ -34,15 +43,55 @@ export function SubscriptionManager({
   trialMonths = 3,
   billingEnabled = true,
   activeGateway = "stripe",
+  siteActive = true,
+  pixDiscountPercent = 0,
+  installments = 0,
+  installmentsWithoutInterest = true,
 }: SubManagerProps) {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const paymentOk = searchParams.get("sucesso") === "1";
 
   const activationPaid = activation?.status === "succeeded";
+
+  /** Banner de ativação: só para quem nunca contratou e está sem site ativo. */
+  const showActivationBanner = billingEnabled && !siteActive && !subscription && !activationPaid;
+
+  const pixCents = pixDiscountPercent > 0
+    ? Math.round((activationPriceCents * (100 - pixDiscountPercent)) / 100)
+    : activationPriceCents;
+
+  async function recordTermsAcceptance() {
+    try {
+      await fetch("/api/subscription/terms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ version: SITE_TERMS_VERSION }),
+      });
+    } catch {
+      // Best-effort: o aceite local (checkbox) já foi dado; não bloqueia o pagamento.
+    }
+  }
+
+  /** Ativação com aceite obrigatório dos Termos e compromisso. */
+  async function handleActivate(planId: string) {
+    if (!acceptedTerms) {
+      setShowTerms(true);
+      setMsg({ ok: false, text: "Para ativar seu site, leia e aceite os Termos e compromisso." });
+      return;
+    }
+    await recordTermsAcceptance();
+    checkout(planId);
+  }
+
+  function scrollToActions() {
+    document.getElementById("assinatura-acoes")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   async function checkout(planId: string) {
     setLoading(true);
@@ -111,6 +160,67 @@ export function SubscriptionManager({
         </div>
       )}
 
+      {/* Banner de ativação — somente quando o site ainda não está ativo */}
+      {showActivationBanner && (
+        <div className="overflow-hidden rounded-2xl border border-[#e3d3a1] bg-gradient-to-br from-[#1d5c3a] via-[#17502f] to-[#0f3a22] text-white">
+          <div className="p-6 sm:p-8">
+            <p className="text-xs font-semibold uppercase tracking-widest text-[#f3e3b3]">Ativação do site profissional</p>
+            <h2 className="mt-2 text-2xl sm:text-3xl font-semibold" style={{ fontFamily: "var(--font-display)" }}>
+              🚀 Seu site profissional está pronto para ser ativado!
+            </h2>
+            <p className="mt-3 text-sm sm:text-base text-white/85 max-w-2xl">
+              Ative agora por apenas <strong className="text-white">{formatBRL(activationPriceCents)}</strong> e
+              aproveite <strong className="text-white">{trialMonths} {trialMonths === 1 ? "mês sem mensalidade" : "meses sem mensalidade"}</strong>.
+              Organize sua presença digital, divulgue seus produtos e serviços, fortaleça o
+              relacionamento com seus clientes e aproveite as ferramentas do seu painel.
+            </p>
+
+            <div className="mt-5 flex flex-wrap items-end gap-x-8 gap-y-3">
+              <div>
+                <p className="text-xs uppercase tracking-wider text-white/60 font-semibold">Ativação (pagamento único)</p>
+                <p className="text-3xl sm:text-4xl font-bold" style={{ fontFamily: "var(--font-display)" }}>
+                  {formatBRL(activationPriceCents)}
+                </p>
+              </div>
+              <div className="rounded-xl bg-white/10 border border-white/20 px-4 py-2.5">
+                <p className="text-sm font-bold text-[#ffe9a8]">🎁 {trialMonths} {trialMonths === 1 ? "MÊS SEM MENSALIDADE" : "MESES SEM MENSALIDADE"}</p>
+                <p className="text-xs text-white/75 mt-0.5">
+                  Depois: {formatBRL(monthlyPriceCents)}/mês · Sem fidelidade — cancele quando quiser
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 flex flex-col sm:flex-row gap-3">
+              <button className="btn btn-gold !py-3.5 !px-8 !text-base w-full sm:w-auto" onClick={scrollToActions} disabled={loading}>
+                ⚡ Ativar meu site agora
+              </button>
+              <button
+                className="w-full sm:w-auto rounded-lg border border-white/30 px-6 py-3 text-sm font-semibold text-white hover:bg-white/10 transition"
+                onClick={() => setShowTerms(true)}
+              >
+                Ler Termos e compromisso
+              </button>
+            </div>
+
+            <div className="mt-6 rounded-xl bg-black/20 border border-white/10 p-4 sm:p-5">
+              <p className="text-sm font-semibold text-[#ffe9a8] mb-3">O que você terá ao ativar</p>
+              <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm text-white/85">
+                <li>🌐 Site profissional personalizado</li>
+                <li>📱 Site responsivo para celular</li>
+                <li>🛍️ Ferramentas para divulgação de produtos e serviços</li>
+                <li>📣 Recursos para divulgação e marketing</li>
+                <li>👥 CRM para organização dos clientes</li>
+                <li>📊 Recursos de acompanhamento e gestão</li>
+                <li>🤖 Ferramentas de IA disponíveis no painel</li>
+                <li>💬 Recursos de relacionamento e comunicação</li>
+                <li>🔗 Seu próprio endereço/site</li>
+                <li>⚙️ Painel completo para administrar sua presença digital</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Estado atual */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="card">
@@ -167,7 +277,7 @@ export function SubscriptionManager({
       )}
 
       {/* Ações */}
-      <div className="card">
+      <div className="card" id="assinatura-acoes" style={{ scrollMarginTop: 90 }}>
         <h2 className="card-title mb-4">Ações</h2>
         <div className="flex flex-wrap gap-3">
           {isActive && billingEnabled && (
@@ -199,22 +309,65 @@ export function SubscriptionManager({
           )}
 
           {!subscription && billingEnabled && (
-            <>
-              <p className="w-full text-xs text-gray-400">
-                Forma de pagamento:{" "}
-                {activeGateway === "mercadopago"
-                  ? "🇧🇷 Mercado Pago (PIX ou cartão)"
-                  : "💳 Stripe (cartão de crédito)"}{" "}
-                — definida pela plataforma.
-              </p>
+            <div className="w-full space-y-4">
+              <div className="rounded-xl border border-[#e3d3a1] bg-[#fffdf5] p-4 sm:p-5">
+                <p className="font-semibold text-base sm:text-lg" style={{ fontFamily: "var(--font-display)" }}>
+                  ⚡ Ativar Site Profissional — {formatBRL(activationPriceCents)}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {formatBRL(activationPriceCents)} é o valor único da <strong>ativação</strong> (não é mensalidade).
+                </p>
+                <ul className="mt-3 space-y-1.5 text-sm text-gray-700">
+                  {activeGateway === "mercadopago" && pixDiscountPercent > 0 && (
+                    <li>💠 <strong>PIX:</strong> {pixDiscountPercent}% de desconto — sai por <strong>{formatBRL(pixCents)}</strong></li>
+                  )}
+                  {activeGateway === "mercadopago" && installments > 0 && (
+                    <li>💳 <strong>Cartão:</strong> em até {installments}x{installmentsWithoutInterest ? " sem juros" : ""} de {formatBRL(Math.round(activationPriceCents / installments))}</li>
+                  )}
+                  <li>🎁 <strong>Primeiros {trialMonths} {trialMonths === 1 ? "mês" : "meses"}: sem cobrança da mensalidade</strong></li>
+                  <li>🔁 <strong>Após os {trialMonths} {trialMonths === 1 ? "mês" : "meses"}:</strong> {formatBRL(monthlyPriceCents)}/mês</li>
+                  <li>✅ <strong>Sem fidelidade — cancele quando quiser</strong></li>
+                </ul>
+                <p className="w-full text-xs text-gray-400 mt-3">
+                  Forma de pagamento:{" "}
+                  {activeGateway === "mercadopago"
+                    ? "🇧🇷 Mercado Pago (PIX ou cartão)"
+                    : "💳 Stripe (cartão de crédito)"}{" "}
+                  — definida pela plataforma.
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <p className="font-semibold text-sm">Termos e compromisso</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Leia as condições de utilização, pagamento, responsabilidade pelo conteúdo e cancelamento.
+                    </p>
+                  </div>
+                  <button type="button" className="btn btn-outline !py-2 !px-4 text-xs shrink-0" onClick={() => setShowTerms(true)}>
+                    Ler termos
+                  </button>
+                </div>
+                <label className="mt-3 flex items-start gap-2.5 cursor-pointer rounded-lg bg-white border border-gray-200 px-3 py-2.5">
+                  <input
+                    type="checkbox"
+                    className="mt-1 h-4 w-4 accent-[#1d5c3a]"
+                    checked={acceptedTerms}
+                    onChange={(e) => setAcceptedTerms(e.target.checked)}
+                  />
+                  <span className="text-sm text-gray-700">Li e concordo com os <strong>Termos e compromisso</strong>.</span>
+                </label>
+              </div>
+
               {plans.map((p) => (
-                <button key={p.id} className="btn btn-gold" onClick={() => checkout(p.id)} disabled={loading}>
-                  {activeGateway === "mercadopago" ? "⚡ Ativar via PIX/cartão" : "⚡ Ativar site"} (
-                  {p.name}) — {formatBRL(monthlyPriceCents)}/mês + ativação{" "}
-                  {formatBRL(activationPriceCents)}
+                <button key={p.id} className="btn btn-gold !py-3 w-full sm:w-auto" onClick={() => handleActivate(p.id)} disabled={loading}>
+                  {loading ? "Processando..." : (
+                    <>{activeGateway === "mercadopago" ? "⚡ Ativar via PIX/cartão" : "⚡ Ativar site"} ({p.name}) — {formatBRL(monthlyPriceCents)}/mês + ativação {formatBRL(activationPriceCents)}</>
+                  )}
                 </button>
               ))}
-            </>
+            </div>
           )}
 
           {!billingEnabled && (
@@ -266,6 +419,124 @@ export function SubscriptionManager({
           </div>
         )}
       </div>
+
+      {/* Termos e compromisso */}
+      {showTerms && (
+        <Modal open onClose={() => setShowTerms(false)} title="Termos e compromisso de utilização do site profissional">
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 text-sm text-gray-600">
+            <section>
+              <p className="font-semibold text-gray-800">1. Objeto</p>
+              <p className="mt-1">
+                A ativação disponibiliza ao usuário o acesso ao site profissional e às ferramentas
+                da plataforma TopConsultores, conforme os recursos existentes e as condições
+                apresentadas no momento da contratação.
+              </p>
+            </section>
+            <section>
+              <p className="font-semibold text-gray-800">2. Responsabilidade pelo conteúdo</p>
+              <p className="mt-1">
+                O usuário é integralmente responsável pelos conteúdos que inserir, publicar ou
+                disponibilizar em seu site — textos, imagens, vídeos, produtos, serviços, preços,
+                informações comerciais, dados de contato e materiais enviados por ele. Declara possuir
+                autorização para utilizar esses conteúdos e compromete-se a não usar o sistema para
+                atividades ilícitas ou que violem direitos de terceiros.
+              </p>
+            </section>
+            <section>
+              <p className="font-semibold text-gray-800">3. Responsabilidade do usuário</p>
+              <p className="mt-1">
+                O usuário deve utilizar a plataforma conforme a legislação aplicável e responde pelas
+                informações que disponibilizar ao público. A plataforma fornece a estrutura e as
+                ferramentas tecnológicas, sem assumir responsabilidade pelo conteúdo comercial,
+                publicitário ou informativo inserido pelo próprio usuário.
+              </p>
+            </section>
+            <section>
+              <p className="font-semibold text-gray-800">4. Ativação</p>
+              <p className="mt-1">
+                A ativação ocorre após a confirmação do pagamento da taxa de ativação e, quando
+                aplicável, da contratação da mensalidade correspondente. Após a confirmação, o
+                sistema pode disponibilizar automaticamente o site e os recursos contratados.
+              </p>
+            </section>
+            <section>
+              <p className="font-semibold text-gray-800">5. Condições financeiras</p>
+              <div className="mt-1 rounded-lg bg-gray-50 border border-gray-100 p-3 space-y-1">
+                <p><strong>Ativação:</strong> {formatBRL(activationPriceCents)} (pagamento único)</p>
+                {activeGateway === "mercadopago" && pixDiscountPercent > 0 && (
+                  <p><strong>PIX:</strong> {pixDiscountPercent}% de desconto ({formatBRL(pixCents)})</p>
+                )}
+                {activeGateway === "mercadopago" && installments > 0 && (
+                  <p><strong>Cartão:</strong> em até {installments}x{installmentsWithoutInterest ? " sem juros" : ""}</p>
+                )}
+                <p><strong>Primeiros {trialMonths} {trialMonths === 1 ? "mês" : "meses"}:</strong> sem cobrança da mensalidade</p>
+                <p><strong>Após os {trialMonths} {trialMonths === 1 ? "mês" : "meses"}:</strong> {formatBRL(monthlyPriceCents)}/mês</p>
+              </div>
+              <p className="mt-1">
+                Caso as condições comerciais sejam alteradas futuramente, as novas condições serão
+                apresentadas antes de qualquer nova contratação ou renovação aplicável.
+              </p>
+            </section>
+            <section>
+              <p className="font-semibold text-gray-800">6. Cancelamento</p>
+              <p className="mt-1">
+                O usuário pode solicitar o cancelamento da assinatura/mensalidade quando desejar,
+                observadas as condições aplicáveis e eventuais valores já vencidos. Após o
+                cancelamento, o acesso aos recursos que dependem de assinatura ativa pode ser
+                interrompido conforme as regras da plataforma.
+              </p>
+            </section>
+            <section>
+              <p className="font-semibold text-gray-800">7. Disponibilidade do serviço</p>
+              <p className="mt-1">
+                A plataforma busca manter seus serviços disponíveis, mas indisponibilidades
+                temporárias podem ocorrer por manutenção, atualizações, falhas técnicas, serviços
+                de terceiros ou eventos fora de seu controle direto.
+              </p>
+            </section>
+            <section>
+              <p className="font-semibold text-gray-800">8. Uso adequado</p>
+              <p className="mt-1">
+                É proibido usar a plataforma para atividades ilegais, fraudulentas, que violem
+                direitos de terceiros ou prejudiquem o serviço e outros usuários.
+              </p>
+            </section>
+            <section>
+              <p className="font-semibold text-gray-800">9. Alterações</p>
+              <p className="mt-1">
+                A plataforma pode atualizar funcionalidades, recursos e condições de uso. Alterações
+                relevantes nas condições comerciais ou contratuais serão comunicadas de forma
+                adequada, observada a legislação aplicável.
+              </p>
+            </section>
+            <section>
+              <p className="font-semibold text-gray-800">10. Aceite</p>
+              <p className="mt-1">Ao aceitar e prosseguir com a ativação, o usuário declara que:</p>
+              <ul className="mt-1 list-disc list-inside space-y-0.5">
+                <li>leu e compreendeu estes termos;</li>
+                <li>concorda com as regras de utilização;</li>
+                <li>reconhece sua responsabilidade pelos conteúdos publicados;</li>
+                <li>está ciente da taxa de ativação de {formatBRL(activationPriceCents)};</li>
+                <li>está ciente da mensalidade de {formatBRL(monthlyPriceCents)} após o período promocional;</li>
+                <li>está ciente de que pode cancelar quando desejar, conforme as condições aplicáveis.</li>
+              </ul>
+            </section>
+            <p className="text-xs text-gray-500">Versão dos termos: {SITE_TERMS_VERSION}</p>
+            <div className="flex flex-col sm:flex-row gap-2 pt-2">
+              <button
+                type="button"
+                className="btn btn-primary flex-1 !py-3"
+                onClick={() => { setAcceptedTerms(true); setShowTerms(false); }}
+              >
+                Li e concordo — ativar meu site
+              </button>
+              <button type="button" className="btn btn-outline" onClick={() => setShowTerms(false)}>
+                Fechar
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

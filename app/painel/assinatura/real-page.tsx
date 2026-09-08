@@ -4,7 +4,7 @@ import { SectionTitle } from "@/components/dashboard/ui";
 import { SubscriptionManager } from "@/components/dashboard/SubscriptionManager";
 import { getActivationPrice, getMonthlyPrice } from "@/lib/billing";
 import { getActiveOffer } from "@/lib/commercial";
-import { getActiveGateway } from "@/lib/gateway-config";
+import { getActiveGateway, resolveGateways } from "@/lib/gateway-config";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +70,8 @@ export default async function AssinaturaPage(p: { demoCtx?: DashboardContext }) 
     }
   }
 
+  const mp = await gatewayConditions();
+
   return (
     <div>
       <SectionTitle sub="Gerencie a ativação do site, sua mensalidade e o histórico financeiro.">
@@ -88,7 +90,24 @@ export default async function AssinaturaPage(p: { demoCtx?: DashboardContext }) 
         trialMonths={trialMonths}
         billingEnabled={ctx.tenant?.monthly_billing_enabled !== false}
         activeGateway={await getActiveGateway()}
+        siteActive={ctx.tenant?.site_status === "active"}
+        pixDiscountPercent={mp.pixDiscountPercent}
+        installments={mp.installments}
+        installmentsWithoutInterest={mp.installmentsWithoutInterest}
       />
     </div>
   );
+}
+
+async function gatewayConditions() {
+  try {
+    const g = await resolveGateways();
+    return {
+      pixDiscountPercent: g.mercadopago.pixDiscountPercent || 0,
+      installments: g.mercadopago.installments || 0,
+      installmentsWithoutInterest: g.mercadopago.installmentsWithoutInterest !== false,
+    };
+  } catch {
+    return { pixDiscountPercent: 0, installments: 0, installmentsWithoutInterest: true };
+  }
 }
