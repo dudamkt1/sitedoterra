@@ -69,6 +69,10 @@ export function SiteHome({ slug, sections, contact, logo, extraNav = [], theme, 
     logo?.mode === "text"
       ? undefined
       : logo?.url || (headerContent.logoUrl as string) || undefined;
+  // Versão clara do logo (menu com fundo claro ao rolar): prioriza a do
+  // dono do site (site_settings) e cai para a global do Cabeçalho/Menu.
+  const logoLightUrl =
+    logo?.lightUrl || (headerContent.logoLightUrl as string) || undefined;
 
   const navItems = visible
     .filter((s) => s.settings?.showInNav !== false && s.type !== "header" && s.type !== "footer")
@@ -88,7 +92,7 @@ export function SiteHome({ slug, sections, contact, logo, extraNav = [], theme, 
       {/* Tema do dono do site (server-side): variáveis CSS em #tenant-site */}
       <style dangerouslySetInnerHTML={{ __html: themeStyleTag(theme) }} />
       <SiteEffects />
-      <Header logoText={logoText} logoUrl={logoUrl} logoLightUrl={logo?.lightUrl} navItems={navItems} extraNav={extraNav} />
+      <Header logoText={logoText} logoUrl={logoUrl} logoLightUrl={logoLightUrl} navItems={navItems} extraNav={extraNav} />
 
       {/* Captura ?ref= do link de afiliado: dispara o click, persiste visitor_token
           em cookie first-party e leva o visitante até o destino resolvido

@@ -57,7 +57,7 @@ export default async function CheckoutPage({
     (siteData.logoMode as string) === "text"
       ? undefined
       : (siteData.logoUrl as string) || (headerContent.logoUrl as string) || undefined;
-  const logoLightUrl = (siteData.logoLightUrl as string) || undefined;
+  const logoLightUrl = (siteData.logoLightUrl as string) || (headerContent.logoLightUrl as string) || undefined;
 
   // Nav da HOME (mesma ordem/labels) — no checkout prefixa "/" para navegar de volta à HOME
   const homeNavItems = visible

@@ -94,7 +94,7 @@ const DEFAULT_PERMISSIONS: SectionPermissions = {
  * referência visual "padrão da plataforma").
  */
 export const DEFAULT_SECTION_CONTENT: Record<SectionType, Record<string, unknown>> = {
-  header: { logoText: "Ana Beatriz" },
+  header: { logoText: "Ana Beatriz", logoUrl: "", logoLightUrl: "" },
   hero: {
     eyebrow: "Consultora Certificada doTERRA",
     firstName: "Ana",
