@@ -271,6 +271,21 @@ export function SubscriptionManager({
                     : "💳 Stripe (cartão de crédito)"}{" "}
                   — definida pela plataforma.
                 </p>
+                <div className="mt-4 rounded-xl bg-gray-50 border border-gray-100 p-4">
+                  <p className="text-sm font-semibold text-gray-800">O que você terá ao ativar</p>
+                  <ul className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm text-gray-600">
+                    <li>🌐 Site profissional personalizado</li>
+                    <li>📱 Site responsivo para celular</li>
+                    <li>🛍️ Divulgação de produtos e serviços</li>
+                    <li>📣 Recursos de divulgação e marketing</li>
+                    <li>👥 CRM para organização dos clientes</li>
+                    <li>📊 Acompanhamento e gestão</li>
+                    <li>🤖 Ferramentas de IA do painel</li>
+                    <li>💬 Relacionamento e comunicação</li>
+                    <li>🔗 Seu próprio endereço/site</li>
+                    <li>⚙️ Painel completo de administração</li>
+                  </ul>
+                </div>
               </div>
 
               <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
