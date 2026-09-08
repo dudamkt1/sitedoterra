@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { CrmModal, EmptyState, LoadingState, ErrorState, Toast, Field, apiPost, apiPut, apiDelete, confirmDialog, CrmStatusBadge } from "@/components/crm/crm-ui";
+import { ReceiptModal, ReceiptSettingsModal } from "@/components/crm/CrmReceipt";
 import { MoneyInput } from "@/components/ui/MoneyInput";
 import { formatBRL } from "@/lib/utils";
 import { SALE_STATUSES, SALE_STATUS_COLORS } from "@/lib/crm-shared";
@@ -46,6 +47,8 @@ export default function CrmSales() {
 
   const [statusFilter, setStatusFilter] = useState("");
   const [clientFilter, setClientFilter] = useState("");
+  const [receiptSaleId, setReceiptSaleId] = useState<string | null>(null);
+  const [showReceiptSettings, setShowReceiptSettings] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -187,7 +190,10 @@ export default function CrmSales() {
           <h1 className="text-3xl font-semibold" style={{ fontFamily: "var(--font-display)" }}>Vendas</h1>
           <p className="text-sm text-gray-500 mt-1">{total} vendas registradas · visíveis nesta página {formatBRL(monthTotal)}</p>
         </div>
-        <button className="btn btn-primary" onClick={openCreate}>+ Registrar venda</button>
+        <div className="flex gap-2">
+          <button className="btn btn-outline" onClick={() => setShowReceiptSettings(true)}>🧾 Meu recibo</button>
+          <button className="btn btn-primary" onClick={openCreate}>+ Registrar venda</button>
+        </div>
       </div>
 
       <div className="card mb-4">
@@ -238,6 +244,15 @@ export default function CrmSales() {
                     <td><CrmStatusBadge value={s.status} colorMap={SALE_STATUS_COLORS} /></td>
                     <td>
                       <div className="flex items-center justify-end gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setReceiptSaleId(s.id)}
+                          className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#1d5c3a] hover:border-[#1d5c3a]/30 transition"
+                          aria-label="Gerar recibo"
+                          title="Gerar recibo em PDF"
+                        >
+                          📄 <span className="hidden sm:inline">Recibo</span>
+                        </button>
                         <button
                           type="button"
                           onClick={() => openEdit(s)}
@@ -399,6 +414,14 @@ export default function CrmSales() {
             setToast({ ok: true, text: `${p.name} adicionado. Você pode ajustar preço e quantidade.` });
           }}
         />
+      )}
+
+      {receiptSaleId && (
+        <ReceiptModal saleId={receiptSaleId} onClose={() => setReceiptSaleId(null)} />
+      )}
+
+      {showReceiptSettings && (
+        <ReceiptSettingsModal onClose={() => setShowReceiptSettings(false)} />
       )}
     </div>
   );

@@ -15,7 +15,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
   if (!sale) return NextResponse.json({ error: "Venda não encontrada." }, { status: 404 });
   let client = null;
   if (sale.client_id) {
-    const { data: c } = await admin.from("crm_clients").select("id, name, whatsapp, phone, email").eq("id", sale.client_id).eq("tenant_id", tenant!.id).maybeSingle();
+    const { data: c } = await admin.from("crm_clients").select("id, name, whatsapp, phone, email, cpf").eq("id", sale.client_id).eq("tenant_id", tenant!.id).maybeSingle();
     client = c;
   }
   return NextResponse.json({ sale, items: items || [], client });
