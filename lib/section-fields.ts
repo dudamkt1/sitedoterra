@@ -25,6 +25,11 @@ export interface ContentFieldDef {
   aiKind?: "title" | "description" | "faq" | "post" | "default";
   itemLabel?: string;
   fields?: ContentFieldDef[];
+  /**
+   * Quando true e o campo é uma lista simples de strings (sem `fields`),
+   * o editor renderiza textarea em vez de input (ex.: parágrafos).
+   */
+  multiline?: boolean;
 }
 
 export const SECTION_CONTENT_FIELDS: Record<SectionType, ContentFieldDef[]> = {
@@ -111,7 +116,13 @@ export const SECTION_CONTENT_FIELDS: Record<SectionType, ContentFieldDef[]> = {
   story: [
     { key: "eyebrow", label: "Selo superior", type: "text" },
     { key: "title", label: "Título", type: "text", ai: true, aiKind: "title" },
-    { key: "paragraphs", label: "Parágrafos", type: "list", itemLabel: "Parágrafo", fields: [{ key: "p", label: "Parágrafo", type: "textarea", ai: true, aiKind: "description" }] },
+    // IMPORTANTE: paragraphs é string[] em todo o resto do código
+    // (DEFAULT_SECTION_CONTENT, StoryContent, seed do banco). Por isso o
+    // schema aqui também é uma lista simples de strings (sem `fields`).
+    // O formato antigo [{ p: "..." }] corrompia o dado e quebrava a HOME
+    // com "Objects are not valid as a React child". O normalizador abaixo
+    // e os renderers aceitam ambos os formatos por compatibilidade.
+    { key: "paragraphs", label: "Parágrafos", type: "list", itemLabel: "Parágrafo", multiline: true },
     { key: "signature", label: "Assinatura", type: "text" },
     { key: "image", label: "Foto (URL)", type: "image" },
     { key: "imageAlt", label: "Texto alternativo", type: "text" },
@@ -242,4 +253,46 @@ export function contentSummary(content: Record<string, unknown>): string {
   if (typeof v === "string") return v;
   if (Array.isArray(v)) return `${first}: ${v.length} item(ns)`;
   return first;
+}
+
+/**
+ * Normaliza a lista de parágrafos da seção "História / Sobre" para string[].
+ *
+ * Aceita o formato canônico (string[]) e o formato legado/corrompido
+ * produzido pelo editor antigo ([{ p: "..." }] ou misto), extraindo o texto
+ * de objetos `{ p }` / `{ text }`. Qualquer outro valor não-texto é
+ * descartado — nunca retorna objetos, então é seguro renderizar com
+ * `{paragraphs.map((p, i) => <p key={i}>{p}</p>)}` sem o erro
+ * "Objects are not valid as a React child" (tela branca).
+ */
+export function normalizeParagraphs(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const out: string[] = [];
+  for (const item of value) {
+    if (typeof item === "string") {
+      out.push(item);
+    } else if (typeof item === "number" || typeof item === "boolean") {
+      out.push(String(item));
+    } else if (item && typeof item === "object") {
+      const obj = item as Record<string, unknown>;
+      const text = obj.p ?? obj.text ?? obj.value ?? obj.paragraph;
+      if (typeof text === "string") out.push(text);
+      else if (typeof text === "number" || typeof text === "boolean") out.push(String(text));
+      // objetos sem texto reconhecível são ignorados (não quebram o render)
+    }
+  }
+  return out;
+}
+
+/** Extrai o texto de exibição/edição de um item de lista simples (string[]). */
+export function plainListItemText(item: unknown): string {
+  if (typeof item === "string") return item;
+  if (typeof item === "number" || typeof item === "boolean") return String(item);
+  if (item && typeof item === "object") {
+    const obj = item as Record<string, unknown>;
+    const text = obj.p ?? obj.text ?? obj.value ?? obj.paragraph;
+    if (typeof text === "string") return text;
+    if (typeof text === "number" || typeof text === "boolean") return String(text);
+  }
+  return "";
 }

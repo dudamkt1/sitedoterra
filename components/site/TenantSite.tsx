@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { PublicTenant } from "@/types";
 import { DEFAULT_SITE_DATA, type SiteData } from "@/lib/site-data";
+import { normalizeParagraphs } from "@/lib/section-fields";
 
 export { DEFAULT_SITE_DATA, type SiteData };
 
@@ -390,7 +391,7 @@ export function TenantSite({
         <div className="historia-text reveal" style={{ transitionDelay: "0.2s" }}>
           <div className="section-eyebrow"><span className="eyebrow-line"></span><span className="eyebrow-text">Minha jornada</span></div>
           <h2 className="section-title">Uma história de<br /><em>cura e propósito</em></h2>
-          {data.history?.paragraphs.map((p, i) => <p key={i}>{p}</p>)}
+          {normalizeParagraphs((data.history as { paragraphs?: unknown } | undefined)?.paragraphs).map((p, i) => <p key={i}>{p}</p>)}
           <p className="historia-assinatura">{data.history?.signature}</p>
         </div>
       </section>

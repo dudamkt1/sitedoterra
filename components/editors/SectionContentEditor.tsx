@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { SectionType } from "@/types";
-import { SECTION_CONTENT_FIELDS, jsonToString, stringToJson, type ContentFieldDef } from "@/lib/section-fields";
+import { SECTION_CONTENT_FIELDS, jsonToString, stringToJson, plainListItemText, type ContentFieldDef } from "@/lib/section-fields";
 import { deepMerge } from "@/lib/home";
 import { MediaPicker } from "@/components/media/MediaPicker";
 import { BookingAgendaEditor } from "@/components/editors/BookingAgendaEditor";
@@ -202,6 +202,7 @@ export function SectionContentEditor({ sectionType, value, onChange, mediaScope,
           );
         case "list": {
           const list = Array.isArray(current) ? (current as unknown[]) : [];
+          const hasSubFields = (field.fields?.length || 0) > 0;
           return (
             <div className="space-y-2">
               {list.map((item, idx) => (
@@ -216,9 +217,17 @@ export function SectionContentEditor({ sectionType, value, onChange, mediaScope,
                       Remover
                     </button>
                   </div>
-                  {field.fields?.length ? (
+                  {hasSubFields ? (
                     (field.fields || []).map((sub) => {
-                      const itemObj = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+                      // Compat: itens primitivos (ex.: string[]) editados por um
+                      // schema de objetos — trata o primitivo como valor do
+                      // primeiro/único subcampo em vez de perder o conteúdo.
+                      const itemObj =
+                        item && typeof item === "object"
+                          ? (item as Record<string, unknown>)
+                          : field.fields!.length === 1
+                            ? { [field.fields![0].key]: typeof item === "string" ? item : "" }
+                            : {};
                       const subValue = getPath(itemObj, [sub.key]);
                       return renderListItem(sub, subValue, (next) => {
                         const updated = [...list];
@@ -226,10 +235,20 @@ export function SectionContentEditor({ sectionType, value, onChange, mediaScope,
                         onChange(setPath(value, path, updated));
                       });
                     })
+                  ) : field.multiline ? (
+                    <textarea
+                      className="input min-h-14"
+                      value={plainListItemText(item)}
+                      onChange={(e) => {
+                        const updated = [...list];
+                        updated[idx] = e.target.value;
+                        onChange(setPath(value, path, updated));
+                      }}
+                    />
                   ) : (
                     <input
                       className="input"
-                      value={typeof item === "string" ? item : JSON.stringify(item)}
+                      value={plainListItemText(item)}
                       onChange={(e) => {
                         const updated = [...list];
                         updated[idx] = e.target.value;
@@ -239,7 +258,7 @@ export function SectionContentEditor({ sectionType, value, onChange, mediaScope,
                   )}
                 </div>
               ))}
-              <button type="button" className="btn btn-outline !py-1.5 !px-3 !text-xs" onClick={() => onChange(setPath(value, path, [...list, {}]))}>
+              <button type="button" className="btn btn-outline !py-1.5 !px-3 !text-xs" onClick={() => onChange(setPath(value, path, [...list, hasSubFields ? {} : ""]))}>
                 + Adicionar {field.itemLabel || "item"}
               </button>
             </div>
@@ -311,7 +330,7 @@ export function SectionContentEditor({ sectionType, value, onChange, mediaScope,
             <label className="label">{field.label}</label>
             {list.map((item, idx) => (
               <div key={idx} className="flex items-center gap-2 mb-1">
-                <input className="input flex-1" value={typeof item === "string" ? item : ""} onChange={(e) => {
+                <input className="input flex-1" value={plainListItemText(item)} onChange={(e) => {
                   const updated = [...list];
                   updated[idx] = e.target.value;
                   onChangeItem({ [field.key]: updated });

@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { DEFAULT_SECTIONS, DEFAULT_SECTION_CONTENT, anchorFor, normalizeSectionPermissions } from "@/lib/site-sections";
+import { normalizeParagraphs } from "@/lib/section-fields";
 import { getActiveOffer, buildPricingContent } from "@/lib/commercial";
 import { resolveGateways } from "@/lib/gateway-config";
 import type { PublicTenant, ResolvedHomeSection, SiteSection, TenantSection } from "@/types";
@@ -270,6 +271,14 @@ export async function resolveHomeSections(opts: ResolveOptions): Promise<Resolve
           section.type === "pricing" && paymentConditions ? { paymentConditions } : {}
         );
     const content = merged;
+    // Blindagem: a seção "História / Sobre" já foi corrompida uma vez para
+    // paragraphs=[{ p: "..." }] pelo editor antigo. Normaliza aqui para que
+    // nenhum dado legado no banco quebre a HOME pública (tela branca).
+    if (section.type === "story" && content && typeof content === "object" && "paragraphs" in (content as Record<string, unknown>)) {
+      (content as Record<string, unknown>).paragraphs = normalizeParagraphs(
+        (content as Record<string, unknown>).paragraphs
+      );
+    }
 
     const navLabel = (override?.settings?.navLabel as string) || (section.settings?.navLabel as string) || section.label;
 

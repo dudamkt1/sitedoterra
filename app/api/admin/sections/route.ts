@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser, getProfile } from "@/lib/auth";
 import { SECTION_TYPES, SECTION_TYPE_LABELS, DEFAULT_SECTION_CONTENT } from "@/lib/site-sections";
+import { normalizeParagraphs } from "@/lib/section-fields";
 import { slugify } from "@/lib/utils";
 
 export const runtime = "nodejs";
@@ -14,8 +15,15 @@ async function requireSuperAdmin(): Promise<NextResponse | null> {
   return null;
 }
 
-function cleanContent(content: unknown): Record<string, unknown> {
-  return content && typeof content === "object" && !Array.isArray(content) ? (content as Record<string, unknown>) : {};
+function cleanContent(content: unknown, type?: string): Record<string, unknown> {
+  const out = content && typeof content === "object" && !Array.isArray(content) ? { ...(content as Record<string, unknown>) } : {};
+  // A seção "História / Sobre" usa paragraphs: string[]. Normaliza aqui para
+  // que resíduos do formato antigo [{ p: "..." }] sejam convertidos em texto
+  // no salvamento e nunca mais quebrem a HOME pública.
+  if (type === "story" && "paragraphs" in out) {
+    out.paragraphs = normalizeParagraphs(out.paragraphs);
+  }
+  return out;
 }
 
 function cleanPermissions(p: unknown): Record<string, unknown> {
@@ -68,7 +76,7 @@ export async function POST(request: Request) {
         is_required: Boolean(body.is_required),
         sort_order: nextOrder,
         settings: body.settings && typeof body.settings === "object" ? body.settings : {},
-        content: cleanContent(body.content && Object.keys(body.content).length ? body.content : DEFAULT_SECTION_CONTENT[type as keyof typeof DEFAULT_SECTION_CONTENT]),
+        content: cleanContent(body.content && Object.keys(body.content).length ? body.content : DEFAULT_SECTION_CONTENT[type as keyof typeof DEFAULT_SECTION_CONTENT], type),
         permissions: cleanPermissions(body.permissions),
       })
       .select()
@@ -82,6 +90,15 @@ export async function POST(request: Request) {
   if (action === "update") {
     const id = String(body.id || "");
     if (!id) return NextResponse.json({ error: "Seção não informada" }, { status: 400 });
+    // Tipo da seção (para sanitização específica, ex.: story.paragraphs).
+    // Prefere o enviado pelo editor; cai para o valor atual no banco.
+    let sectionType = typeof body.type === "string" ? body.type : undefined;
+    if (!sectionType && body.content !== undefined) {
+      const { data: current } = await admin.from("site_sections").select("type").eq("id", id).maybeSingle();
+      if (current && typeof (current as { type?: unknown }).type === "string") {
+        sectionType = (current as { type: string }).type;
+      }
+    }
     const payload: Record<string, unknown> = {};
     if (body.label !== undefined) payload.label = String(body.label);
     if (body.title !== undefined) payload.title = body.title || null;
@@ -90,7 +107,7 @@ export async function POST(request: Request) {
     if (body.is_required !== undefined) payload.is_required = Boolean(body.is_required);
     if (body.sort_order !== undefined) payload.sort_order = Number(body.sort_order) || 0;
     if (body.settings !== undefined) payload.settings = body.settings || {};
-    if (body.content !== undefined) payload.content = cleanContent(body.content);
+    if (body.content !== undefined) payload.content = cleanContent(body.content, sectionType);
     if (body.permissions !== undefined) payload.permissions = cleanPermissions(body.permissions);
 
     const { error } = await admin.from("site_sections").update(payload).eq("id", id);

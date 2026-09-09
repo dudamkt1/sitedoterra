@@ -7,6 +7,7 @@ import { invalidateOfficialHomeCache } from "@/lib/site-official";
 import { blockIfDemo } from "@/lib/demo/auth";
 import { resolveHomeSections } from "@/lib/home";
 import { normalizeSectionPermissions } from "@/lib/site-sections";
+import { normalizeParagraphs } from "@/lib/section-fields";
 import type { SectionPermissions, SiteSection, TenantSection } from "@/types";
 
 export const runtime = "nodejs";
@@ -169,6 +170,11 @@ export async function POST(request: Request) {
     }
     const incoming = (body.content && typeof body.content === "object" ? body.content : {}) as Record<string, unknown>;
     const filtered = stripInternalKeys(filterContentByPermissions(incoming, perms));
+    // Mesmo resguardo da rota do Super Admin: paragraphs da história é
+    // sempre string[] — converte resíduos [{ p }] vindos de edições antigas.
+    if ((section as SiteSection).type === "story" && "paragraphs" in filtered) {
+      filtered.paragraphs = normalizeParagraphs(filtered.paragraphs);
+    }
     content = filtered;
     if (body.settings && typeof body.settings === "object") {
       if (perms.can_edit_colors) settings = { ...settings, ...(body.settings as Record<string, unknown>) };

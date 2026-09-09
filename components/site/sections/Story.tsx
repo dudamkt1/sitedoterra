@@ -1,7 +1,12 @@
+import { normalizeParagraphs } from "@/lib/section-fields";
+
 export interface StoryContent {
   eyebrow?: string;
   title?: string;
-  paragraphs?: string[];
+  // paragraphs é string[] no formato canônico, mas normalizamos na
+  // renderização para tolerar o formato legado [{ p: "..." }] sem quebrar
+  // a página (tela branca "client-side exception").
+  paragraphs?: unknown;
   signature?: string;
   image?: string | null;
   imageAlt?: string;
@@ -10,7 +15,7 @@ export interface StoryContent {
 }
 
 export function Story({ content }: { content: StoryContent }) {
-  const paragraphs = content.paragraphs || [];
+  const paragraphs = normalizeParagraphs(content.paragraphs);
   if (paragraphs.length === 0) return null;
   return (
     <section id="historia">
