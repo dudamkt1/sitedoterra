@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { SectionType } from "@/types";
-import { SECTION_CONTENT_FIELDS, jsonToString, stringToJson, plainListItemText, type ContentFieldDef } from "@/lib/section-fields";
+import { SECTION_CONTENT_FIELDS, jsonToString, stringToJson, plainListItemText, isHexColor, PRODUCT_BG_PALETTE, type ContentFieldDef } from "@/lib/section-fields";
 import { deepMerge } from "@/lib/home";
 import { MediaPicker } from "@/components/media/MediaPicker";
 import { BookingAgendaEditor } from "@/components/editors/BookingAgendaEditor";
@@ -65,6 +65,62 @@ const AI_KIND_PROMPTS: Record<string, string> = {
   faq: "Gere uma pergunta comum (FAQ) sobre bem-estar e óleos essenciais.",
   default: "Escreva um texto claro e elegante em português do Brasil.",
 };
+
+/**
+ * Seletor de cor com paleta padrão + cor personalizada.
+ * Usado pela "Cor de fundo" dos produtos (ideal para fotos com fundo
+ * transparente). Salva o hexadecimal (ex.: "#E8F5EE") ou "" (sem cor).
+ */
+function ColorField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const hex = isHexColor(value) ? value : "#ffffff";
+  return (
+    <div>
+      <div className="flex flex-wrap items-center gap-2">
+        {PRODUCT_BG_PALETTE.map((c) => {
+          const active = value.toLowerCase() === c.toLowerCase();
+          return (
+            <button
+              key={c}
+              type="button"
+              title={c}
+              aria-label={`Cor ${c}`}
+              onClick={() => onChange(c)}
+              className="h-8 w-8 rounded-full border transition"
+              style={{
+                background: c,
+                borderColor: active ? "#1d5c3a" : "#d1d5db",
+                outline: active ? "2px solid #1d5c3a" : undefined,
+                outlineOffset: 1,
+              }}
+            />
+          );
+        })}
+      </div>
+      <div className="mt-2 flex items-center gap-2">
+        <input
+          type="color"
+          value={hex}
+          onChange={(e) => onChange(e.target.value)}
+          className="h-8 w-10 cursor-pointer rounded border border-gray-200 bg-white p-0.5"
+          title="Cor personalizada"
+        />
+        <input
+          type="text"
+          value={value}
+          placeholder="#FFFFFF"
+          onChange={(e) => onChange(e.target.value)}
+          className="input !w-28 font-mono !text-xs"
+        />
+        {value && (
+          <button type="button" className="text-xs text-red-600 hover:underline" onClick={() => onChange("")}>
+            Limpar
+          </button>
+        )}
+      </div>
+      <p className="mt-1 text-[0.7rem] text-gray-400">Fundo do card — ideal para fotos com fundo transparente.</p>
+    </div>
+  );
+}
 
 export function SectionContentEditor({ sectionType, value, onChange, mediaScope, disableLibrary }: SectionContentEditorProps) {
   const fields = useMemo(() => SECTION_CONTENT_FIELDS[sectionType] || [], [sectionType]);
@@ -183,6 +239,10 @@ export function SectionContentEditor({ sectionType, value, onChange, mediaScope,
               <input type="checkbox" checked={Boolean(current)} onChange={(e) => onChange(setPath(value, path, e.target.checked))} />
               Ativo
             </label>
+          );
+        case "color":
+          return (
+            <ColorField value={typeof current === "string" ? current : ""} onChange={(v) => onChange(setPath(value, path, v))} />
           );
         case "json":
           return (
@@ -314,6 +374,43 @@ export function SectionContentEditor({ sectionType, value, onChange, mediaScope,
           <div key={field.key} className="mb-2">
             <label className="label">{field.label}</label>
             <textarea className="input min-h-14" value={typeof current === "string" ? current : ""} onChange={(e) => onChangeItem({ [field.key]: e.target.value })} />
+          </div>
+        );
+      case "image": {
+        const str = typeof current === "string" ? current : "";
+        return (
+          <div key={field.key} className="mb-2">
+            <label className="label">{field.label}</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                className="input flex-1"
+                value={str}
+                placeholder={disableLibrary ? "URL da imagem" : "URL da imagem ou escolha na biblioteca"}
+                onChange={(e) => onChangeItem({ [field.key]: e.target.value })}
+              />
+              {!disableLibrary && (
+                <MediaPicker
+                  scope={mediaScope || "tenant"}
+                  value={str}
+                  onChange={(url) => onChangeItem({ [field.key]: url })}
+                />
+              )}
+            </div>
+            {str && (
+              <div className="mt-2 rounded-lg bg-gray-50 p-2 inline-block">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={str} alt="preview" className="h-20 w-auto max-w-full object-contain rounded" referrerPolicy="no-referrer" />
+              </div>
+            )}
+          </div>
+        );
+      }
+      case "color":
+        return (
+          <div key={field.key} className="mb-2">
+            <label className="label">{field.label}</label>
+            <ColorField value={typeof current === "string" ? current : ""} onChange={(v) => onChangeItem({ [field.key]: v })} />
           </div>
         );
       case "boolean":

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser, getProfile } from "@/lib/auth";
 import { SECTION_TYPES, SECTION_TYPE_LABELS, DEFAULT_SECTION_CONTENT } from "@/lib/site-sections";
-import { normalizeParagraphs } from "@/lib/section-fields";
+import { normalizeParagraphs, sanitizeProductsContent } from "@/lib/section-fields";
 import { slugify } from "@/lib/utils";
 
 export const runtime = "nodejs";
@@ -22,6 +22,9 @@ function cleanContent(content: unknown, type?: string): Record<string, unknown> 
   // no salvamento e nunca mais quebrem a HOME pública.
   if (type === "story" && "paragraphs" in out) {
     out.paragraphs = normalizeParagraphs(out.paragraphs);
+  }
+  if (type === "products") {
+    return sanitizeProductsContent(out);
   }
   return out;
 }

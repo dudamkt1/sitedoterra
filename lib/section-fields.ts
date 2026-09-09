@@ -11,6 +11,7 @@ export type ContentFieldType =
   | "textarea"
   | "url"
   | "image"
+  | "color"
   | "boolean"
   | "json"
   | "object"
@@ -169,16 +170,20 @@ export const SECTION_CONTENT_FIELDS: Record<SectionType, ContentFieldDef[]> = {
   products: [
     { key: "eyebrow", label: "Selo superior", type: "text" },
     { key: "title", label: "Título", type: "text", ai: true, aiKind: "title" },
-    { key: "storeUrl", label: "Link da loja", type: "url" },
+    { key: "storeUrl", label: "Link da loja", type: "url", placeholder: "https://sualoja.com.br" },
     {
       key: "items", label: "Produtos", type: "list", itemLabel: "Produto", fields: [
         { key: "name", label: "Nome", type: "text" },
         { key: "category", label: "Categoria", type: "text" },
         { key: "description", label: "Descrição", type: "textarea", ai: true, aiKind: "post" },
         { key: "price", label: "Preço", type: "text" },
-        { key: "emoji", label: "Emoji", type: "text" },
+        // Antes: campo "Emoji" (texto) e "Gradiente (CSS)" (texto livre).
+        // Agora: foto do produto (upload/URL) e cor de fundo via paleta.
+        // Os valores legados `emoji`/`gradient` continuam renderizando como
+        // fallback — nada antigo é perdido.
+        { key: "image", label: "Imagem do produto", type: "image" },
         { key: "badge", label: "Selo (ex.: Mais vendido)", type: "text" },
-        { key: "gradient", label: "Gradiente (CSS)", type: "text" },
+        { key: "bgColor", label: "Cor de fundo", type: "color" },
       ],
     },
   ],
@@ -295,4 +300,65 @@ export function plainListItemText(item: unknown): string {
     if (typeof text === "number" || typeof text === "boolean") return String(text);
   }
   return "";
+}
+
+/**
+ * Paleta padrão de cores de fundo para os cards de produto.
+ * Ideal para fotos com fundo transparente (PNG): a cor preenche o card.
+ */
+export const PRODUCT_BG_PALETTE: string[] = [
+  "#FFFFFF",
+  "#F7F2EA",
+  "#E8F5EE",
+  "#C8E8D8",
+  "#A8D5B5",
+  "#4A9E6B",
+  "#1D5C3A",
+  "#FFF8E8",
+  "#FCE8B0",
+  "#F5E6D0",
+  "#F0F4FE",
+  "#C8D8F8",
+];
+
+/** Diz se o valor é uma cor hexadecimal válida (#RGB ou #RRGGBB). */
+export function isHexColor(value: unknown): value is string {
+  return typeof value === "string" && /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(value);
+}
+
+/**
+ * Normaliza um link digitado no editor.
+ * Completa com https:// quando o esquema está ausente (ex.: "sualoja.com.br"
+ * ou "www.sualoja.com.br"), que era o motivo de o "Link da loja" não abrir o
+ * site desejado (o navegador tratava como caminho relativo do próprio site).
+ * Âncoras (#...), caminhos internos (/...), mailto: e tel: são preservados.
+ */
+export function normalizeUrl(value: unknown): string {
+  if (typeof value !== "string") return "";
+  const v = value.trim();
+  if (!v) return "";
+  if (/^(https?:\/\/|mailto:|tel:|#|\/)/i.test(v)) return v;
+  if (v.startsWith("//")) return `https:${v}`;
+  return `https://${v}`;
+}
+
+/**
+ * Sanitiza o conteúdo da seção "Produtos em destaque" no salvamento:
+ * normaliza o link da loja e aparafusa os campos de texto do produto.
+ * Chaves legadas (`emoji`, `gradient`) são preservadas como fallback.
+ */
+export function sanitizeProductsContent(content: Record<string, unknown>): Record<string, unknown> {
+  const out = { ...content };
+  if ("storeUrl" in out) out.storeUrl = normalizeUrl(out.storeUrl);
+  if (Array.isArray(out.items)) {
+    out.items = (out.items as unknown[]).map((it) => {
+      if (!it || typeof it !== "object" || Array.isArray(it)) return it;
+      const p = { ...(it as Record<string, unknown>) };
+      for (const k of ["name", "category", "description", "price", "image", "badge", "bgColor", "emoji", "gradient"]) {
+        if (typeof p[k] === "string") p[k] = (p[k] as string).trim();
+      }
+      return p;
+    });
+  }
+  return out;
 }

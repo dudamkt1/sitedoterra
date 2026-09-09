@@ -1734,6 +1734,15 @@
 }
 
 
+#tenant-site .produto-img img.produto-foto {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 1.25rem;
+  filter: drop-shadow(0 10px 20px rgba(0,0,0,0.12));
+}
+
+
 #tenant-site .produto-badge-tag {
   position: absolute;
   top: 12px; left: 12px;
