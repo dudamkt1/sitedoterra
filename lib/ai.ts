@@ -395,14 +395,21 @@ export async function saveAiSettings(userId: string, providerId: string | null, 
 }
 
 /**
- * Testa a conexão com o provedor usando a chave salva do usuário.
+ * Testa a conexão com o provedor.
+ * Usa a chave salva do usuário; se `apiKeyOverride` for informada (chave
+ * recém-digitada ainda não salva), testa com ela sem persistir.
  */
-export async function testProviderConnection(userId: string, providerId: string): Promise<{ ok: boolean; message: string }> {
-  const settings = await getAiSettings(userId);
-  if (!settings?.api_key_enc) {
-    return { ok: false, message: "Nenhuma API Key configurada ainda." };
+export async function testProviderConnection(userId: string, providerId: string, apiKeyOverride?: string | null): Promise<{ ok: boolean; message: string }> {
+  let apiKey: string | null = null;
+  if (apiKeyOverride && apiKeyOverride.trim()) {
+    apiKey = apiKeyOverride.trim();
+  } else {
+    const settings = await getAiSettings(userId);
+    if (!settings?.api_key_enc) {
+      return { ok: false, message: "Nenhuma API Key encontrada — cole sua chave no campo e salve (ou teste com a chave digitada)." };
+    }
+    apiKey = decryptSecret(settings.api_key_enc);
   }
-  const apiKey = decryptSecret(settings.api_key_enc);
   if (!apiKey) return { ok: false, message: "Não foi possível ler a API Key armazenada." };
 
   const admin = createAdminClient();

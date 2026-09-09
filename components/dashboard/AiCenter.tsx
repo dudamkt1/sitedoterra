@@ -53,6 +53,31 @@ export function AiCenter({ isSuperAdmin }: { isSuperAdmin: boolean }) {
     setCatalog((c) => (c ? { ...c, favorites } : c));
   }
 
+  /** Rola até um painel da página (usado pelas ferramentas manuais). */
+  function scrollToPanel(id: string) {
+    window.setTimeout(() => {
+      document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
+  }
+
+  /**
+   * Ferramentas "manuais" (Central de prompts, Templates) NÃO geram conteúdo
+   * via IA aqui dentro — elas abrem painéis de modelos prontos para copiar.
+   * Por isso o botão delas abre o painel correspondente em vez do modal de
+   * geração (que ficava com o botão desabilitado e "nada acontecia").
+   */
+  function openSpecialTool(tool: AiTool) {
+    if (tool.code === "templates") {
+      setShowTemplates(true);
+      setShowPrompts(false);
+      scrollToPanel("ia-templates");
+    } else {
+      setShowPrompts(true);
+      setShowTemplates(false);
+      scrollToPanel("ia-prompts");
+    }
+  }
+
   async function toggleFavorite(tool: AiTool) {
     const current = catalog?.favorites.includes(tool.code) || false;
     const res = await fetch("/api/ai/favorites", {
@@ -129,12 +154,16 @@ export function AiCenter({ isSuperAdmin }: { isSuperAdmin: boolean }) {
         <AiConfig
           settings={catalog.settings}
           providers={catalog.providers}
-          onSaved={() => setMessage({ ok: true, text: "Configuração salva! Agora teste a conexão e use as ferramentas." })}
+          onSaved={(s) => {
+            // Reflete na hora: selo "IA configurada" + botões de gerar liberados.
+            setCatalog((c) => (c ? { ...c, settings: s } : c));
+            setMessage({ ok: true, text: "Configuração salva! Agora teste a conexão e use as ferramentas." });
+          }}
         />
         {!hasKey && (
           <p className="mt-4 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
-            💡 Configure sua IA gratuita acima para desbloquear a geração de conteúdo. As áreas de <strong>Prompts
-            prontos</strong> e <strong>Templates</strong> funcionam mesmo sem chave.
+            💡 Configure sua IA gratuita acima para desbloquear a geração de conteúdo (botão <strong>“Usar ferramenta”</strong>). As áreas de <strong>Prompts
+            prontos</strong> e <strong>Templates</strong> (botão <strong>“Abrir”</strong>, selo <strong>📋 Manual</strong>) funcionam mesmo sem chave.
           </p>
         )}
       </div>
@@ -184,6 +213,7 @@ export function AiCenter({ isSuperAdmin }: { isSuperAdmin: boolean }) {
             {filtered.map((tool) => {
               const isFav = catalog.favorites.includes(tool.code);
               const needsKey = tool.generates_content && !hasKey;
+              const isManual = !tool.generates_content;
               return (
                 <div key={tool.id} className="rounded-xl border border-gray-100 bg-gray-50 hover:border-[#1d5c3a] hover:shadow-sm transition-all p-4 flex flex-col">
                   <div className="flex items-start justify-between mb-2">
@@ -209,15 +239,24 @@ export function AiCenter({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 
                   <div className="mt-3 flex items-center justify-between gap-2">
                     <div className="flex items-center gap-1.5">
-                      <span className={`badge ${tool.generates_content ? "badge-green" : "badge-blue"}`}>
-                        {tool.generates_content ? "IA gratuita" : "Sem chave"}
+                      <span
+                        className={`badge ${tool.generates_content ? "badge-green" : "badge-blue"}`}
+                        title={tool.generates_content ? "Gera o texto aqui dentro usando sua IA configurada" : "Não gera aqui dentro nem precisa de chave: abre modelos prontos para copiar"}
+                      >
+                        {tool.generates_content ? "✨ Gera com IA" : "📋 Manual"}
                       </span>
                       {isFav && <span className="badge badge-yellow">Favorita</span>}
                     </div>
-                    <button className="btn btn-primary !py-2 !px-4 text-xs" onClick={() => setOpenTool(tool)}>
-                      Usar ferramenta
+                    <button className="btn btn-primary !py-2 !px-4 text-xs" onClick={() => (isManual ? openSpecialTool(tool) : setOpenTool(tool))}>
+                      {isManual ? "Abrir" : "Usar ferramenta"}
                     </button>
                   </div>
+
+                  {isManual && (
+                    <p className="mt-2 text-[0.7rem] text-gray-500 bg-gray-100 rounded px-2 py-1">
+                      Modelos prontos para copiar — abre aqui mesmo, sem gerar via IA e sem precisar de chave.
+                    </p>
+                  )}
 
                   {needsKey && (
                     <p className="mt-2 text-[0.7rem] text-amber-700 bg-amber-50 rounded px-2 py-1">
@@ -284,17 +323,23 @@ export function AiCenter({ isSuperAdmin }: { isSuperAdmin: boolean }) {
       </div>
 
       {/* ---------- Prompts prontos ---------- */}
-      {showPrompts && <AiPromptsPanel />}
+      {showPrompts && (
+        <div id="ia-prompts" className="scroll-mt-4">
+          <AiPromptsPanel />
+        </div>
+      )}
 
       {/* ---------- Templates ---------- */}
       {showTemplates && (
-        <AiTemplatesPanel
-          templates={catalog.templates}
-          userTemplates={catalog.userTemplates}
-          onSavedTemplate={(t) =>
-            setCatalog((c) => (c ? { ...c, userTemplates: [t, ...c.userTemplates] } : c))
-          }
-        />
+        <div id="ia-templates" className="scroll-mt-4">
+          <AiTemplatesPanel
+            templates={catalog.templates}
+            userTemplates={catalog.userTemplates}
+            onSavedTemplate={(t) =>
+              setCatalog((c) => (c ? { ...c, userTemplates: [t, ...c.userTemplates] } : c))
+            }
+          />
+        </div>
       )}
 
       {/* ---------- Histórico ---------- */}

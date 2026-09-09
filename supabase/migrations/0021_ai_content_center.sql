@@ -253,7 +253,7 @@ values
   ),
   (
     'prompts', 'Central de prompts', '🧩', 'especial',
-    'Prompts prontos para copiar e usar em qualquer ferramenta gratuita de IA (ChatGPT, Gemini, Copilot e outras).',
+    'Modelos de instrução prontos para copiar e colar no ChatGPT, Gemini, Copilot e outras IAs — não gera aqui dentro e não precisa de chave.',
     '["Criar legenda para Instagram", "Criar roteiro de Reel", "Criar descrição de produto"]',
     true, false, 100,
     null

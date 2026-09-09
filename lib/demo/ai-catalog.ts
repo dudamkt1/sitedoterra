@@ -179,7 +179,7 @@ export const DEMO_AI_TOOLS: DemoAiToolRow[] = [
     "name": "Central de prompts",
     "emoji": "🧩",
     "category": "especial",
-    "description": "Prompts prontos para copiar e usar em qualquer ferramenta gratuita de IA (ChatGPT, Gemini, Copilot e outras).",
+    "description": "Modelos de instrução prontos para copiar e colar no ChatGPT, Gemini, Copilot e outras IAs — não gera aqui dentro e não precisa de chave.",
     "examples": [
       "Criar legenda para Instagram",
       "Criar roteiro de Reel",

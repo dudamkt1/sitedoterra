@@ -35,5 +35,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Erro ao salvar a configuração de IA." }, { status: 500 });
   }
 
-  return NextResponse.json({ success: true });
+  // Retorna o estado atualizado para a tela refletir na hora (sem recarregar).
+  const updated = await getAiSettings(user.id);
+  return NextResponse.json({
+    success: true,
+    settings: {
+      provider_id: updated?.provider_id || null,
+      has_key: Boolean(updated?.api_key_enc),
+      key_hint: keyHint(updated?.api_key_enc),
+    },
+  });
 }

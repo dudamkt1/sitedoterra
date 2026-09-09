@@ -6,7 +6,8 @@ import type { AiProvider } from "@/types";
 interface AiConfigProps {
   settings: { provider_id: string | null; has_key: boolean; key_hint: string | null };
   providers: AiProvider[];
-  onSaved: () => void;
+  /** Chamado após salvar, com o estado atualizado — a tela reflete na hora. */
+  onSaved: (settings: { provider_id: string | null; has_key: boolean; key_hint: string | null }) => void;
 }
 
 export function AiConfig({ settings, providers, onSaved }: AiConfigProps) {
@@ -31,7 +32,12 @@ export function AiConfig({ settings, providers, onSaved }: AiConfigProps) {
     if (res.ok) {
       setApiKey("");
       setMessage({ ok: true, text: "Configuração salva com sucesso." });
-      onSaved();
+      // Atualiza a tela na hora (selo "IA configurada", botões de gerar).
+      if (json.settings) {
+        onSaved(json.settings);
+      } else {
+        onSaved({ provider_id: providerId || null, has_key: Boolean(apiKey) || Boolean(settings?.has_key), key_hint: settings?.key_hint || null });
+      }
     } else {
       setMessage({ ok: false, text: json.error || "Erro ao salvar." });
     }
@@ -41,10 +47,11 @@ export function AiConfig({ settings, providers, onSaved }: AiConfigProps) {
   async function test() {
     setTesting(true);
     setTestResult(null);
+    // Envia a chave digitada (se houver) para testar antes mesmo de salvar.
     const res = await fetch("/api/ai/test", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ provider_id: providerId }),
+      body: JSON.stringify({ provider_id: providerId, api_key: apiKey || undefined }),
     });
     const json = await res.json();
     setTestResult({ ok: json.ok, text: json.message || "Sem resposta do provedor." });
@@ -55,7 +62,7 @@ export function AiConfig({ settings, providers, onSaved }: AiConfigProps) {
     <div className="card">
       <h2 className="card-title mb-1">Configurar provedor de IA</h2>
       <p className="text-sm text-gray-500 mb-4">
-        Você pode utilizar uma API com plano gratuito. Cada provedor possui seus próprios limites. Sua chave fica armazenada com segurança no servidor.
+        Você pode utilizar uma API com plano gratuito. Cada provedor possui seus próprios limites. Sua chave fica armazenada com segurança no servidor. Dica: cole a chave, clique em <strong>Testar conexão</strong> para validar e depois em <strong>Salvar</strong>.
       </p>
 
       {message && (

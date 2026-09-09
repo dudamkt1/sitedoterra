@@ -114,12 +114,19 @@ export function AiPromptsPanel() {
     <div className="card">
       <div className="flex items-center justify-between mb-1">
         <h2 className="card-title mb-1">Central de Prompts</h2>
-        <span className="badge badge-blue">Funciona sem chave</span>
+        <span className="badge badge-blue">📋 Não precisa de chave</span>
       </div>
-      <p className="text-sm text-gray-500 mb-4">
-        Prompts prontos para copiar e usar em qualquer IA gratuita que você já conhece (ChatGPT, Google Gemini,
-        Microsoft Copilot, Groq e outros). Substitua os campos entre colchetes — como <code className="bg-gray-100 px-1 rounded">[PRODUTO]</code> — pelo seu assunto e cole na ferramenta de IA.
+      <p className="text-sm text-gray-500 mb-3">
+        Para que serve: esta ferramenta <strong>não gera texto aqui dentro</strong> — ela entrega <strong>prompts
+        prontos</strong> (instruções sob medida para o universo doTERRA) para você <strong>copiar e colar em qualquer
+        IA gratuita que já usa</strong>: ChatGPT, Google Gemini, Microsoft Copilot, Groq e outras. É o caminho sem
+        configurar nada.
       </p>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4">
+        <div className="rounded-lg bg-gray-50 border border-gray-100 px-3 py-2 text-xs text-gray-600"><strong>1.</strong> Escolha o prompt e clique em <strong>Copiar</strong> (ou Editar antes).</div>
+        <div className="rounded-lg bg-gray-50 border border-gray-100 px-3 py-2 text-xs text-gray-600"><strong>2.</strong> Substitua os campos entre colchetes — como <code className="bg-gray-100 px-1 rounded">[PRODUTO]</code> — pelo seu assunto.</div>
+        <div className="rounded-lg bg-gray-50 border border-gray-100 px-3 py-2 text-xs text-gray-600"><strong>3.</strong> Cole na sua IA favorita e receba o conteúdo pronto.</div>
+      </div>
 
       {editing && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
