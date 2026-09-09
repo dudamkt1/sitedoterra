@@ -82,13 +82,14 @@ export default async function LoginPage() {
       <Header logoText={logoText} logoUrl={logoUrl} logoLightUrl={logoLightUrl} navItems={navItems} extraNav={extraNav} />
       {/* Isolado do NAV fixo (70px) + respiro — conteúdo nunca fica atrás do header */}
       <main className="flex-1 bg-[#fcf9f5] pt-[70px]">
-        <div className="max-w-[1160px] mx-auto px-5 sm:px-6 lg:px-8 pt-12 sm:pt-14 pb-16 sm:pb-20 flex justify-center">
-          <div className="w-full max-w-[520px]">
-            <div className="rounded-[20px] bg-white border border-[#e7ece8] shadow-[0_10px_30px_rgba(16,61,45,0.06)] p-6 sm:p-8">
-              <Suspense fallback={<div className="py-12 text-center text-sm text-slate-500">Carregando...</div>}>
-                <LoginForm />
-              </Suspense>
-            </div>
+        <div className="max-w-[1160px] mx-auto px-5 sm:px-6 lg:px-8 pt-10 sm:pt-14 pb-16 sm:pb-20 flex flex-col items-center">
+          <p className="text-center text-[24px] sm:text-[28px] font-semibold tracking-tight" style={{ fontFamily: "var(--font-display)", color: "var(--verde)" }}>
+            {logoText}
+          </p>
+          <div className="mt-7 sm:mt-8 w-full max-w-[480px]">
+            <Suspense fallback={<div className="py-12 text-center text-sm text-slate-500">Carregando...</div>}>
+              <LoginForm />
+            </Suspense>
           </div>
         </div>
       </main>

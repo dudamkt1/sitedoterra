@@ -6,6 +6,18 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { PasswordField } from "@/components/PasswordField";
 
+/** Inputs altos, borda suave e foco elegante (padrão da página de login). */
+const FIELD_CLS =
+  "w-full h-[52px] rounded-xl border border-[#dbe3db] bg-white pl-11 pr-4 text-[15px] text-[#0f1a2a] placeholder:text-[#9aa8b5] outline-none transition focus:border-[#1d5c3a] focus:ring-4 focus:ring-[#1d5c3a]/10";
+
+function FieldIcon({ children }: { children: React.ReactNode }) {
+  return (
+    <span aria-hidden className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[#9aa8b5]">
+      {children}
+    </span>
+  );
+}
+
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -23,6 +35,7 @@ export function LoginForm() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (loading) return;
     setError(null);
     setLoading(true);
 
@@ -112,171 +125,264 @@ export function LoginForm() {
   }
 
   return (
-    <div>
-      <h1 className="text-2xl font-semibold mb-1" style={{ fontFamily: "var(--font-display)" }}>
-        Entrar no painel
-      </h1>
-      <p className="text-sm text-gray-500 mb-6">Acesse sua conta para gerenciar seu site e assinatura.</p>
+    <div className="w-full">
+      {/* ============ CARD DE LOGIN ============ */}
+      <section aria-label="Entrar na conta" className="rounded-[24px] bg-white border border-[#e7ece8] shadow-[0_16px_48px_rgba(16,61,45,0.08)] p-7 sm:p-9">
+        {!forgotMode ? (
+          <>
+            <header className="text-center">
+              <h1 className="text-[26px] sm:text-[28px] font-bold tracking-tight text-[#0f1a2a] leading-tight">
+                Bem-vindo(a)!
+              </h1>
+              <p className="text-[14px] leading-6 text-[#6b7a89] mt-2.5">
+                Entre na sua conta para acessar seu painel.
+              </p>
+            </header>
 
-      {!forgotMode ? (
-        <>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="label" htmlFor="email">E-mail</label>
-              <input
-                id="email"
-                type="email"
-                required
-                className="input"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="voce@email.com"
-              />
-            </div>
-            <div>
-              <div className="flex items-center justify-between">
-                <label className="label mb-0" htmlFor="password">Senha</label>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setForgotEmail(email);
-                    setForgotError(null);
-                    setForgotSuccess(null);
-                    setForgotMode(true);
-                  }}
-                  className="text-xs font-medium hover:underline"
-                  style={{ color: "var(--verde)" }}
-                >
-                  Esqueceu a senha?
-                </button>
+            <form onSubmit={handleSubmit} className="mt-8 space-y-5" noValidate={false}>
+              <div>
+                <label className="block text-[13px] font-semibold text-[#0f1a2a] mb-2" htmlFor="email">
+                  E-mail
+                </label>
+                <div className="relative">
+                  <FieldIcon>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="5" width="18" height="14" rx="2.5" />
+                      <path d="m4 7 8 6 8-6" />
+                    </svg>
+                  </FieldIcon>
+                  <input
+                    id="email"
+                    type="email"
+                    required
+                    autoComplete="email"
+                    className={FIELD_CLS}
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="voce@email.com"
+                  />
+                </div>
               </div>
-              <PasswordField
-                id="password"
-                required
-                value={password}
-                onChange={setPassword}
-                placeholder="••••••••"
-                autoComplete="current-password"
-              />
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-[13px] font-semibold text-[#0f1a2a]" htmlFor="password">
+                    Senha
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setForgotEmail(email);
+                      setForgotError(null);
+                      setForgotSuccess(null);
+                      setForgotMode(true);
+                    }}
+                    className="text-[13px] font-semibold text-[#1d5c3a] hover:underline underline-offset-2 rounded focus-visible:outline-2 focus-visible:outline-[#1d5c3a]"
+                  >
+                    Esqueceu a senha?
+                  </button>
+                </div>
+                <div className="relative">
+                  <FieldIcon>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="5" y="11" width="14" height="10" rx="2.5" />
+                      <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+                    </svg>
+                  </FieldIcon>
+                  <PasswordField
+                    id="password"
+                    required
+                    value={password}
+                    onChange={setPassword}
+                    placeholder="Sua senha"
+                    autoComplete="current-password"
+                    className={`${FIELD_CLS} pr-12`}
+                  />
+                </div>
+              </div>
+
+              {error && (
+                <p role="alert" className="rounded-xl bg-[#fef2f2] border border-[#fde4e4] px-4 py-3 text-sm leading-5 text-[#991b1b]">
+                  {error}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full h-[52px] rounded-xl bg-[#1d5c3a] px-6 text-[15px] font-bold tracking-wide text-white shadow-[0_10px_28px_rgba(29,92,58,0.28)] hover:bg-[#154730] active:bg-[#103d2d] transition disabled:opacity-70 disabled:cursor-not-allowed disabled:shadow-none flex items-center justify-center gap-2.5"
+              >
+                {loading ? (
+                  <>
+                    <span className="w-[18px] h-[18px] rounded-full border-[2.5px] border-white/30 border-t-white animate-spin" aria-hidden />
+                    Entrando...
+                  </>
+                ) : (
+                  "Entrar"
+                )}
+              </button>
+            </form>
+
+            <div className="mt-7 pt-6 border-t border-[#eef2ee] text-center">
+              <p className="text-[13.5px] text-[#6b7a89] leading-5">Ainda não possui uma conta?</p>
+              <Link
+                href="/cadastro"
+                className="mt-3 flex items-center justify-center w-full h-[50px] rounded-xl border-[1.5px] border-[#dbe3db] bg-white px-6 text-[14.5px] font-bold text-[#1d5c3a] hover:border-[#1d5c3a] hover:bg-[#f2f8f3] active:bg-[#e9f2ea] transition"
+              >
+                Criar conta
+              </Link>
             </div>
+          </>
+        ) : (
+          <>
+            <header className="text-center">
+              <h1 className="text-[24px] sm:text-[26px] font-bold tracking-tight text-[#0f1a2a] leading-tight">
+                Recuperar senha
+              </h1>
+              <p className="text-[14px] leading-6 text-[#6b7a89] mt-2.5">
+                Informe seu e-mail e enviaremos um link para criar uma nova senha.
+              </p>
+            </header>
 
-            {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
+            <form onSubmit={handleForgot} className="mt-8 space-y-5">
+              <div>
+                <label className="block text-[13px] font-semibold text-[#0f1a2a] mb-2" htmlFor="forgot-email">
+                  E-mail cadastrado
+                </label>
+                <div className="relative">
+                  <FieldIcon>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="5" width="18" height="14" rx="2.5" />
+                      <path d="m4 7 8 6 8-6" />
+                    </svg>
+                  </FieldIcon>
+                  <input
+                    id="forgot-email"
+                    type="email"
+                    required
+                    autoComplete="email"
+                    className={FIELD_CLS}
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    placeholder="voce@email.com"
+                  />
+                </div>
+              </div>
 
-            <button type="submit" className="btn btn-primary w-full" disabled={loading}>
-              {loading ? "Entrando..." : "Entrar"}
-            </button>
-          </form>
+              {forgotError && (
+                <p role="alert" className="rounded-xl bg-[#fef2f2] border border-[#fde4e4] px-4 py-3 text-sm leading-5 text-[#991b1b]">
+                  {forgotError}
+                </p>
+              )}
+              {forgotSuccess && (
+                <p role="status" className="rounded-xl bg-[#f0fdf4] border border-[#bbf7d0] px-4 py-3 text-sm leading-5 text-[#166534]">
+                  {forgotSuccess}
+                </p>
+              )}
 
-          <p className="mt-6 text-sm text-gray-500 text-center">
-            Ainda não tem conta?{" "}
-            <Link href="/cadastro" className="font-semibold" style={{ color: "var(--verde)" }}>
-              Criar conta
-            </Link>
-          </p>
-        </>
-      ) : (
-        <div>
-          <h2 className="text-lg font-semibold mb-1" style={{ fontFamily: "var(--font-display)" }}>
-            Recuperar senha
-          </h2>
-          <p className="text-sm text-gray-500 mb-4">Informe seu e-mail cadastrado. Enviaremos um link para criar uma nova senha.</p>
-          <form onSubmit={handleForgot} className="space-y-4">
-            <div>
-              <label className="label" htmlFor="forgot-email">E-mail cadastrado</label>
-              <input
-                id="forgot-email"
-                type="email"
-                required
-                className="input"
-                value={forgotEmail}
-                onChange={(e) => setForgotEmail(e.target.value)}
-                placeholder="voce@email.com"
-              />
-            </div>
-            {forgotError && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{forgotError}</p>}
-            {forgotSuccess && <p className="text-sm text-green-700 bg-green-50 rounded-lg px-3 py-2">{forgotSuccess}</p>}
-            <button type="submit" className="btn btn-primary w-full" disabled={forgotLoading}>
-              {forgotLoading ? "Enviando..." : "Enviar link de recuperação"}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setForgotMode(false);
-                setForgotError(null);
-                setForgotSuccess(null);
-              }}
-              className="btn btn-outline w-full"
-            >
-              Voltar ao login
-            </button>
-          </form>
-        </div>
-      )}
+              <button
+                type="submit"
+                disabled={forgotLoading}
+                className="w-full h-[52px] rounded-xl bg-[#1d5c3a] px-6 text-[15px] font-bold text-white shadow-[0_10px_28px_rgba(29,92,58,0.28)] hover:bg-[#154730] active:bg-[#103d2d] transition disabled:opacity-70 disabled:cursor-not-allowed disabled:shadow-none flex items-center justify-center gap-2.5"
+              >
+                {forgotLoading ? (
+                  <>
+                    <span className="w-[18px] h-[18px] rounded-full border-[2.5px] border-white/30 border-t-white animate-spin" aria-hidden />
+                    Enviando...
+                  </>
+                ) : (
+                  "Enviar link de recuperação"
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setForgotMode(false);
+                  setForgotError(null);
+                  setForgotSuccess(null);
+                }}
+                className="w-full h-[50px] rounded-xl border-[1.5px] border-[#dbe3db] bg-white px-6 text-[14.5px] font-bold text-[#334155] hover:border-[#1d5c3a] hover:text-[#1d5c3a] transition"
+              >
+                Voltar ao login
+              </button>
+            </form>
+          </>
+        )}
+      </section>
 
-      <div className="mt-8 relative rounded-xl border-2 border-[#1d5c3a] bg-gradient-to-br from-[#e5f4ea] via-[#faf8f2] to-[#fdf6e9] p-5 shadow-md overflow-hidden">
-        <span
-          aria-hidden
-          className="absolute -right-4 -top-4 text-6xl opacity-10 select-none pointer-events-none"
-        >
-          🔓
-        </span>
-
-        <span className="inline-block mb-2 rounded-full bg-[#1d5c3a] px-3 py-1 text-[0.6rem] font-bold uppercase tracking-widest text-white">
+      {/* ============ CARD DEMONSTRAÇÃO ============ */}
+      <section aria-label="Experimente a demonstração" className="mt-6 rounded-[24px] border border-[#cfe6d4] bg-gradient-to-br from-[#eef7ef] via-[#f7fbf4] to-white shadow-[0_12px_36px_rgba(29,92,58,0.10)] p-7 sm:p-8">
+        <span className="inline-flex items-center rounded-full bg-[#1d5c3a] px-3 py-1 text-[10.5px] font-bold uppercase tracking-[0.12em] text-white">
           Acesso rápido • Sem cadastro
         </span>
-
-        <h2
-          className="text-lg font-bold text-[#1d5c3a] leading-snug mb-1.5"
-          style={{ fontFamily: "var(--font-display)" }}
-        >
-          👀 Acesse e veja por dentro tudo o que você poderá adquirir!
+        <h2 className="mt-3.5 text-[20px] sm:text-[21px] font-bold tracking-tight text-[#0f1a2a] leading-snug">
+          ⚡ Experimente antes de começar
         </h2>
-
-        <p className="text-xs text-gray-700 leading-relaxed mb-3">
-          Entre com <strong>1 clique</strong> e explore o painel completo como se
-          o site já fosse seu: edite seções, teste a IA, gerencie clientes no
-          CRM e muito mais.
+        <p className="mt-2 text-[13.5px] leading-6 text-[#4b5a48]">
+          Acesse a demonstração e explore tudo o que você poderá ter no seu próprio site.
         </p>
 
-        <ul className="text-xs text-gray-600 space-y-1 mb-4">
-          <li>✅ Tudo liberado para você explorar</li>
-          <li>🔒 Suas alterações ficam salvas apenas neste navegador/celular</li>
-          <li>🛡️ Nada é alterado em nenhum site real</li>
+        <ul className="mt-5 space-y-2.5">
+          {[
+            "Explore o painel completo",
+            "Teste ferramentas e recursos",
+            "Personalize e veja como funciona",
+            "Alterações ficam somente neste dispositivo",
+            "Nada é alterado em sites reais",
+          ].map((item) => (
+            <li key={item} className="flex items-start gap-2.5 text-[13.5px] leading-5 text-[#334155]">
+              <span aria-hidden className="mt-[1px] flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#1d5c3a]/10">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#1d5c3a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+              </span>
+              {item}
+            </li>
+          ))}
         </ul>
 
         <button
           type="button"
           onClick={startDemo}
           disabled={demoStarting || loading}
-          className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-[#1d5c3a] px-4 py-3 text-sm font-bold text-white shadow hover:bg-[#154730] transition-colors disabled:opacity-60"
+          className="mt-6 flex items-center justify-center gap-2 w-full h-[52px] rounded-xl bg-[#1d5c3a] px-6 text-[15px] font-bold text-white shadow-[0_10px_28px_rgba(29,92,58,0.28)] hover:bg-[#154730] active:bg-[#103d2d] transition disabled:opacity-70 disabled:cursor-not-allowed disabled:shadow-none"
         >
-          ⚡{" "}
-          {demoStarting ? "Preparando seu acesso..." : "Entrar agora — ver demonstração"}
+          {demoStarting ? (
+            <>
+              <span className="w-[18px] h-[18px] rounded-full border-[2.5px] border-white/30 border-t-white animate-spin" aria-hidden />
+              Preparando seu acesso...
+            </>
+          ) : (
+            "⚡ Entrar na demonstração"
+          )}
         </button>
-      </div>
+        <p className="mt-3.5 text-center text-[11.5px] leading-4 text-[#8a9aa8]">
+          Área de testes • sem cadastro
+        </p>
+      </section>
 
-      <div className="mt-8 pt-4 border-t border-gray-100 flex justify-center">
+      {/* Acesso de testes (utilidade de desenvolvimento, discreto) */}
+      <div className="mt-6 text-center">
         <button
           type="button"
           onClick={() => setShowAdminArea((v) => !v)}
-          className="text-[0.65rem] text-gray-400 hover:text-gray-600 transition-colors"
+          className="text-[11.5px] text-[#a4b3ad] hover:text-[#6b7a89] transition-colors rounded focus-visible:outline-2 focus-visible:outline-[#1d5c3a]"
         >
           {showAdminArea ? "Ocultar área de testes" : "Área de testes"}
         </button>
+        {showAdminArea && (
+          <div className="mt-3 rounded-xl border border-gray-200 bg-white/70 p-3">
+            <button
+              type="button"
+              onClick={quickLogin}
+              disabled={loading}
+              className="w-full min-h-[44px] text-xs font-medium text-gray-700 hover:text-gray-900 underline underline-offset-2 rounded"
+            >
+              Entrar como administrador de testes
+            </button>
+          </div>
+        )}
       </div>
-
-      {showAdminArea && (
-        <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
-          <button
-            type="button"
-            onClick={quickLogin}
-            disabled={loading}
-            className="w-full text-xs font-medium text-gray-700 hover:text-gray-900 underline underline-offset-2"
-          >
-            Entrar como administrador de testes
-          </button>
-        </div>
-      )}
     </div>
   );
 }

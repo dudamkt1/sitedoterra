@@ -14,6 +14,7 @@ export function PasswordField({
   required,
   minLength,
   autoComplete,
+  className,
 }: {
   id: string;
   value: string;
@@ -22,6 +23,8 @@ export function PasswordField({
   required?: boolean;
   minLength?: number;
   autoComplete?: string;
+  /** Classes do input (substitui o padrão "input pr-11" quando informado). */
+  className?: string;
 }) {
   const [show, setShow] = useState(false);
 
@@ -32,7 +35,7 @@ export function PasswordField({
         type={show ? "text" : "password"}
         required={required}
         minLength={minLength}
-        className="input pr-11"
+        className={className || "input pr-11"}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
