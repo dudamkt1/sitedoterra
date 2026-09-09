@@ -62,6 +62,8 @@ export function SubscriptionManager({
   const [checking, setChecking] = useState(false);
   /** Checkout iniciado em outra aba e ainda sem confirmação (localStorage). */
   const [checkoutPending, setCheckoutPending] = useState(false);
+  /** Abertura do painel de demonstração ("Ainda tem dúvidas?"). */
+  const [demoLoading, setDemoLoading] = useState(false);
 
   useEffect(() => {
     try {
@@ -176,6 +178,25 @@ export function SubscriptionManager({
     setLoading(false);
   }
 
+  /** Leva ao painel de demonstração (mesmo fluxo do site público). */
+  async function handleDemo() {
+    if (demoLoading) return;
+    setDemoLoading(true);
+    setMsg(null);
+    try {
+      const res = await fetch("/api/demo/start", { method: "POST" });
+      if (res.ok) {
+        window.location.href = "/painel";
+        return;
+      }
+      setMsg({ ok: false, text: "Não foi possível abrir a demonstração agora. Tente novamente." });
+    } catch {
+      setMsg({ ok: false, text: "Não foi possível abrir a demonstração agora. Tente novamente." });
+    } finally {
+      setTimeout(() => setDemoLoading(false), 2000);
+    }
+  }
+
   const cancelScheduled = subscription?.cancel_at_period_end === true;
   const isActive = subscription?.status === "active" && !cancelScheduled;
   const isCanceled =
@@ -197,56 +218,7 @@ export function SubscriptionManager({
 
       {/* Banner de ativação removido — a ativação vive na seção "Ações" abaixo. */}
 
-      {/* Estado atual */}
-
-      {/* Estado atual */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="card">
-          <p className="text-xs uppercase tracking-wider text-gray-400 font-semibold">Ativação do site</p>
-          <p className="mt-2 text-xl font-semibold" style={{ fontFamily: "var(--font-display)" }}>
-            {activationPaid ? "Pago" : "Pendente"}
-          </p>
-          <p className="text-sm text-gray-400 mt-1">
-            {activationRegularPriceCents ? (
-              <><span className="line-through mr-1">{formatBRL(activationRegularPriceCents)}</span> {formatBRL(activationPriceCents)} — pagamento único</>
-            ) : (
-              `${formatBRL(activationPriceCents)} — pagamento único`
-            )}
-          </p>
-        </div>
-        <div className="card">
-          <p className="text-xs uppercase tracking-wider text-gray-400 font-semibold">Plano</p>
-          <p className="mt-2 text-xl font-semibold" style={{ fontFamily: "var(--font-display)" }}>
-            {subscription?.plan?.name || "Nenhum plano ativo"}
-          </p>
-          {monthlyPriceCents > 0 && <p className="text-sm text-gray-400 mt-1">{formatBRL(monthlyPriceCents)}/mês</p>}
-          {subscription?.gateway === "mercadopago" && (
-            <p className="text-xs text-gray-400 mt-1">Pagamento via Mercado Pago</p>
-          )}
-        </div>
-        <div className="card">
-          <p className="text-xs uppercase tracking-wider text-gray-400 font-semibold">Status</p>
-          <div className="mt-2"><StatusBadge status={subscription?.status || "awaiting_activation"} /></div>
-          {statusLabel && <p className="text-xs text-gray-400 mt-2">{statusLabel}</p>}
-          {!billingEnabled && (
-            <p className="text-xs text-emerald-600 mt-2">Ativo sem mensalidade recorrente.</p>
-          )}
-        </div>
-        <div className="card">
-          <p className="text-xs uppercase tracking-wider text-gray-400 font-semibold">Próxima cobrança</p>
-          <p className="mt-2 text-xl font-semibold" style={{ fontFamily: "var(--font-display)" }}>
-            {nextBilling ? formatDate(nextBilling) : "—"}
-          </p>
-          {monthlyPriceCents > 0 && <p className="text-sm text-gray-400 mt-1">{formatBRL(monthlyPriceCents)}</p>}
-          {!nextBilling && (
-            <p className="text-xs text-gray-400 mt-1">
-              {trialMonths > 0
-                ? `primeira cobrança após ${trialMonths} ${trialMonths === 1 ? "mês" : "meses"} da ativação`
-                : "primeira cobrança após a ativação"}
-            </p>
-          )}
-        </div>
-      </div>
+      {/* O resumo "Minha Assinatura" foi movido para baixo de "Ações", logo acima do histórico. */}
 
       {msg && (
         <p className={`rounded-lg px-4 py-3 text-sm ${msg.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"}`}>
@@ -289,8 +261,22 @@ export function SubscriptionManager({
           {!subscription && billingEnabled && (
             <div className="w-full space-y-4">
               <div className="rounded-xl border border-[#e3d3a1] bg-[#fffdf5] p-4 sm:p-5">
-                <p className="font-semibold text-base sm:text-lg" style={{ fontFamily: "var(--font-display)" }}>
-                  ⚡ Ativar Site Profissional — {formatBRL(activationPriceCents)}
+                <div className="rounded-xl border-2 border-[#1d5c3a] bg-gradient-to-br from-[#f0faf3] to-[#fffdf5] p-4 text-center mb-4">
+                  <p className="text-xs uppercase tracking-wider text-gray-500 font-semibold">Oferta de lançamento</p>
+                  {(activationRegularPriceCents || 150000) > (activationPriceCents || 29700) ? (
+                    <p className="mt-1 text-2xl sm:text-3xl font-bold" style={{ fontFamily: "var(--font-display)" }}>
+                      <span className="text-gray-400 line-through text-lg mr-2">De {formatBRL(activationRegularPriceCents || 150000)}</span>
+                      por apenas <span className="text-[#1d5c3a]">{formatBRL(activationPriceCents || 29700)}</span>
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-2xl sm:text-3xl font-bold text-[#1d5c3a]" style={{ fontFamily: "var(--font-display)" }}>
+                      {formatBRL(activationPriceCents || 29700)}
+                    </p>
+                  )}
+                  <p className="text-xs text-gray-500 mt-1">pagamento único da ativação + {trialMonths} {trialMonths === 1 ? "mês" : "meses"} sem mensalidade</p>
+                </div>
+              <p className="font-semibold text-base sm:text-lg" style={{ fontFamily: "var(--font-display)" }}>
+                ⚡ Ativar Site Profissional — {formatBRL(activationPriceCents)}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
                   {formatBRL(activationPriceCents)} é o valor único da <strong>ativação</strong> (não é mensalidade).
@@ -306,7 +292,20 @@ export function SubscriptionManager({
                   <li>🔁 <strong>Após os {trialMonths} {trialMonths === 1 ? "mês" : "meses"}:</strong> {formatBRL(monthlyPriceCents)}/mês</li>
                   <li>✅ <strong>Sem fidelidade — cancele quando quiser</strong></li>
                 </ul>
-                <p className="w-full text-xs text-gray-400 mt-3">
+                <div className="rounded-xl border border-gray-200 bg-white p-4">
+                  <p className="font-semibold text-sm">💡 Quanto custaria montar isso por conta própria?</p>
+                  <ul className="mt-2 space-y-1.5 text-sm text-gray-700">
+                    <li>🧑‍💻 Site com freelancer: <strong>R$ 2.000–5.000</strong> (só o site, pagamento único)</li>
+                    <li>👥 CRM separado: <strong>R$ 50–150/mês</strong></li>
+                    <li>📅 Ferramenta de agendamento: <strong>R$ 30–80/mês</strong></li>
+                  </ul>
+                  <p className="mt-2 text-sm text-gray-700">
+                    Aqui você leva <strong>tudo junto</strong> — site + CRM + agendamento + IA — por{" "}
+                    <strong>{formatBRL(activationPriceCents || 29700)}</strong> na ativação e{" "}
+                    <strong>{formatBRL(monthlyPriceCents)}/mês</strong> após os {trialMonths} {trialMonths === 1 ? "mês" : "meses"} iniciais.
+                  </p>
+                </div>
+              <p className="w-full text-xs text-gray-400 mt-3">
                   Forma de pagamento:{" "}
                   {activeGateway === "mercadopago"
                     ? "🇧🇷 Mercado Pago (PIX ou cartão)"
@@ -373,6 +372,13 @@ export function SubscriptionManager({
                   {loading ? "Processando..." : "⚡ Ativar Site Profissional"}
                 </button>
               ))}
+              <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#1d5c3a] text-xl text-white" role="img" aria-label="Garantia">🛡️</span>
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">Garantia incondicional de 7 dias</p>
+                  <p className="text-sm text-emerald-900 mt-0.5">Se não gostar, devolvemos <strong>100%</strong> do valor. Sem perguntas, sem burocracia.</p>
+                </div>
+              </div>
             </div>
           )}
 
@@ -381,6 +387,70 @@ export function SubscriptionManager({
               Sua conta está ativa sem mensalidade. Não há cobranças recorrentes vinculadas.
             </p>
           )}
+        </div>
+      </div>
+
+      {/* Ainda tem dúvidas? — mostra por dentro o que está incluído */}
+      <div className="card border-[#d5e8db] bg-gradient-to-br from-[#f0faf3] to-white">
+        <h2 className="card-title mb-1">Ainda tem dúvidas? 🤔</h2>
+        <p className="text-sm text-gray-600 mb-4">
+          Acesse e veja por dentro <strong>tudo o que você poderá adquirir</strong>: explore o painel de
+          demonstração com Central de IA, CRM, agendamento e todas as ferramentas — sem compromisso.
+        </p>
+        <button type="button" className="btn btn-primary !py-3 !px-6 text-sm" onClick={handleDemo} disabled={demoLoading}>
+          {demoLoading ? "Preparando demonstração..." : "👀 Ver demonstração por dentro →"}
+        </button>
+      </div>
+
+      {/* Minha Assinatura (resumo) — abaixo de Ações, acima do histórico */}
+      <div>
+        <h2 className="card-title mb-4">Minha Assinatura</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="card">
+            <p className="text-xs uppercase tracking-wider text-gray-400 font-semibold">Ativação do site</p>
+            <p className="mt-2 text-xl font-semibold" style={{ fontFamily: "var(--font-display)" }}>
+              {activationPaid ? "Pago" : "Pendente"}
+            </p>
+            <p className="text-sm text-gray-400 mt-1">
+              {activationRegularPriceCents ? (
+                <><span className="line-through mr-1">{formatBRL(activationRegularPriceCents)}</span> {formatBRL(activationPriceCents)} — pagamento único</>
+              ) : (
+                `${formatBRL(activationPriceCents)} — pagamento único`
+              )}
+            </p>
+          </div>
+          <div className="card">
+            <p className="text-xs uppercase tracking-wider text-gray-400 font-semibold">Plano</p>
+            <p className="mt-2 text-xl font-semibold" style={{ fontFamily: "var(--font-display)" }}>
+              {subscription?.plan?.name || "Nenhum plano ativo"}
+            </p>
+            {monthlyPriceCents > 0 && <p className="text-sm text-gray-400 mt-1">{formatBRL(monthlyPriceCents)}/mês</p>}
+            {subscription?.gateway === "mercadopago" && (
+              <p className="text-xs text-gray-400 mt-1">Pagamento via Mercado Pago</p>
+            )}
+          </div>
+          <div className="card">
+            <p className="text-xs uppercase tracking-wider text-gray-400 font-semibold">Status</p>
+            <div className="mt-2"><StatusBadge status={subscription?.status || "awaiting_activation"} /></div>
+            {statusLabel && <p className="text-xs text-gray-400 mt-2">{statusLabel}</p>}
+            {!billingEnabled && (
+              <p className="text-xs text-emerald-600 mt-2">Ativo sem mensalidade recorrente.</p>
+            )}
+          </div>
+          <div className="card">
+            <p className="text-xs uppercase tracking-wider text-gray-400 font-semibold">Próxima cobrança</p>
+            <p className="mt-2 text-xl font-semibold" style={{ fontFamily: "var(--font-display)" }}>
+              {nextBilling ? formatDate(nextBilling) : "—"}
+            </p>
+            {monthlyPriceCents > 0 && <p className="text-sm text-gray-400 mt-1">{formatBRL(monthlyPriceCents)}</p>}
+            {!nextBilling && (
+              <p className="text-xs text-gray-400 mt-1">
+                {trialMonths > 0
+                  ? `primeira cobrança após ${trialMonths} ${trialMonths === 1 ? "mês" : "meses"} da ativação`
+                  : "primeira cobrança após a ativação"}
+              </p>
+            )}
+          </div>
         </div>
       </div>
 
