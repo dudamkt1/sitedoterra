@@ -69,9 +69,17 @@ export interface MpPayment {
   date_created: string;
   payer?: { email?: string | null; first_name?: string | null };
   payment_type_id?: string | null;
+  payment_method_id?: string | null;
   preference_id?: string | null;
   metadata?: Record<string, unknown> | null;
   description?: string | null;
+  point_of_interaction?: {
+    transaction_data?: {
+      qr_code?: string | null;
+      qr_code_base64?: string | null;
+      ticket_url?: string | null;
+    } | null;
+  } | null;
 }
 
 export interface MpSubscription {
@@ -161,6 +169,133 @@ export async function createActivationPreference(
   if (!initPoint) throw new Error("Mercado Pago não retornou um init_point");
 
   return { id: pref.id, initPoint };
+}
+
+// ============================ PAYMENT BRICK (PAGAMENTO DENTRO DO SITE) ============================
+
+export interface BrickFormData {
+  token?: string | null;
+  issuer_id?: string | number | null;
+  payment_method_id?: string | null;
+  payment_type_id?: string | null;
+  /** Enviado pelo Brick, mas IGNORADO aqui: o valor é recalculado do plano. */
+  transaction_amount?: number | null;
+  installments?: number | null;
+  payer?: {
+    email?: string | null;
+    first_name?: string | null;
+    last_name?: string | null;
+    identification?: { type?: string | null; number?: string | null } | null;
+  } | null;
+}
+
+export interface BrickPaymentInput {
+  tenantId: string;
+  planId: string;
+  email: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  activationAmountCents: number;
+  planName: string;
+  visitorToken?: string | null;
+  formData: BrickFormData;
+}
+
+/**
+ * Processa o pagamento gerado pelo Payment Brick (cartão ou Pix) via
+ * Payments API — o usuário permanece dentro do site, sem redirect.
+ *
+ * Mantém o MESMO contrato da Preference para o webhook continuar funcionando
+ * sem alterações: `external_reference = "act_<tenantId>"` + `metadata`
+ * { tenant_id, plan_id, type: "activation", visitor_token? } +
+ * `notification_url` do webhook. A ativação continua acontecendo SOMENTE pelo
+ * webhook (fonte de verdade), nunca pelo retorno do frontend.
+ */
+export async function processBrickPayment(input: BrickPaymentInput): Promise<MpPayment> {
+  const amount = Math.round(input.activationAmountCents) / 100;
+  if (!Number.isFinite(amount) || amount <= 0) throw new Error("Valor de ativação inválido");
+
+  const fd = input.formData || {};
+  const methodId =
+    typeof fd.payment_method_id === "string" && fd.payment_method_id.trim()
+      ? fd.payment_method_id.trim()
+      : null;
+  if (!methodId) throw new Error("Método de pagamento não informado");
+  const isPix = methodId === "pix";
+
+  const token = typeof fd.token === "string" && fd.token.trim() ? fd.token.trim() : null;
+  if (!isPix && !token) throw new Error("Token do cartão não gerado. Tente novamente.");
+
+  const payer = fd.payer || {};
+  const email =
+    (typeof payer.email === "string" && payer.email.trim()) || input.email;
+  const identification =
+    payer.identification &&
+    typeof payer.identification.number === "string" &&
+    payer.identification.number.trim()
+      ? {
+          type:
+            typeof payer.identification.type === "string" && payer.identification.type.trim()
+              ? payer.identification.type.trim()
+              : "CPF",
+          number: payer.identification.number.trim(),
+        }
+      : undefined;
+
+  let installments = 1;
+  if (!isPix) {
+    const n = Number(fd.installments);
+    installments = Number.isFinite(n) && n >= 1 ? Math.min(Math.floor(n), 12) : 1;
+  }
+
+  const metadata: Record<string, unknown> = {
+    tenant_id: input.tenantId,
+    plan_id: input.planId,
+    type: "activation",
+  };
+  if (input.visitorToken) metadata.visitor_token = input.visitorToken;
+
+  const appUrl = getPublicBaseUrl();
+  const body: Record<string, unknown> = {
+    transaction_amount: amount,
+    description: `${input.planName} — Ativação do site`,
+    payment_method_id: methodId,
+    payer: {
+      email,
+      first_name: input.firstName || payer.first_name || undefined,
+      last_name: input.lastName || payer.last_name || undefined,
+      ...(identification ? { identification } : {}),
+    },
+    external_reference: `act_${input.tenantId}`,
+    metadata,
+    notification_url: `${appUrl}/api/webhooks/mercadopago`,
+    statement_descriptor: "SITE DOTERRA",
+    capture: true,
+  };
+  if (!isPix) {
+    body.token = token;
+    body.installments = installments;
+    if (fd.issuer_id !== undefined && fd.issuer_id !== null && String(fd.issuer_id) !== "") {
+      body.issuer_id = fd.issuer_id;
+    }
+  }
+
+  const res = await fetch(`${MERCADOPAGO_API}/v1/payments`, {
+    method: "POST",
+    cache: "no-store",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${await getMercadoPagoAccessToken()}`,
+      // Idempotência por tentativa: duplo clique/reatentativa não duplica cobrança.
+      "X-Idempotency-Key": crypto.randomUUID(),
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Mercado Pago API POST /v1/payments falhou (${res.status}): ${text.slice(0, 500)}`);
+  }
+  return (await res.json()) as MpPayment;
 }
 
 // ============================ RECORRÊNCIA ============================

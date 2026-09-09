@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { loadStripe } from "@stripe/stripe-js";
+import { MercadoPagoBrick, type PixData } from "@/components/checkout/MercadoPagoBrick";
 
 const INTENT_KEY = "checkout_intent_v1";
 
@@ -55,9 +56,9 @@ function clearIntent() {
   } catch {}
 }
 
-type Step = "identify" | "checkout" | "payment" | "processing" | "success" | "error" | "pending";
+type Step = "identify" | "checkout" | "payment" | "pix" | "processing" | "success" | "error" | "pending";
 
-function friendlyError(raw: string): string {
+export function friendlyError(raw: string): string {
   const m = (raw || "").toLowerCase();
   if (
     m.includes("access token") ||
@@ -133,8 +134,13 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [stripeClientSecret, setStripeClientSecret] = useState<string | null>(null);
   const [mpUrl, setMpUrl] = useState<string | null>(null);
+  const [preferenceId, setPreferenceId] = useState<string | null>(null);
+  /** Brick indisponível/falhou → fallback sem iframe (link nova aba). */
+  const [brickFailed, setBrickFailed] = useState(false);
+  /** Dados do Pix (QR + copia e cola) após submit do Brick. */
+  const [pix, setPix] = useState<PixData | null>(null);
+  const [copiedPix, setCopiedPix] = useState(false);
   const [processingMsg, setProcessingMsg] = useState<string | null>(null);
-  const [mpLoaded, setMpLoaded] = useState(false);
 
   const pollRef = useRef<NodeJS.Timeout | null>(null);
   const checkoutGuardRef = useRef(false);
@@ -146,8 +152,11 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
     setAuthMsg(null);
     setStripeClientSecret(null);
     setMpUrl(null);
+    setPreferenceId(null);
+    setBrickFailed(false);
+    setPix(null);
+    setCopiedPix(false);
     setProcessingMsg(null);
-    setMpLoaded(false);
     checkoutGuardRef.current = false;
     if (pollRef.current) clearInterval(pollRef.current);
 
@@ -246,7 +255,10 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
     setCheckoutError(null);
     setStripeClientSecret(null);
     setMpUrl(null);
-    setMpLoaded(false);
+    setPreferenceId(null);
+    setBrickFailed(false);
+    setPix(null);
+    setCopiedPix(false);
     try {
       const res = await fetch("/api/checkout", {
         method: "POST",
@@ -261,10 +273,16 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
         }
         throw new Error(friendlyError(json.error || "Não foi possível iniciar o pagamento. Tente novamente."));
       }
-      if (json.gateway === "mercadopago" && json.url) {
-        setMpUrl(json.url);
+      if (json.gateway === "mercadopago" && (json.preferenceId || json.url)) {
+        setMpUrl(json.url || null);
+        setPreferenceId(json.preferenceId || null);
+        setBrickFailed(false);
+        setPix(null);
         setStep("payment");
-        startPolling();
+        // O polling só começa após o submit no Brick (evita tela "pendente"
+        // enquanto o usuário ainda preenche o cartão). No fallback (nova
+        // aba), o polling começa ao abrir o link.
+        if (!json.preferenceId || !gatewayInfo?.mercadopago?.publicKey) startPolling();
       } else if (json.gateway === "stripe" && json.clientSecret) {
         setStripeClientSecret(json.clientSecret);
         setStep("payment");
@@ -304,6 +322,34 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
         }
       } catch {}
     }, 3000);
+  }
+
+  /** Callbacks do Payment Brick (pagamento dentro do site). */
+  function handleBrickApproved() {
+    setProcessingMsg("Pagamento recebido! Confirmando com o banco...");
+    setStep("processing");
+    startPolling();
+  }
+  function handleBrickPix(data: PixData) {
+    setPix(data);
+    setCopiedPix(false);
+    setStep("pix");
+    startPolling();
+  }
+  function handleBrickPending() {
+    setStep("pending");
+    startPolling();
+  }
+
+  async function copyPixCode() {
+    if (!pix?.qr_code) return;
+    try {
+      await navigator.clipboard.writeText(pix.qr_code);
+      setCopiedPix(true);
+      setTimeout(() => setCopiedPix(false), 2000);
+    } catch {
+      setCheckoutError("Não foi possível copiar. Selecione o código manualmente.");
+    }
   }
 
   useEffect(() => {
@@ -356,6 +402,10 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
   const installmentLabel = installmentText(activationCents, mpInstallments, mpInstallmentsWithoutInterest);
   const hasMpConditions = gateway === "mercadopago" && (mpPixDiscount > 0 || mpInstallments > 0);
   const gatewayLabel = gateway === "mercadopago" ? "Mercado Pago" : "Stripe";
+  const mpPublicKey = gatewayInfo?.mercadopago?.publicKey || null;
+  const brickAmount = Math.round(activationCents) / 100;
+  const brickMaxInstallments = mpInstallments > 0 ? mpInstallments : 1;
+  const canUseBrick = gateway === "mercadopago" && !!mpPublicKey && !brickFailed;
   const gatewaySecureText =
     gateway === "mercadopago"
       ? "Seu pagamento é processado com segurança pelo Mercado Pago. Seus dados são protegidos com criptografia."
@@ -527,10 +577,10 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
         {/* Título centralizado — mais respiro e legibilidade */}
         <div className="text-center w-full max-w-[980px] mx-auto pt-1 sm:pt-2 pb-1 mb-8 sm:mb-10">
           <h1 className="text-[26px] sm:text-[32px] font-bold tracking-[-0.02em] text-[#0f1a2a] leading-tight sm:leading-none">
-            Ative seu site profissional
+            Finalize a ativação do seu site
           </h1>
           <p className="text-[13.5px] sm:text-[15px] leading-7 sm:leading-7 text-[#5a6b7a] mt-4 max-w-[560px] mx-auto px-2 sm:px-0">
-            Pagamento seguro e ativação imediata após a confirmação.
+            Escolha a forma de pagamento e ative seu Site Profissional.
           </p>
         </div>
 
@@ -576,7 +626,14 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
 
                 <div className="mt-7 h-px bg-[#eef2ee]" />
 
-                <div className="mt-6 rounded-[12px] bg-[#f2f7f3] border border-[#e6efe7] px-4 py-4 flex items-center justify-between gap-3">
+                <div className="mt-6 rounded-[12px] bg-[#fffbeb] border border-[#fde68a] px-4 py-3.5 flex items-center gap-3">
+                  <span className="text-[18px] leading-none shrink-0" aria-hidden>🎁</span>
+                  <p className="text-[12.5px] leading-5 text-[#92400e]">
+                    <b>{trialMonths} {trialMonths === 1 ? "mês" : "meses"} sem mensalidade</b> — você só paga a ativação hoje.
+                  </p>
+                </div>
+
+                <div className="mt-4 rounded-[12px] bg-[#f2f7f3] border border-[#e6efe7] px-4 py-4 flex items-center justify-between gap-3">
                   <div>
                     <p className="text-[10px] font-bold tracking-[0.13em] uppercase text-[#6b7a89] leading-4">Total hoje</p>
                     <p className="text-[22px] font-extrabold text-[#13402e] leading-6 mt-1.5 tracking-tight">{brl(activationCents)}</p>
@@ -774,7 +831,7 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
       <div className="w-full max-w-[680px] mx-auto">
         <div className="text-center mb-6 sm:mb-8 pt-2">
           <h1 className="text-[22px] sm:text-[26px] font-bold text-[#0f1a2a] leading-tight">Finalize seu pagamento</h1>
-          <p className="text-sm text-[#6b7a89] mt-2 leading-5">Escolha PIX ou cartão no quadro abaixo. Você permanece no site.</p>
+          <p className="text-sm text-[#6b7a89] mt-2 leading-5">Pague com PIX ou cartão sem sair do site. A ativação é automática após a confirmação.</p>
         </div>
 
         <div className="rounded-[16px] border border-[#eef2ee] bg-white shadow-[0_6px_20px_rgba(0,0,0,0.04)] px-5 py-4 flex items-center justify-between gap-4 mb-5">
@@ -797,49 +854,73 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
             </div>
             <p className="text-xs text-[#6b7a89] text-center mt-4 leading-4">Você permanece no site durante todo o processo.</p>
           </div>
-        ) : gateway === "mercadopago" && mpUrl ? (
+        ) : gateway === "mercadopago" && (preferenceId || mpUrl) ? (
           <div className="rounded-[20px] border border-[#eef2ee] bg-white p-6 sm:p-7 shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <h3 className="text-sm font-semibold text-[#0f1a2a] leading-5">Pagamento</h3>
-                <p className="text-sm text-[#6b7a89] mt-1 leading-5">Escolha sua forma de pagamento abaixo.</p>
+                <p className="text-sm text-[#6b7a89] mt-1 leading-5">
+                  {canUseBrick ? "Preencha abaixo sem sair do site. A confirmação é automática." : "Conclua o pagamento com segurança."}
+                </p>
               </div>
               <span className="shrink-0 inline-flex items-center rounded-full bg-[#009ee3]/10 border border-[#009ee3]/15 px-3 py-1.5 text-xs font-semibold text-[#009ee3]">Mercado Pago</span>
             </div>
 
-            <div className="mt-6 rounded-xl border border-[#e6ecef] bg-[#f8faf8] p-3 sm:p-4">
-              <div className="rounded-xl overflow-hidden border border-[#e6ecef] bg-white shadow-[0_4px_20px_rgba(0,0,0,0.04)]">
-                {!mpLoaded && (
-                  <div className="w-full h-[420px] sm:h-[500px] flex flex-col items-center justify-center gap-4 bg-white p-6 text-center">
-                    <div className="w-10 h-10 rounded-full border-4 border-[#e8efe8] border-t-[#103d2d] animate-spin" />
-                    <p className="text-sm font-medium text-[#4a5a6a] leading-5">Carregando pagamento seguro...</p>
-                    <p className="text-xs text-[#6b7a89] leading-4">Mercado Pago • Não feche esta janela</p>
-                  </div>
-                )}
-                <iframe
-                  src={mpUrl}
-                  title="Pagamento seguro — Mercado Pago"
-                  className={`w-full border-0 block ${mpLoaded ? "h-[520px] sm:h-[560px]" : "h-0 overflow-hidden"}`}
-                  allow="payment *; clipboard-write; clipboard-read"
-                  loading="lazy"
-                  onLoad={() => setMpLoaded(true)}
+            {canUseBrick ? (
+              <div className="mt-6">
+                <MercadoPagoBrick
+                  publicKey={mpPublicKey!}
+                  preferenceId={preferenceId}
+                  amount={brickAmount}
+                  payerEmail={userEmail || email}
+                  maxInstallments={brickMaxInstallments}
+                  planId={offer?.id}
+                  onApproved={handleBrickApproved}
+                  onPixPending={handleBrickPix}
+                  onPending={handleBrickPending}
+                  onBrickError={() => setBrickFailed(true)}
                 />
+                <div className="mt-6 grid grid-cols-2 gap-3">
+                  <button type="button" onClick={() => setStep("checkout")} className="rounded-full border border-[#dde6de] bg-white px-4 py-3.5 text-sm font-medium text-[#2d3a4a] hover:bg-[#f6faf7] transition leading-5">
+                    Voltar
+                  </button>
+                  <button type="button" onClick={() => { setStep("processing"); startPolling(); }} className="rounded-full bg-[#0f1a2a] px-4 py-3.5 text-sm font-semibold text-white hover:bg-black transition leading-5">
+                    Já paguei
+                  </button>
+                </div>
               </div>
-            </div>
+            ) : (
+              <>
+                <div className="mt-6 rounded-xl border border-[#e6ecef] bg-[#f8faf8] p-5 sm:p-6 text-center">
+                  <p className="text-sm font-semibold text-[#0f1a2a] leading-6">Pagamento em ambiente seguro do Mercado Pago</p>
+                  <p className="text-[13px] text-[#64748b] mt-1.5 leading-5">
+                    {brl(activationCents)} {mpPixDiscount > 0 ? `(ou ${brl(pixCents)} no PIX)` : ""} • Após a confirmação, voltamos para ativar seu site automaticamente.
+                  </p>
+                  {mpUrl ? (
+                    <a
+                      href={mpUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => startPolling()}
+                      className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-[12px] bg-[#009ee3] px-6 py-4 text-[15px] font-semibold text-white shadow-[0_6px_18px_rgba(0,158,227,0.25)] hover:bg-[#0089c7] transition"
+                    >
+                      Ir para pagamento seguro →
+                    </a>
+                  ) : (
+                    <p className="mt-4 text-sm text-[#991b1b]">Não foi possível preparar o pagamento. Tente novamente.</p>
+                  )}
+                </div>
 
-            <p className="text-xs text-[#6b7a89] text-center mt-4 leading-5 px-2">PIX copia e cola e cartão disponíveis no quadro acima. Após a confirmação, seu site será ativado automaticamente.</p>
-
-            <div className="mt-6 grid grid-cols-2 gap-3">
-              <button type="button" onClick={() => setStep("checkout")} className="rounded-full border border-[#dde6de] bg-white px-4 py-3.5 text-sm font-medium text-[#2d3a4a] hover:bg-[#f6faf7] transition leading-5">
-                Voltar
-              </button>
-              <a href={mpUrl} target="_blank" rel="noopener noreferrer" className="rounded-full bg-white border border-[#dde6de] px-4 py-3.5 text-sm font-medium text-[#2d3a4a] text-center hover:bg-[#f6faf7] transition leading-5">
-                Nova aba
-              </a>
-            </div>
-            <button type="button" onClick={() => { setStep("processing"); startPolling(); }} className="mt-3 w-full rounded-full bg-[#0f1a2a] px-6 py-3.5 text-sm font-semibold text-white hover:bg-black transition leading-5">
-              Já paguei, verificar ativação
-            </button>
+                <div className="mt-6 grid grid-cols-2 gap-3">
+                  <button type="button" onClick={() => setStep("checkout")} className="rounded-full border border-[#dde6de] bg-white px-4 py-3.5 text-sm font-medium text-[#2d3a4a] hover:bg-[#f6faf7] transition leading-5">
+                    Voltar
+                  </button>
+                  <button type="button" onClick={() => { setStep("processing"); startPolling(); }} className="rounded-full bg-[#0f1a2a] px-4 py-3.5 text-sm font-semibold text-white hover:bg-black transition leading-5">
+                    Já paguei, verificar ativação
+                  </button>
+                </div>
+              </>
+            )}
 
             <div className="mt-5 flex gap-3 items-start rounded-xl bg-[#f0fdf4]/60 border border-[#dcfce7] px-4 py-4">
               <span className="text-[#166534] text-sm leading-none mt-0.5">🔒</span>
@@ -853,6 +934,67 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
         )}
 
         {checkoutError && <p className="mt-4 rounded-xl bg-[#fef2f2] border border-[#fde4e4] px-4 py-3 text-sm text-[#991b1b]">{checkoutError}</p>}
+      </div>
+    );
+  }
+
+  // PIX — QR Code + copia e cola, tudo dentro do site
+  if (step === "pix") {
+    return (
+      <div className="w-full max-w-[560px] mx-auto">
+        <div className="text-center mb-6 sm:mb-8 pt-2">
+          <h1 className="text-[22px] sm:text-[26px] font-bold text-[#0f1a2a] leading-tight">Pague com PIX</h1>
+          <p className="text-sm text-[#6b7a89] mt-2 leading-5">Escaneie o QR Code ou use o código copia e cola. A confirmação é automática.</p>
+        </div>
+
+        <div className="rounded-[20px] border border-[#eef2ee] bg-white p-6 sm:p-7 shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-[10.5px] font-semibold tracking-[0.11em] uppercase text-[#8a9aa8]">Total no PIX</p>
+              <p className="text-[22px] font-extrabold text-[#13402e] leading-none mt-1.5">{mpPixDiscount > 0 ? brl(pixCents) : brl(activationCents)}</p>
+            </div>
+            <span className="shrink-0 inline-flex items-center rounded-full bg-[#16a34a]/10 border border-[#16a34a]/15 px-3 py-1.5 text-xs font-semibold text-[#16a34a]">PIX • Aprovação rápida</span>
+          </div>
+
+          {pix?.qr_code_base64 ? (
+            <div className="mt-6 flex justify-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`data:image/png;base64,${pix.qr_code_base64}`}
+                alt="QR Code do PIX"
+                className="w-[220px] h-[220px] rounded-[12px] border border-[#e6ecef] bg-white p-2"
+              />
+            </div>
+          ) : null}
+
+          {pix?.qr_code ? (
+            <div className="mt-6">
+              <p className="text-[12px] font-semibold text-[#0f1a2a] mb-2 leading-5">PIX copia e cola</p>
+              <p className="rounded-[12px] border border-[#e6ecef] bg-[#f8faf8] px-4 py-3 text-[12px] leading-5 text-[#334155] break-all font-mono max-h-[96px] overflow-y-auto">{pix.qr_code}</p>
+              <button
+                type="button"
+                onClick={copyPixCode}
+                className="mt-3 w-full rounded-[12px] bg-[#103d2d] px-6 py-3.5 text-sm font-semibold text-white hover:bg-[#0e3326] transition leading-5"
+              >
+                {copiedPix ? "✓ Código copiado!" : "📋 Copiar código PIX"}
+              </button>
+            </div>
+          ) : null}
+
+          <div className="mt-6 rounded-[12px] bg-[#fffbeb] border border-[#fde68a] px-4 py-3.5 flex items-center gap-3">
+            <span className="w-8 h-8 rounded-full border-2 border-[#fde68a] border-t-[#d97706] animate-spin shrink-0" aria-hidden />
+            <p className="text-[13px] text-[#92400e] leading-5">Aguardando confirmação do pagamento... Não feche esta janela.</p>
+          </div>
+
+          <div className="mt-4 flex flex-col gap-2 w-full">
+            <button type="button" onClick={() => startPolling()} className="w-full rounded-full bg-[#0f1a2a] px-6 py-3.5 text-sm font-semibold text-white hover:bg-black transition leading-5">
+              Já paguei — verificar agora
+            </button>
+            <button type="button" onClick={() => setStep("payment")} className="w-full rounded-full border border-[#dde6de] bg-white px-6 py-3.5 text-sm font-medium text-[#2d3a4a] hover:bg-[#f6faf7] transition leading-5">
+              Escolher outra forma
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
