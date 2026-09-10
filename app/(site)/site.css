@@ -1685,6 +1685,14 @@
 #tenant-site .insta-item:hover .insta-item-inner { transform: scale(1.06); }
 
 
+#tenant-site .insta-item-inner img.insta-foto {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+
 #tenant-site .insta-overlay {
   position: absolute;
   inset: 0;

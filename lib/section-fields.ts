@@ -162,8 +162,12 @@ export const SECTION_CONTENT_FIELDS: Record<SectionType, ContentFieldDef[]> = {
     // instagramHandle/instagramUrl vêm de "Informações do site" (Instagram) —
     {
       key: "items", label: "Publicações", type: "list", itemLabel: "Publicação", fields: [
-        { key: "emoji", label: "Emoji", type: "text" },
-        { key: "gradient", label: "Gradiente (CSS)", type: "text" },
+        // Antes: campo "Emoji" (texto) e "Gradiente (CSS)" (texto livre).
+        // Agora: foto da publicação (upload/URL) e cor de fundo via paleta
+        // (para imagem com fundo transparente). Os valores legados
+        // `emoji`/`gradient` continuam renderizando como fallback.
+        { key: "image", label: "Imagem da publicação", type: "image" },
+        { key: "bgColor", label: "Cor de fundo", type: "color" },
       ],
     },
   ],
