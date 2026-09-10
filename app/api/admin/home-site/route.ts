@@ -184,41 +184,6 @@ async function syncTenantOverrides(
   }
 }
 
-/**
- * Overlay de exibição: projeta os valores EFETIVOS do hero-override sobre o
- * site_data, para a seção mostrar exatamente o que a home exibe hoje. Ao
- * salvar, tudo converge (site_settings + override ficam iguais).
- */
-function overlayHeroOverride(
-  siteData: Record<string, unknown>,
-  heroContent: Record<string, unknown> | null
-): Record<string, unknown> {
-  if (!heroContent) return siteData;
-  const out = { ...siteData };
-  const pick = (v: unknown) => nonEmpty(v);
-  const firstName = pick(heroContent.firstName);
-  const lastName = pick(heroContent.lastName);
-  if (firstName) out.name = firstName;
-  if (lastName) out.surname = lastName;
-  if (firstName || lastName) {
-    out.fullName = [firstName || out.name, lastName || out.surname].filter(Boolean).join(" ") || out.fullName;
-  }
-  for (const [ok, sk] of [["role", "role"], ["eyebrow", "eyebrow"], ["description", "description"], ["badgeTitle", "badgeTitle"], ["badgeSubtitle", "badgeSubtitle"]] as const) {
-    const v = pick(heroContent[ok]);
-    if (v) (out as Record<string, unknown>)[sk] = v;
-  }
-  const statsArr = heroContent.stats;
-  if (Array.isArray(statsArr) && statsArr.length > 0) {
-    const vals = (statsArr as { value?: unknown }[]).map((s) => nonEmpty(s?.value));
-    const st = { ...((out.stats as Record<string, unknown>) || {}) };
-    if (vals[0]) st.years = vals[0];
-    if (vals[1]) st.clients = vals[1];
-    if (vals[2]) st.satisfaction = vals[2];
-    out.stats = st;
-  }
-  return out;
-}
-
 async function resolveOfficialTenantId(admin: ReturnType<typeof createAdminClient>) {
   const host = mainDomainHostname();
 
@@ -277,32 +242,13 @@ export async function GET() {
 
   const stored = (settings?.data as Record<string, unknown>) || {};
 
-  // Overlay do hero-override para exibir os valores efetivos da home.
-  let heroContent: Record<string, unknown> | null = null;
-  try {
-    const typeMap = await getSectionTypeMap(admin);
-    let heroId: string | null = null;
-    typeMap.forEach((t, id) => {
-      if (!heroId && t === "hero") heroId = id;
-    });
-    if (heroId) {
-      const { data: ov } = await admin
-        .from("tenant_sections")
-        .select("content")
-        .eq("tenant_id", tenant.id)
-        .eq("section_id", heroId)
-        .maybeSingle();
-      if (ov?.content && typeof ov.content === "object") {
-        heroContent = ov.content as Record<string, unknown>;
-      }
-    }
-  } catch {
-    // overlay é best-effort
-  }
-
+  // Retorna o site_settings PURO: é exatamente a fonte que o domínio
+  // principal renderiza (a HOME oficial mescla global + site_settings,
+  // ignorando tenant_sections). Sem overlay — o formulário mostra o mesmo
+  // conteúdo do ar; campos vazios caem para o template na home.
   return NextResponse.json({
     tenant: { id: tenant.id, slug: tenant.slug, domain: tenant.domain || null, source: tenant.source },
-    siteData: overlayHeroOverride(stored, heroContent),
+    siteData: stored,
   });
 }
 
