@@ -139,7 +139,7 @@ export default async function HomePage() {
   const pwaEnabled = Boolean(pwa?.settings.enabled);
   const { manifestUrl, swUrl } = pwaUrls(pwa?.basePath || "/");
 
-  const sections = await resolveHomeSections({ tenant, tenantDataOverridesGlobal: true });
+  const sections = await resolveHomeSections({ tenant, tenantDataOverridesGlobal: true, ignoreTenantOverrides: true });
   const siteData = (tenant.site_data || {}) as Record<string, unknown>;
   const theme = (siteData.theme as SiteThemeConfig | undefined) || null;
   const user = await userPromise;

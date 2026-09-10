@@ -179,6 +179,15 @@ export interface ResolveOptions {
    * Quando false, o conteúdo global vence.
    */
   tenantDataOverridesGlobal?: boolean;
+  /**
+   * Quando true, ignora os overrides do tenant (tenant_sections) — a página
+   * renderiza o conteúdo GLOBAL + site_settings. Usado pela HOME oficial
+   * (`/`), que é controlada pelo /admin/editor-home: assim, tudo o que o
+   * super admin edita nas seções reflete no domínio principal, mesmo que o
+   * tenant oficial tenha personalizações antigas salvas (elas continuam no
+   * banco, só não são aplicadas aqui).
+   */
+  ignoreTenantOverrides?: boolean;
 }
 
 /**
@@ -191,11 +200,13 @@ export async function resolveHomeSections(opts: ResolveOptions): Promise<Resolve
   // Paraleliza global + tenant (economiza ~1 RTT Supabase)
   const [global, tenantMapRaw] = await Promise.all([
     opts.globalSections ? Promise.resolve(opts.globalSections) : getGlobalSections(),
-    opts.tenantSectionMap
-      ? Promise.resolve(opts.tenantSectionMap)
-      : opts.tenant?.tenant_id && hasSupabaseEnv()
-        ? getTenantSections(opts.tenant.tenant_id)
-        : Promise.resolve(new Map<string, TenantSection>()),
+    opts.ignoreTenantOverrides
+      ? Promise.resolve(new Map<string, TenantSection>())
+      : opts.tenantSectionMap
+        ? Promise.resolve(opts.tenantSectionMap)
+        : opts.tenant?.tenant_id && hasSupabaseEnv()
+          ? getTenantSections(opts.tenant.tenant_id)
+          : Promise.resolve(new Map<string, TenantSection>()),
   ]);
   const globalSections = global as SiteSection[];
   const siteData = (opts.tenant?.site_data || {}) as Record<string, unknown>;

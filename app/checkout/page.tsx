@@ -45,7 +45,7 @@ export default async function CheckoutPage({
   const homeSlug = process.env.HOME_TENANT_SLUG || "usuarioteste";
   const tenantRaw = await getPublicTenantBySlug(homeSlug);
   const tenant = tenantRaw || DEMO_TENANT;
-  const sections = await resolveHomeSections({ tenant, tenantDataOverridesGlobal: true });
+  const sections = await resolveHomeSections({ tenant, tenantDataOverridesGlobal: true, ignoreTenantOverrides: true });
   const siteData = (tenant.site_data || {}) as Record<string, unknown>;
   const theme = (siteData.theme as SiteThemeConfig | undefined) || null;
 
