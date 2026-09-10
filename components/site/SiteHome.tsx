@@ -12,6 +12,7 @@ import { Tips } from "@/components/site/sections/Tips";
 import { Products } from "@/components/site/sections/Products";
 import { Faq } from "@/components/site/sections/Faq";
 import { Pricing } from "@/components/site/sections/Pricing";
+import { Affiliates } from "@/components/site/sections/Affiliates";
 import { Footer } from "@/components/site/sections/Footer";
 import { SiteEffects } from "@/components/site/sections/SiteEffects";
 import { ThemePickerSection } from "@/components/site/ThemePickerSection";
@@ -74,9 +75,13 @@ export function SiteHome({ slug, sections, contact, logo, extraNav = [], theme, 
   const logoLightUrl =
     logo?.lightUrl || (headerContent.logoLightUrl as string) || undefined;
 
-  const navItems = visible
-    .filter((s) => s.settings?.showInNav !== false && s.type !== "header" && s.type !== "footer")
-    .map((s) => ({ label: (s.navLabel || s.label) as string, href: `#${s.anchor}` }));
+  const navItems = [
+    ...visible
+      .filter((s) => s.settings?.showInNav !== false && s.type !== "header" && s.type !== "footer" && s.type !== "affiliates")
+      .map((s) => ({ label: (s.navLabel || s.label) as string, href: `#${s.anchor}` })),
+    // A seção "affiliates" é só uma chamada — o item do menu leva à página.
+    { label: "Afiliados", href: "/afiliados" },
+  ];
 
   const footerSection = visible.find((s) => s.type === "footer");
   const footerContent = (footerSection?.content || {}) as Record<string, unknown>;
@@ -130,6 +135,8 @@ export function SiteHome({ slug, sections, contact, logo, extraNav = [], theme, 
             return <Faq key={s.id} content={s.content as never} />;
           case "pricing":
             return <Pricing key={s.id} content={s.content as never} />;
+          case "affiliates":
+            return <Affiliates key={s.id} content={s.content as never} />;
           case "footer":
             return null;
           default:

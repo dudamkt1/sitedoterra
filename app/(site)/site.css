@@ -705,6 +705,48 @@
 #tenant-site .btn-vitrine:hover { background: var(--verde-medio); transform: translateY(-2px); box-shadow: 0 10px 30px rgba(29,92,58,0.3); }
 
 
+/* Faixa/chamada do Programa de Afiliados (#afiliados) — mesma linguagem do
+   vitrine-cta-banner, em tom verde para diferenciar do dourado da vitrine. */
+#tenant-site #afiliados {
+  padding: 70px 8%;
+  background: var(--branco);
+}
+
+#tenant-site .afiliados-cta-banner {
+  background: linear-gradient(135deg, rgba(29,92,58,0.06) 0%, rgba(196,150,58,0.07) 100%);
+  border: 1px solid rgba(29,92,58,0.12);
+  border-left: 3px solid var(--verde);
+  border-radius: 16px;
+  padding: 2rem 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+
+#tenant-site .afiliados-cta-text {
+  min-width: 0;
+  flex: 1 1 280px;
+}
+
+#tenant-site .afiliados-cta-text p {
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  font-weight: 500;
+  color: var(--verde);
+  line-height: 1.25;
+}
+
+#tenant-site .afiliados-cta-text span {
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  color: var(--cinza);
+  display: block;
+  margin-top: 0.4rem;
+}
+
+
 
 #tenant-site section { scroll-margin-top: 70px; }
 

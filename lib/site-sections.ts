@@ -24,6 +24,7 @@ export const SECTION_TYPES: SectionType[] = [
   "products",
   "faq",
   "pricing",
+  "affiliates",
   "footer",
 ];
 
@@ -40,6 +41,7 @@ export const SECTION_TYPE_LABELS: Record<SectionType, string> = {
   products: "Produtos em destaque",
   faq: "Perguntas frequentes",
   pricing: "Planos / Oferta",
+  affiliates: "Chamada Afiliados",
   footer: "Rodapé",
 };
 
@@ -56,6 +58,7 @@ export const SECTION_TYPE_ICONS: Record<SectionType, string> = {
   products: "🛍️",
   faq: "❓",
   pricing: "💰",
+  affiliates: "🤝",
   footer: "🦶",
 };
 
@@ -73,6 +76,7 @@ export function anchorFor(type: SectionType): string {
     products: "produtos",
     faq: "faq",
     pricing: "planos",
+    affiliates: "afiliados",
     footer: "rodape",
   };
   return map[type] || type;
@@ -342,6 +346,13 @@ export const DEFAULT_SECTION_CONTENT: Record<SectionType, Record<string, unknown
     },
     showPlatformCredit: true,
   },
+  affiliates: {
+    eyebrow: "Ganhe indicando",
+    title: "Indique. Sua colega ativa. Você recebe.",
+    subtitle: "Transforme sua rede de consultoras em renda extra.",
+    buttonText: "Saiba como funciona",
+    buttonUrl: "/afiliados",
+  },
 };
 
 function makeFallbackSection(type: SectionType, sort: number, required = true): SiteSection {
@@ -385,6 +396,7 @@ export const DEFAULT_SECTIONS: SiteSection[] = [
   makeFallbackSection("products", 100),
   makeFallbackSection("faq", 110),
   makeFallbackSection("pricing", 120, false),
+  makeFallbackSection("affiliates", 125, false),
   makeFallbackSection("footer", 130),
 ];
 

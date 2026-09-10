@@ -191,6 +191,7 @@ export type SectionType =
   | "products"
   | "faq"
   | "pricing"
+  | "affiliates"
   | "footer";
 
 export interface SectionPermissions {

@@ -56,9 +56,9 @@ export default async function LoginPage() {
 
   // Nav da HOME (mesma ordem/labels) — no login prefixa "/" para navegar de volta à HOME
   const homeNavItems = visible
-    .filter((s) => s.settings?.showInNav !== false && s.type !== "header" && s.type !== "footer")
+    .filter((s) => s.settings?.showInNav !== false && s.type !== "header" && s.type !== "footer" && s.type !== "affiliates")
     .map((s) => ({ label: (s.navLabel || s.label) as string, href: `#${s.anchor}` }));
-  const navItems = homeNavItems.map((i) => ({ ...i, href: `/${i.href}` }));
+  const navItems = [...homeNavItems.map((i) => ({ ...i, href: `/${i.href}` })), { label: "Afiliados", href: "/afiliados" }];
 
   const extraNav = [{ label: "Painel", href: user ? "/painel" : "/login" }];
 

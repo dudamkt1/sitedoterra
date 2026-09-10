@@ -201,6 +201,13 @@ export const SECTION_CONTENT_FIELDS: Record<SectionType, ContentFieldDef[]> = {
   pricing: [
     { key: "eyebrow", label: "Selo superior", type: "text" },
   ],
+  affiliates: [
+    { key: "eyebrow", label: "Selo superior", type: "text" },
+    { key: "title", label: "Título", type: "text", ai: true, aiKind: "title" },
+    { key: "subtitle", label: "Subtítulo", type: "text" },
+    { key: "buttonText", label: "Texto do botão", type: "text" },
+    { key: "buttonUrl", label: "Link do botão", type: "url" },
+  ],
   footer: [
     { key: "aboutText", label: "Texto sobre", type: "textarea", ai: true, aiKind: "description" },
     {
