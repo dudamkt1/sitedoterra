@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { HomeEditor } from "@/components/admin/HomeEditor";
+import { HomeSiteInfo } from "@/components/admin/HomeSiteInfo";
 import type { SiteSection } from "@/types";
 import { getPublicBaseUrl } from "@/lib/public-url";
 
@@ -22,7 +23,10 @@ export default async function AdminEditorHomePage() {
           As alterações aqui valem para todos os sites. A ordem salva é refletida automaticamente na página pública.
         </p>
       </div>
-      <HomeEditor initialSections={sections} appUrl={getPublicBaseUrl()} />
+      <HomeSiteInfo />
+      <div className="mt-6">
+        <HomeEditor initialSections={sections} appUrl={getPublicBaseUrl()} />
+      </div>
     </div>
   );
 }
