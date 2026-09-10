@@ -15,9 +15,15 @@ export const runtime = "nodejs";
  * tenant oficial da plataforma (o mesmo exibido na HOME `/`) em vez de no
  * tenant do usuário logado.
  *
- * GET  → { tenant: { id, slug }, siteData } (site_settings.data do oficial)
- * POST → mescla os campos de conteúdo permitidos (mesma lista do /api/site)
- *        e invalida os caches da home.
+ * SINCRONIA TOTAL com o domínio principal: a HOME monta cada seção como
+ * global → site_settings → tenant_sections (override vence). Como o tenant
+ * oficial possui overrides (hero/story com imagens e textos próprios), este
+ * endpoint também propaga os campos de perfil para dentro desses overrides —
+ * preservando as demais chaves (imagens, botões, layout). Assim, tudo o que
+ * for modificado na seção reflete na home principal.
+ *
+ * GET  → { tenant, siteData } (site_settings + overlay dos overrides p/ exibição)
+ * POST → salva site_settings, propaga perfil p/ overrides e invalida caches.
  */
 
 async function requireSuperAdmin() {
@@ -70,6 +76,147 @@ async function resolveTenantRow(
     .eq("id", tenantId)
     .maybeSingle();
   return (row as { id: string; slug: string } | null) || null;
+}
+
+/** Mapa section_id → type das seções globais (para achar hero/story do oficial). */
+async function getSectionTypeMap(
+  admin: ReturnType<typeof createAdminClient>
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  try {
+    const { data } = await admin.from("site_sections").select("id, type");
+    for (const s of (data as { id: string; type: string }[]) || []) {
+      map.set(s.id, s.type);
+    }
+  } catch {
+    // sem mapa, sem propagação
+  }
+  return map;
+}
+
+function nonEmpty(v: unknown): string | undefined {
+  const s = typeof v === "string" ? v.trim() : "";
+  return s || undefined;
+}
+
+/**
+ * Chaves de perfil do hero derivadas do site_data (mesma correspondência do
+ * `legacyContentFor` em lib/home.ts). Valores vazios viram `undefined` para
+ * NÃO apagar o template — só valores reais sobrescrevem.
+ */
+function heroProfileKeys(siteData: Record<string, unknown>): Record<string, unknown> {
+  const stats = (siteData.stats as Record<string, unknown>) || {};
+  const entries = [
+    { value: nonEmpty(stats.years), label: (nonEmpty(stats.labelYears) as string) || "Anos de experiência" },
+    { value: nonEmpty(stats.clients), label: (nonEmpty(stats.labelClients) as string) || "Clientes atendidas" },
+    { value: nonEmpty(stats.satisfaction), label: (nonEmpty(stats.labelSatisfaction) as string) || "Satisfação" },
+  ].filter((s) => Boolean(s.value));
+  return {
+    firstName: nonEmpty(siteData.name),
+    lastName: nonEmpty(siteData.surname),
+    role: nonEmpty(siteData.role),
+    eyebrow: nonEmpty(siteData.eyebrow),
+    description: nonEmpty(siteData.description),
+    badgeTitle: nonEmpty(siteData.badgeTitle),
+    badgeSubtitle: nonEmpty(siteData.badgeSubtitle),
+    stats: entries.length > 0 ? entries : undefined,
+  };
+}
+
+/** Aplica chaves de perfil num override preservando as demais (imagens, botões...). */
+function applyProfileKeys(
+  current: Record<string, unknown>,
+  keys: Record<string, unknown>
+): Record<string, unknown> {
+  const next = { ...(current || {}) };
+  for (const [k, v] of Object.entries(keys)) {
+    if (v === undefined) delete next[k];
+    else next[k] = v;
+  }
+  return next;
+}
+
+/**
+ * Propaga os campos de perfil do site_data para os overrides
+ * (tenant_sections) do tenant oficial — hero e selo da story. As demais
+ * chaves dos overrides (imagens, botões, parágrafos, layout) são preservadas.
+ */
+async function syncTenantOverrides(
+  admin: ReturnType<typeof createAdminClient>,
+  tenantId: string,
+  siteData: Record<string, unknown>
+) {
+  const typeMap = await getSectionTypeMap(admin);
+  if (typeMap.size === 0) return;
+  const { data: overrides } = await admin
+    .from("tenant_sections")
+    .select("section_id, content")
+    .eq("tenant_id", tenantId);
+  if (!overrides) return;
+
+  const profile = heroProfileKeys(siteData);
+  const years = nonEmpty((siteData.stats as Record<string, unknown> | undefined)?.years);
+
+  for (const ov of overrides as { section_id: string; content: unknown }[]) {
+    const type = typeMap.get(ov.section_id);
+    const content = (ov.content as Record<string, unknown>) || {};
+    if (type === "hero") {
+      const next = applyProfileKeys(content, profile);
+      if (JSON.stringify(next) !== JSON.stringify(content)) {
+        await admin
+          .from("tenant_sections")
+          .update({ content: next })
+          .eq("tenant_id", tenantId)
+          .eq("section_id", ov.section_id);
+      }
+    } else if (type === "story") {
+      const next = { ...content };
+      if (years) next.badgeValue = years;
+      else delete next.badgeValue;
+      if (JSON.stringify(next) !== JSON.stringify(content)) {
+        await admin
+          .from("tenant_sections")
+          .update({ content: next })
+          .eq("tenant_id", tenantId)
+          .eq("section_id", ov.section_id);
+      }
+    }
+  }
+}
+
+/**
+ * Overlay de exibição: projeta os valores EFETIVOS do hero-override sobre o
+ * site_data, para a seção mostrar exatamente o que a home exibe hoje. Ao
+ * salvar, tudo converge (site_settings + override ficam iguais).
+ */
+function overlayHeroOverride(
+  siteData: Record<string, unknown>,
+  heroContent: Record<string, unknown> | null
+): Record<string, unknown> {
+  if (!heroContent) return siteData;
+  const out = { ...siteData };
+  const pick = (v: unknown) => nonEmpty(v);
+  const firstName = pick(heroContent.firstName);
+  const lastName = pick(heroContent.lastName);
+  if (firstName) out.name = firstName;
+  if (lastName) out.surname = lastName;
+  if (firstName || lastName) {
+    out.fullName = [firstName || out.name, lastName || out.surname].filter(Boolean).join(" ") || out.fullName;
+  }
+  for (const [ok, sk] of [["role", "role"], ["eyebrow", "eyebrow"], ["description", "description"], ["badgeTitle", "badgeTitle"], ["badgeSubtitle", "badgeSubtitle"]] as const) {
+    const v = pick(heroContent[ok]);
+    if (v) (out as Record<string, unknown>)[sk] = v;
+  }
+  const statsArr = heroContent.stats;
+  if (Array.isArray(statsArr) && statsArr.length > 0) {
+    const vals = (statsArr as { value?: unknown }[]).map((s) => nonEmpty(s?.value));
+    const st = { ...((out.stats as Record<string, unknown>) || {}) };
+    if (vals[0]) st.years = vals[0];
+    if (vals[1]) st.clients = vals[1];
+    if (vals[2]) st.satisfaction = vals[2];
+    out.stats = st;
+  }
+  return out;
 }
 
 async function resolveOfficialTenantId(admin: ReturnType<typeof createAdminClient>) {
@@ -128,9 +275,31 @@ export async function GET() {
     .eq("tenant_id", tenant.id)
     .maybeSingle();
 
+  const stored = (settings?.data as Record<string, unknown>) || {};
+
+  // Overlay do hero-override para exibir os valores efetivos da home.
+  let heroContent: Record<string, unknown> | null = null;
+  try {
+    const typeMap = await getSectionTypeMap(admin);
+    const heroId = [...typeMap.entries()].find(([, t]) => t === "hero")?.[0] || null;
+    if (heroId) {
+      const { data: ov } = await admin
+        .from("tenant_sections")
+        .select("content")
+        .eq("tenant_id", tenant.id)
+        .eq("section_id", heroId)
+        .maybeSingle();
+      if (ov?.content && typeof ov.content === "object") {
+        heroContent = ov.content as Record<string, unknown>;
+      }
+    }
+  } catch {
+    // overlay é best-effort
+  }
+
   return NextResponse.json({
     tenant: { id: tenant.id, slug: tenant.slug, domain: tenant.domain || null, source: tenant.source },
-    siteData: (settings?.data as Record<string, unknown>) || {},
+    siteData: overlayHeroOverride(stored, heroContent),
   });
 }
 
@@ -169,6 +338,14 @@ export async function POST(request: Request) {
 
   if (error) {
     return NextResponse.json({ error: "Não foi possível salvar as informações." }, { status: 500 });
+  }
+
+  // Propaga o perfil para os overrides (hero/story) — sem isso a home
+  // continuaria exibindo os valores antigos dos overrides.
+  try {
+    await syncTenantOverrides(admin, tenant.id, merged);
+  } catch (e) {
+    console.error("[admin/home-site] falha ao sincronizar overrides", e);
   }
 
   invalidateOfficialHomeCache();
