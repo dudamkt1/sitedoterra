@@ -68,6 +68,7 @@ function fromSiteData(siteData: Record<string, any>): HomeSiteForm {
 
 export function HomeSiteInfo() {
   const [tenantSlug, setTenantSlug] = useState<string | null>(null);
+  const [tenantDomain, setTenantDomain] = useState<string | null>(null);
   const [form, setForm] = useState<HomeSiteForm>(EMPTY_FORM);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -84,6 +85,7 @@ export function HomeSiteInfo() {
           return;
         }
         setTenantSlug(data.tenant?.slug || null);
+        setTenantDomain(data.tenant?.domain || null);
         setForm(fromSiteData((data.siteData as Record<string, any>) || {}));
       } catch {
         setLoadError("Falha de conexão com o servidor.");
@@ -172,7 +174,11 @@ export function HomeSiteInfo() {
       <h2 className="card-title mb-1">Informações do site</h2>
       <p className="text-sm text-gray-500 mb-5">
         Estas informações aparecem na HOME oficial do site
-        {tenantSlug ? (
+        {tenantDomain ? (
+          <>
+            {" "}(<strong>{tenantDomain}</strong>)
+          </>
+        ) : tenantSlug ? (
           <>
             {" "}(<strong>{tenantSlug}</strong>)
           </>

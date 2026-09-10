@@ -3,6 +3,8 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser, getProfile } from "@/lib/auth";
 import { getOfficialHomeTenant, invalidateOfficialHomeCache } from "@/lib/site-official";
+import { getPublicTenantByDomain } from "@/lib/tenant";
+import { getPublicBaseUrl } from "@/lib/public-url";
 
 export const runtime = "nodejs";
 
@@ -46,7 +48,39 @@ const ALLOWED_KEYS = [
   "stats",
 ] as const;
 
+/** Hostname do domínio principal (ex.: oleos.topconsultores.com.br). */
+function mainDomainHostname(): string | null {
+  try {
+    const host = new URL(getPublicBaseUrl()).hostname.toLowerCase().replace(/^www\./, "");
+    if (!host || host === "localhost" || host.endsWith(".vercel.app")) return null;
+    return host;
+  } catch {
+    return null;
+  }
+}
+
 async function resolveOfficialTenantId(admin: ReturnType<typeof createAdminClient>) {
+  // 1) Domínio principal — as informações do /admin/editor-home são SEMPRE
+  //    as do domínio principal (ex.: oleos.topconsultores.com.br).
+  const host = mainDomainHostname();
+  if (host) {
+    try {
+      const byDomain = await getPublicTenantByDomain(host);
+      const tid = byDomain?.tenant_id || null;
+      if (tid && tid !== "index") {
+        const { data: row } = await admin
+          .from("tenants")
+          .select("id, slug")
+          .eq("id", tid)
+          .maybeSingle();
+        if (row) return { ...(row as { id: string; slug: string }), domain: host };
+      }
+    } catch {
+      // cai para o fallback abaixo
+    }
+  }
+
+  // 2) Fallback: resolução oficial anterior (RPC / platform_config / superadmin).
   const official = await getOfficialHomeTenant();
   const tenantId = official?.tenant_id || null;
   // "index"/demo = fallback estático (sem banco) — nada para editar.
@@ -57,7 +91,7 @@ async function resolveOfficialTenantId(admin: ReturnType<typeof createAdminClien
     .eq("id", tenantId)
     .maybeSingle();
   if (!row) return null;
-  return row as { id: string; slug: string };
+  return { ...(row as { id: string; slug: string }), domain: host };
 }
 
 export async function GET() {
@@ -77,7 +111,7 @@ export async function GET() {
     .maybeSingle();
 
   return NextResponse.json({
-    tenant: { id: tenant.id, slug: tenant.slug },
+    tenant: { id: tenant.id, slug: tenant.slug, domain: tenant.domain || null },
     siteData: (settings?.data as Record<string, unknown>) || {},
   });
 }
