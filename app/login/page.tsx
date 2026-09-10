@@ -94,16 +94,7 @@ export default async function LoginPage() {
           <div className="absolute top-72 -right-24 h-64 w-64 rounded-full bg-[#1d5c3a]/[0.06] blur-3xl" />
         </div>
         <div className="relative max-w-[1160px] mx-auto px-4 sm:px-8 lg:px-10 pt-10 sm:pt-14 lg:pt-16 pb-16 sm:pb-24 flex flex-col items-center">
-          <p className="text-center text-[13px] sm:text-sm font-semibold uppercase tracking-[0.18em] text-[#1d5c3a]/70">
-            Acesso à conta
-          </p>
-          <p className="mt-3 text-center text-[26px] sm:text-[34px] font-bold tracking-tight text-[#0f1a2a] leading-[1.2] px-2" style={{ fontFamily: "var(--font-display)", color: "var(--verde)" }}>
-            {logoText}
-          </p>
-          <p className="mt-3 text-center text-[14px] sm:text-[15px] leading-relaxed text-[#5a6b7a] max-w-[520px] px-4 sm:px-6">
-            Gerencie seu site, assinatura e conteúdos em um só lugar.
-          </p>
-          <div className="mt-8 sm:mt-10 w-full max-w-[540px] px-1 sm:px-0">
+          <div className="w-full max-w-[540px] px-1 sm:px-0">
             <Suspense fallback={<div className="py-12 text-center text-sm text-slate-500">Carregando...</div>}>
               <LoginForm />
             </Suspense>
