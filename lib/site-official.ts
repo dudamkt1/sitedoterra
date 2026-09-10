@@ -60,7 +60,12 @@ async function toPublicTenant(
       ? admin.from("profiles").select("name, email").eq("user_id", userId).maybeSingle()
       : Promise.resolve({ data: null as unknown }),
   ]);
-  const siteData = ((settingsRes?.data as Record<string, unknown> | null) || {}) as Record<string, unknown>;
+  // ATENÇÃO: .maybeSingle() retorna a LINHA { data: <json> } — o site_data é
+  // o `data` INTERNO da linha (igual ao RPC get_public_tenant_by_slug, que
+  // seleciona s.data direto). Sem desembrulhar aqui, site_data chegava vazio
+  // na HOME e o template global vencia tudo.
+  const settingsRow = (settingsRes?.data as { data?: Record<string, unknown> } | null) || null;
+  const siteData = (settingsRow?.data || {}) as Record<string, unknown>;
   const profile = (profileRes?.data as { name?: string; email?: string } | null) || {};
   return {
     tenant_id: tenantId,
