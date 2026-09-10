@@ -38,6 +38,49 @@ function fallbackTenant(): PublicTenant {
 }
 
 /**
+ * Normaliza a linha crua de `tenants` (retorno do RPC
+ * `resolve_official_home_tenant`) para o formato PublicTenant completo —
+ * igual ao RPC `get_public_tenant_by_slug`: `site_data` = `site_settings.data`
+ * (o que o painel /admin/editor-home editam) + nome/e-mail do profile.
+ *
+ * Sem isso, a HOME `/` renderizava com `site_data` vazio e o conteúdo global
+ * do template vencia sempre — as "Informações do site" salvas nunca
+ * apareciam no domínio principal.
+ */
+async function toPublicTenant(
+  admin: ReturnType<typeof createAdminClient>,
+  row: Record<string, unknown>
+): Promise<PublicTenant | null> {
+  const tenantId = String((row.tenant_id as string) || (row.id as string) || "");
+  if (!tenantId) return null;
+  const userId = String(row.user_id || "");
+  const [settingsRes, profileRes] = await Promise.all([
+    admin.from("site_settings").select("data").eq("tenant_id", tenantId).maybeSingle(),
+    userId
+      ? admin.from("profiles").select("name, email").eq("user_id", userId).maybeSingle()
+      : Promise.resolve({ data: null as unknown }),
+  ]);
+  const siteData = ((settingsRes?.data as Record<string, unknown> | null) || {}) as Record<string, unknown>;
+  const profile = (profileRes?.data as { name?: string; email?: string } | null) || {};
+  return {
+    tenant_id: tenantId,
+    slug: String(row.slug || ""),
+    site_name: (row.site_name as string) || null,
+    site_status: ((row.site_status as string) || "active") as PublicTenant["site_status"],
+    settings: (row.settings as Record<string, unknown>) || {},
+    site_data: siteData,
+    profile_name:
+      (profile.name as string) ||
+      (siteData.fullName as string) ||
+      ([siteData.name, siteData.surname].filter(Boolean).join(" ") as string) ||
+      null,
+    email: (profile.email as string) || (siteData.email as string) || "",
+    monthly_billing_enabled: (row.monthly_billing_enabled as boolean) !== false,
+    user_id: userId,
+  };
+}
+
+/**
  * Retorna o tenant oficial da plataforma, ou fallback se não encontrado.
  */
 export async function getOfficialHomeTenant(): Promise<PublicTenant> {
@@ -53,10 +96,12 @@ export async function getOfficialHomeTenant(): Promise<PublicTenant> {
 
   try {
     const { data: tenant } = await admin.rpc("resolve_official_home_tenant" as never);
-    if (tenant && (tenant as { id?: string }).id) {
-      const t = tenant as unknown as PublicTenant;
-      officialHomeCache = { data: t, ts: Date.now() };
-      return t;
+    if (tenant && ((tenant as { id?: string }).id || (tenant as { tenant_id?: string }).tenant_id)) {
+      const normalized = await toPublicTenant(admin, tenant as unknown as Record<string, unknown>);
+      if (normalized) {
+        officialHomeCache = { data: normalized, ts: Date.now() };
+        return normalized;
+      }
     }
   } catch {
     // função pode não existir se a migration 0041 ainda não foi aplicada.

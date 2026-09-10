@@ -83,25 +83,32 @@ export async function getTenantSections(tenantId: string): Promise<Map<string, T
 /** Mapeia os campos legados de site_settings.data para o conteúdo da seção. */
 function legacyContentFor(type: string, siteData: Record<string, unknown> | null | undefined): Record<string, unknown> {
   const d = siteData || {};
+  // String vazia = campo não preenchido → undefined para NÃO apagar o
+  // conteúdo global do template no deepMerge (só undefined/null são pulados).
+  // Mesmo critério da demonstração (DemoPublicSite usa `||` como fallback).
+  const str = (v: unknown): string | undefined => {
+    const s = typeof v === "string" ? v.trim() : "";
+    return s ? (v as string) : undefined;
+  };
   const stats = (d.stats as Record<string, unknown>) || {};
   switch (type) {
-    case "hero":
+    case "hero": {
+      const statEntries = [
+        { value: str(stats.years), label: (str(stats.labelYears) as string) || "Anos de experiência" },
+        { value: str(stats.clients), label: (str(stats.labelClients) as string) || "Clientes atendidas" },
+        { value: str(stats.satisfaction), label: (str(stats.labelSatisfaction) as string) || "Satisfação" },
+      ].filter((s) => Boolean(s.value));
       return {
-        eyebrow: d.eyebrow,
-        firstName: d.name,
-        lastName: d.surname,
-        role: d.role,
-        description: d.description,
-        badgeTitle: d.badgeTitle,
-        badgeSubtitle: d.badgeSubtitle,
-        stats: stats.years || stats.clients || stats.satisfaction
-          ? [
-              { value: stats.years, label: stats.labelYears || "Anos de experiência" },
-              { value: stats.clients, label: stats.labelClients || "Clientes atendidas" },
-              { value: stats.satisfaction, label: stats.labelSatisfaction || "Satisfação" },
-            ]
-          : undefined,
+        eyebrow: str(d.eyebrow),
+        firstName: str(d.name),
+        lastName: str(d.surname),
+        role: str(d.role),
+        description: str(d.description),
+        badgeTitle: str(d.badgeTitle),
+        badgeSubtitle: str(d.badgeSubtitle),
+        stats: statEntries.length > 0 ? statEntries : undefined,
       };
+    }
     case "testimonials":
       return d.testimonials && Array.isArray(d.testimonials) && (d.testimonials as unknown[]).length > 0
         ? { items: d.testimonials }
@@ -164,10 +171,12 @@ export interface ResolveOptions {
   globalSections?: SiteSection[];
   tenantSectionMap?: Map<string, TenantSection>;
   /**
-   * Quando true (sites de tenants em /slug), os dados PRÓPRIOS do tenant
-   * (site_settings.data — editados em /painel/meu-site) têm precedência sobre
-   * o conteúdo GLOBAL (site_sections, o template padrão da plataforma).
-   * Quando false (HOME "/", que é o template global), o conteúdo global vence.
+   * Quando true (sites de tenants em /[slug] E a HOME oficial `/`, que é o
+   * site do tenant oficial), os dados PRÓPRIOS do tenant (site_settings.data
+   * — editados em /painel/meu-site ou /admin/editor-home) têm precedência
+   * sobre o conteúdo GLOBAL (site_sections, o template padrão da plataforma).
+   * Campos vazios/ausentes caem para o global (nunca apagam o template).
+   * Quando false, o conteúdo global vence.
    */
   tenantDataOverridesGlobal?: boolean;
 }
