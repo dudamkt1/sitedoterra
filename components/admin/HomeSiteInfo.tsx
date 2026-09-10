@@ -176,11 +176,12 @@ export function HomeSiteInfo() {
         Estas informações aparecem na HOME oficial do site
         {tenantDomain ? (
           <>
-            {" "}(<strong>{tenantDomain}</strong>)
+            {" "}(<strong>{tenantDomain}</strong>
+            {tenantSlug ? <> · site <strong>{tenantSlug}</strong></> : null})
           </>
         ) : tenantSlug ? (
           <>
-            {" "}(<strong>{tenantSlug}</strong>)
+            {" "}(site <strong>{tenantSlug}</strong>)
           </>
         ) : null}
         . Os mesmos campos do painel do usuário.

@@ -59,63 +59,57 @@ function mainDomainHostname(): string | null {
   }
 }
 
-async function resolveOfficialTenantId(admin: ReturnType<typeof createAdminClient>) {
-  // 1) Slug da HOME (mesma fonte das páginas /login, /checkout e da home
-  //    pública: HOME_TENANT_SLUG). É o caminho que comprovadamente retorna o
-  //    tenant real com conteúdo.
-  const homeSlug = process.env.HOME_TENANT_SLUG || "usuarioteste";
-  try {
-    const bySlug = await getPublicTenantBySlug(homeSlug);
-    const tid = bySlug?.tenant_id || null;
-    if (tid && tid !== "index") {
-      const { data: row } = await admin
-        .from("tenants")
-        .select("id, slug")
-        .eq("id", tid)
-        .maybeSingle();
-      if (row) return { ...(row as { id: string; slug: string }), domain: mainDomainHostname(), source: "slug" as const };
-    }
-  } catch {
-    // tenta as próximas estratégias
-  }
-
-  // 2) Domínio principal (ex.: oleos.topconsultores.com.br).
-  const host = mainDomainHostname();
-  if (host) {
-    try {
-      const byDomain = await getPublicTenantByDomain(host);
-      const tid = byDomain?.tenant_id || null;
-      if (tid && tid !== "index") {
-        const { data: row } = await admin
-          .from("tenants")
-          .select("id, slug")
-          .eq("id", tid)
-          .maybeSingle();
-        if (row) return { ...(row as { id: string; slug: string }), domain: host, source: "domain" as const };
-      }
-    } catch {
-      // cai para o fallback abaixo
-    }
-  }
-
-  // 3) Fallback: resolução oficial anterior (RPC / platform_config).
-  const official = await getOfficialHomeTenant();
-  const tenantId = official?.tenant_id || null;
-  // "index"/demo = fallback estático (sem banco) — nada para editar.
-  if (!tenantId || tenantId === "index") {
-    console.warn("[admin/home-site] nenhum tenant oficial resolvido", { homeSlug, host });
-    return null;
-  }
+async function resolveTenantRow(
+  admin: ReturnType<typeof createAdminClient>,
+  tenantId: string | null | undefined
+) {
+  if (!tenantId || tenantId === "index") return null;
   const { data: row } = await admin
     .from("tenants")
     .select("id, slug")
     .eq("id", tenantId)
     .maybeSingle();
-  if (!row) {
-    console.warn("[admin/home-site] tenant oficial sem linha em tenants", { tenantId });
-    return null;
+  return (row as { id: string; slug: string } | null) || null;
+}
+
+async function resolveOfficialTenantId(admin: ReturnType<typeof createAdminClient>) {
+  const host = mainDomainHostname();
+
+  // 1) Tenant OFICIAL — exatamente o que o domínio principal renderiza na
+  //    HOME `/` (app/page.tsx → getOfficialHomeTenant). O RPC pode retornar
+  //    `id` em vez de `tenant_id` — aceitar ambos.
+  try {
+    const official = (await getOfficialHomeTenant()) as unknown as Record<string, unknown>;
+    const tid = (official?.tenant_id as string) || (official?.id as string) || null;
+    const row = await resolveTenantRow(admin, tid);
+    if (row) return { ...row, domain: host, source: "official" as const };
+  } catch {
+    // tenta as próximas estratégias
   }
-  return { ...(row as { id: string; slug: string }), domain: host, source: "official" as const };
+
+  // 2) Slug da HOME (HOME_TENANT_SLUG) — mesma fonte de /login e /checkout.
+  const homeSlug = process.env.HOME_TENANT_SLUG || "usuarioteste";
+  try {
+    const bySlug = await getPublicTenantBySlug(homeSlug);
+    const row = await resolveTenantRow(admin, bySlug?.tenant_id);
+    if (row) return { ...row, domain: host, source: "slug" as const };
+  } catch {
+    // tenta a próxima estratégia
+  }
+
+  // 3) Domínio principal (ex.: oleos.topconsultores.com.br).
+  if (host) {
+    try {
+      const byDomain = await getPublicTenantByDomain(host);
+      const row = await resolveTenantRow(admin, byDomain?.tenant_id);
+      if (row) return { ...row, domain: host, source: "domain" as const };
+    } catch {
+      // sem mais estratégias
+    }
+  }
+
+  console.warn("[admin/home-site] nenhum tenant oficial resolvido", { homeSlug, host });
+  return null;
 }
 
 export async function GET() {
@@ -135,7 +129,7 @@ export async function GET() {
     .maybeSingle();
 
   return NextResponse.json({
-    tenant: { id: tenant.id, slug: tenant.slug, domain: tenant.domain || null },
+    tenant: { id: tenant.id, slug: tenant.slug, domain: tenant.domain || null, source: tenant.source },
     siteData: (settings?.data as Record<string, unknown>) || {},
   });
 }
