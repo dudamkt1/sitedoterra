@@ -43,9 +43,10 @@ export function DomainManager({ domains, slug, appUrl }: DomainManagerProps) {
     const data = await res.json();
     setConnecting(false);
     if (res.ok) {
+      // NÃO recarrega aqui: o reload apagaria as instruções DNS que o
+      // usuário precisa ver agora. Elas aparecem abaixo (passo 3).
       setInstructions(data.instructions);
       setStep(3);
-      window.location.reload();
     } else {
       setError(data.error || "Erro ao conectar o domínio.");
     }
@@ -152,7 +153,12 @@ export function DomainManager({ domains, slug, appUrl }: DomainManagerProps) {
           )}
 
           {step === 3 && instructions && (
-            <DnsInstructions instructions={instructions} domain={domain || "seu-dominio"} />
+            <>
+              <DnsInstructions instructions={instructions} domain={domain || "seu-dominio"} />
+              <button className="btn btn-primary mt-4" onClick={() => window.location.reload()}>
+                Concluir e ver meu domínio
+              </button>
+            </>
           )}
         </div>
       )}

@@ -9,6 +9,9 @@
 const VERCEL_API = "https://api.vercel.com";
 const VERCEL_PROJECT_ID = process.env.VERCEL_PROJECT_ID;
 const VERCEL_TOKEN = process.env.VERCEL_API_TOKEN;
+// Projetos dentro de um Time exigem ?teamId= em todas as chamadas — sem isso
+// a API retorna 403/404 e o connect quebra. Opcional: só defina se necessário.
+const VERCEL_TEAM_ID = process.env.VERCEL_TEAM_ID;
 
 // Valores canônicos da Vercel para apontamento de domínios
 export const VERCEL_CNAME_TARGET = "cname.vercel-dns.com";
@@ -35,11 +38,25 @@ interface VercelAddDomainResponse {
   cdnEnabled?: boolean;
 }
 
+/** Erro da API Vercel com status/código preservados para mensagens amigáveis. */
+export class VercelApiError extends Error {
+  status: number;
+  code: string | null;
+  constructor(status: number, code: string | null, message: string) {
+    super(message);
+    this.name = "VercelApiError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
 async function vercelFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (!VERCEL_PROJECT_ID || !VERCEL_TOKEN) {
     throw new Error("VERCEL_PROJECT_ID ou VERCEL_API_TOKEN não configurados");
   }
-  const res = await fetch(`${VERCEL_API}${path}`, {
+  const sep = path.includes("?") ? "&" : "?";
+  const url = VERCEL_TEAM_ID ? `${VERCEL_API}${path}${sep}teamId=${VERCEL_TEAM_ID}` : `${VERCEL_API}${path}`;
+  const res = await fetch(url, {
     ...options,
     headers: {
       Authorization: `Bearer ${VERCEL_TOKEN}`,
@@ -50,22 +67,43 @@ async function vercelFetch<T>(path: string, options: RequestInit = {}): Promise<
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(
-      `Vercel API error ${res.status}: ${(body as { error?: { message?: string } })?.error?.message || JSON.stringify(body)}`
+    const err = (body as { error?: { message?: string; code?: string } })?.error || {};
+    throw new VercelApiError(
+      res.status,
+      err.code || null,
+      `Vercel API error ${res.status}: ${err.message || JSON.stringify(body)}`
     );
   }
   return body as T;
 }
 
-/** Adiciona o domínio (ou subdomínio www) ao projeto Vercel. */
+/**
+ * Adiciona o domínio (ou subdomínio www) ao projeto Vercel.
+ * Idempotente: se o domínio já existe no projeto (ex.: tentativa anterior
+ * que registrou na Vercel mas falhou depois), busca o registro existente
+ * em vez de falhar com 409.
+ */
 export async function addVercelDomain(domain: string): Promise<VercelAddDomainResponse> {
-  return vercelFetch<VercelAddDomainResponse>(
-    `/v10/projects/${VERCEL_PROJECT_ID}/domains`,
-    {
-      method: "POST",
-      body: JSON.stringify({ name: domain }),
+  try {
+    return await vercelFetch<VercelAddDomainResponse>(
+      `/v10/projects/${VERCEL_PROJECT_ID}/domains`,
+      {
+        method: "POST",
+        body: JSON.stringify({ name: domain }),
+      }
+    );
+  } catch (err) {
+    const apiErr = err instanceof VercelApiError ? err : null;
+    const alreadyExists =
+      apiErr?.status === 409 ||
+      apiErr?.code === "domain_already_in_use" ||
+      /already (exists|in use)/i.test(apiErr?.message || "");
+    if (alreadyExists) {
+      // Reaproveita o registro existente (retry seguro).
+      return (await getVercelDomain(domain)) as unknown as VercelAddDomainResponse;
     }
-  );
+    throw err;
+  }
 }
 
 /** Consulta o status atual do domínio (verificação, nameservers, etc.). */

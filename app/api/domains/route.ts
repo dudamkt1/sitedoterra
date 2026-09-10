@@ -3,10 +3,32 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/auth";
 import { ensureTenantForUser } from "@/lib/onboarding";
 import { isValidDomain, normalizeDomain, isApexDomain, domainBase } from "@/lib/utils";
-import { addVercelDomain, buildDnsInstructions, getVercelDomain } from "@/lib/vercel";
+import { addVercelDomain, buildDnsInstructions, getVercelDomain, VercelApiError } from "@/lib/vercel";
 import { getPublicBaseUrl } from "@/lib/public-url";
 
 export const runtime = "nodejs";
+
+/** Traduz o erro técnico em mensagem acionável para o usuário. */
+function friendlyInfraError(err: unknown): { error: string; status: number } {
+  const msg = err instanceof Error ? err.message : String(err);
+  if (/não configurados/i.test(msg)) {
+    return { error: "Integração com a infraestrutura indisponível no momento. Tente novamente em instantes ou fale com o suporte.", status: 500 };
+  }
+  const apiErr = err instanceof VercelApiError ? err : null;
+  if (apiErr && (apiErr.status === 401 || apiErr.status === 403)) {
+    return { error: "Falha de autenticação com a infraestrutura. Fale com o suporte para regularizar a conexão.", status: 502 };
+  }
+  if (/already in use|another account|forbidden/i.test(msg)) {
+    return { error: "Este domínio já está em uso em outro projeto. Se for seu, remova de lá ou fale com o suporte.", status: 409 };
+  }
+  if (/invalid|bad_request|400/i.test(msg)) {
+    return { error: "A infraestrutura recusou este domínio. Confira a digitação (ex.: meusite.com.br) e tente novamente.", status: 400 };
+  }
+  if (/fetch failed|network|timeout|ETIMEDOUT|ECONN/i.test(msg)) {
+    return { error: "Falha de comunicação com a infraestrutura. Verifique sua conexão e tente novamente.", status: 502 };
+  }
+  return { error: "Não foi possível registrar o domínio na infraestrutura. Verifique se o domínio é válido e tente novamente.", status: 502 };
+}
 
 /**
  * Conecta um domínio personalizado ao site do tenant.
@@ -51,6 +73,17 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   if (existing) {
+    // Retry do próprio tenant (ex.: tentativa anterior que parou no meio):
+    // retoma de onde parou em vez de barrar com "outro site".
+    if (existing.tenant_id === tenant.id) {
+      let vercelInfo = null;
+      try {
+        const lookup = domain.startsWith("www.") ? domain : domain.replace(/^www\./, "");
+        vercelInfo = await getVercelDomain(lookup);
+      } catch {}
+      const instructions = buildDnsInstructions(domain, Boolean(existing.is_apex ?? isApexDomain(domain)), vercelInfo || undefined);
+      return NextResponse.json({ success: true, domain: existing, instructions, resumed: true });
+    }
     return NextResponse.json(
       { error: "Este domínio já está vinculado a outro site. Se for seu, entre em contato com o suporte." },
       { status: 409 }
@@ -64,10 +97,8 @@ export async function POST(request: Request) {
     vercelInfo = await addVercelDomain(vercelDomain);
   } catch (err) {
     console.error("Falha ao adicionar domínio na Vercel", err);
-    return NextResponse.json(
-      { error: "Não foi possível registrar o domínio na infraestrutura. Verifique se o domínio é válido e tente novamente." },
-      { status: 502 }
-    );
+    const friendly = friendlyInfraError(err);
+    return NextResponse.json({ error: friendly.error }, { status: friendly.status });
   }
 
   // Insere no banco
