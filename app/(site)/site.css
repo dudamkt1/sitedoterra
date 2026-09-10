@@ -20,9 +20,7 @@
 }
 
 
-/* Reset escopado com especificidade zero (:where) para não anular
-   utilitários do Tailwind (ex.: px-*/p-*) dentro do checkout. */
-#tenant-site :where(*, *::before, *::after) { box-sizing: border-box; margin: 0; padding: 0; }
+#tenant-site *, #tenant-site *::before, #tenant-site *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 
 #tenant-site { scroll-behavior: smooth; }

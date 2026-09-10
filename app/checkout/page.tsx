@@ -79,12 +79,18 @@ export default async function CheckoutPage({
   const footerNavItems = homeNavItems.map((i) => ({ ...i, href: `/${i.href}` }));
 
   return (
-    <div id="tenant-site" data-slug={tenant.slug} className="min-h-screen flex flex-col">
-      <style dangerouslySetInnerHTML={{ __html: themeStyleTag(theme) }} />
-      {/* Garante contraste do NAV fixo sobre fundo claro do checkout (sem alterar componente) */}
-      <style dangerouslySetInnerHTML={{ __html: `#tenant-site nav:not(.scrolled){background:rgba(247,242,234,0.92);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid rgba(196,150,58,0.15);} #tenant-site nav:not(.scrolled) .nav-logo{color:var(--verde);} #tenant-site nav:not(.scrolled) .nav-links a{color:var(--cinza);} #tenant-site nav:not(.scrolled) .nav-links a:hover{color:var(--verde);} #tenant-site nav:not(.scrolled) .hamburger span{background:var(--verde);} #tenant-site nav:not(.scrolled) .nav-extra-link{color:var(--ouro);border-color:rgba(196,150,58,0.4);} ` }} />
-      <SiteEffects />
-      <Header logoText={logoText} logoUrl={logoUrl} logoLightUrl={logoLightUrl} navItems={navItems} extraNav={extraNav} />
+    <div className="min-h-screen flex flex-col">
+      {/* Header isolado sob #tenant-site (estilos do site). O <main> do checkout fica
+          FORA de #tenant-site de propósito: o reset global `#tenant-site *{margin:0;padding:0}`
+          tem especificidade de ID e anulava todos os paddings/margins do Tailwind,
+          deixando o texto apertado e sem margens laterais. */}
+      <div id="tenant-site" data-slug={tenant.slug}>
+        <style dangerouslySetInnerHTML={{ __html: themeStyleTag(theme) }} />
+        {/* Garante contraste do NAV fixo sobre fundo claro do checkout (sem alterar componente) */}
+        <style dangerouslySetInnerHTML={{ __html: `#tenant-site nav:not(.scrolled){background:rgba(247,242,234,0.92);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid rgba(196,150,58,0.15);} #tenant-site nav:not(.scrolled) .nav-logo{color:var(--verde);} #tenant-site nav:not(.scrolled) .nav-links a{color:var(--cinza);} #tenant-site nav:not(.scrolled) .nav-links a:hover{color:var(--verde);} #tenant-site nav:not(.scrolled) .hamburger span{background:var(--verde);} #tenant-site nav:not(.scrolled) .nav-extra-link{color:var(--ouro);border-color:rgba(196,150,58,0.4);} ` }} />
+        <SiteEffects />
+        <Header logoText={logoText} logoUrl={logoUrl} logoLightUrl={logoLightUrl} navItems={navItems} extraNav={extraNav} />
+      </div>
       {/* Isolado do NAV fixo (70px) + respiro generoso — checkout central moderno, com margens laterais e fundo suave */}
       <main className="flex-1 bg-gradient-to-b from-[#fcf9f5] via-[#f7f3ea] to-[#fcf9f5] pt-[70px] relative overflow-hidden">
         {/* Detalhe decorativo sutil — profundidade sem poluir */}
@@ -101,6 +107,9 @@ export default async function CheckoutPage({
           </div>
         </div>
       </main>
+      {/* Rodapé sob #tenant-site (estilos do site). Bloco separado do header para
+          manter o checkout fora do reset global. */}
+      <div id="tenant-site" data-slug={tenant.slug}>
       <Footer
         content={footerContent as never}
         navItems={footerNavItems}
@@ -109,6 +118,7 @@ export default async function CheckoutPage({
         contactInstagram={instagram}
         profileName={profileName}
       />
+      </div>
     </div>
   );
 }
