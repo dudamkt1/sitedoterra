@@ -281,7 +281,10 @@ export async function GET() {
   let heroContent: Record<string, unknown> | null = null;
   try {
     const typeMap = await getSectionTypeMap(admin);
-    const heroId = [...typeMap.entries()].find(([, t]) => t === "hero")?.[0] || null;
+    let heroId: string | null = null;
+    typeMap.forEach((t, id) => {
+      if (!heroId && t === "hero") heroId = id;
+    });
     if (heroId) {
       const { data: ov } = await admin
         .from("tenant_sections")
