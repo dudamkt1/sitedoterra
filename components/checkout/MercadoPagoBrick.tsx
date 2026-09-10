@@ -136,6 +136,10 @@ export function MercadoPagoBrick({
               creditCard: "all",
               debitCard: "all",
               ticket: "all",
+              // PIX no Payment Brick = grupo bankTransfer (doc oficial:
+              // "para NÃO incluir um tipo, remova-o do objeto paymentMethods").
+              // Sem esta chave a aba PIX ficava oculta em "Meios de pagamento".
+              bankTransfer: "all",
               maxInstallments: safeMaxInstallments,
             },
             visual: { style: { theme: "default" } },
