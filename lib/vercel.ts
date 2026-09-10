@@ -7,15 +7,113 @@
  */
 
 const VERCEL_API = "https://api.vercel.com";
-const VERCEL_PROJECT_ID = process.env.VERCEL_PROJECT_ID;
-const VERCEL_TOKEN = process.env.VERCEL_API_TOKEN;
-// Projetos dentro de um Time exigem ?teamId= em todas as chamadas — sem isso
-// a API retorna 403/404 e o connect quebra. Opcional: só defina se necessário.
-const VERCEL_TEAM_ID = process.env.VERCEL_TEAM_ID;
 
 // Valores canônicos da Vercel para apontamento de domínios
 export const VERCEL_CNAME_TARGET = "cname.vercel-dns.com";
 export const VERCEL_APEX_A_RECORD = "76.76.21.21";
+
+interface VercelCredentials {
+  projectId: string | null;
+  token: string | null;
+  teamId: string | null;
+}
+
+/** Normaliza valor de platform_config (jsonb pode vir como string quotada). */
+function cfgStr(v: unknown): string {
+  if (typeof v === "string") {
+    const t = v.trim();
+    if (t.length >= 2 && t.startsWith('"') && t.endsWith('"')) {
+      try {
+        return String(JSON.parse(t));
+      } catch {
+        return t.slice(1, -1);
+      }
+    }
+    return t;
+  }
+  return String(v ?? "");
+}
+
+// Cache curto para não ler platform_config em toda chamada.
+let credsCache: { data: VercelCredentials; ts: number } | null = null;
+const CREDS_CACHE_MS = 60_000;
+
+/**
+ * Resolve as credenciais da API Vercel — ENV primeiro, `platform_config`
+ * (editável em /admin/dominios) como alternativa. Sem uma das duas fontes,
+ * a conexão de domínios próprios não funciona.
+ */
+export async function getVercelCredentials(): Promise<VercelCredentials> {
+  const fromEnv: VercelCredentials = {
+    projectId: process.env.VERCEL_PROJECT_ID || null,
+    token: process.env.VERCEL_API_TOKEN || null,
+    teamId: process.env.VERCEL_TEAM_ID || null,
+  };
+  if (fromEnv.projectId && fromEnv.token) return fromEnv;
+  if (credsCache && Date.now() - credsCache.ts < CREDS_CACHE_MS) return credsCache.data;
+  let db: VercelCredentials = { projectId: null, token: null, teamId: null };
+  try {
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    const admin = createAdminClient();
+    const { data } = await admin
+      .from("platform_config")
+      .select("key, value")
+      .in("key", ["vercel_project_id", "vercel_api_token", "vercel_team_id"]);
+    const map = new Map((data || []).map((r: { key: string; value: unknown }) => [r.key, cfgStr(r.value)]));
+    db = {
+      projectId: map.get("vercel_project_id") || null,
+      token: map.get("vercel_api_token") || null,
+      teamId: map.get("vercel_team_id") || null,
+    };
+  } catch {
+    // mantém vazio
+  }
+  const merged: VercelCredentials = {
+    projectId: fromEnv.projectId || db.projectId,
+    token: fromEnv.token || db.token,
+    teamId: fromEnv.teamId || db.teamId,
+  };
+  credsCache = { data: merged, ts: Date.now() };
+  return merged;
+}
+
+/** Status SEM segredos (para exibir no admin). */
+export async function getVercelConfigStatus(): Promise<{
+  projectIdSource: "env" | "admin" | null;
+  hasToken: boolean;
+  teamIdSource: "env" | "admin" | null;
+}> {
+  const envPid = process.env.VERCEL_PROJECT_ID || null;
+  const envToken = process.env.VERCEL_API_TOKEN || null;
+  const envTeam = process.env.VERCEL_TEAM_ID || null;
+  let dbPid: string | null = null;
+  let dbToken = false;
+  let dbTeam: string | null = null;
+  try {
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    const admin = createAdminClient();
+    const { data } = await admin
+      .from("platform_config")
+      .select("key, value")
+      .in("key", ["vercel_project_id", "vercel_api_token", "vercel_team_id"]);
+    for (const r of (data || []) as { key: string; value: unknown }[]) {
+      const v = cfgStr(r.value);
+      if (r.key === "vercel_project_id" && v) dbPid = v;
+      if (r.key === "vercel_api_token" && v) dbToken = true;
+      if (r.key === "vercel_team_id" && v) dbTeam = v;
+    }
+  } catch {}
+  return {
+    projectIdSource: envPid ? "env" : dbPid ? "admin" : null,
+    hasToken: Boolean(envToken) || dbToken,
+    teamIdSource: envTeam ? "env" : dbTeam ? "admin" : null,
+  };
+}
+
+/** Invalida o cache de credenciais (após salvar no admin). */
+export function invalidateVercelCredsCache(): void {
+  credsCache = null;
+}
 
 interface VercelDomainResponse {
   name: string;
@@ -51,15 +149,19 @@ export class VercelApiError extends Error {
 }
 
 async function vercelFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
-  if (!VERCEL_PROJECT_ID || !VERCEL_TOKEN) {
-    throw new Error("VERCEL_PROJECT_ID ou VERCEL_API_TOKEN não configurados");
+  const creds = await getVercelCredentials();
+  if (!creds.projectId || !creds.token) {
+    throw new Error("VERCEL_PROJECT_ID ou VERCEL_API_TOKEN não configurados (nem via ENV nem no admin)");
   }
   const sep = path.includes("?") ? "&" : "?";
-  const url = VERCEL_TEAM_ID ? `${VERCEL_API}${path}${sep}teamId=${VERCEL_TEAM_ID}` : `${VERCEL_API}${path}`;
+  const team = creds.teamId ? `${sep}teamId=${encodeURIComponent(creds.teamId)}` : "";
+  // Projetos dentro de um Time exigem ?teamId= — sem isso a API retorna
+  // 403/404 e o connect quebra.
+  const url = `${VERCEL_API}${path}${team}`;
   const res = await fetch(url, {
     ...options,
     headers: {
-      Authorization: `Bearer ${VERCEL_TOKEN}`,
+      Authorization: `Bearer ${creds.token}`,
       "Content-Type": "application/json",
       ...(options.headers || {}),
     },
@@ -77,6 +179,16 @@ async function vercelFetch<T>(path: string, options: RequestInit = {}): Promise<
   return body as T;
 }
 
+async function vercelProjectPath(suffix: string): Promise<string> {
+  const creds = await getVercelCredentials();
+  return `/v10/projects/${creds.projectId}${suffix}`;
+}
+
+async function vercelProjectPath(suffix: string): Promise<string> {
+  const creds = await getVercelCredentials();
+  return `/v10/projects/${creds.projectId}${suffix}`;
+}
+
 /**
  * Adiciona o domínio (ou subdomínio www) ao projeto Vercel.
  * Idempotente: se o domínio já existe no projeto (ex.: tentativa anterior
@@ -86,7 +198,7 @@ async function vercelFetch<T>(path: string, options: RequestInit = {}): Promise<
 export async function addVercelDomain(domain: string): Promise<VercelAddDomainResponse> {
   try {
     return await vercelFetch<VercelAddDomainResponse>(
-      `/v10/projects/${VERCEL_PROJECT_ID}/domains`,
+      await vercelProjectPath("/domains"),
       {
         method: "POST",
         body: JSON.stringify({ name: domain }),
@@ -109,14 +221,14 @@ export async function addVercelDomain(domain: string): Promise<VercelAddDomainRe
 /** Consulta o status atual do domínio (verificação, nameservers, etc.). */
 export async function getVercelDomain(domain: string): Promise<VercelDomainResponse> {
   return vercelFetch<VercelDomainResponse>(
-    `/v10/projects/${VERCEL_PROJECT_ID}/domains/${encodeURIComponent(domain)}`
+    await vercelProjectPath(`/domains/${encodeURIComponent(domain)}`)
   );
 }
 
 /** Verifica o domínio (força checagem). */
 export async function verifyVercelDomain(domain: string): Promise<VercelDomainResponse> {
   return vercelFetch<VercelDomainResponse>(
-    `/v10/projects/${VERCEL_PROJECT_ID}/domains/${encodeURIComponent(domain)}/verify`,
+    await vercelProjectPath(`/domains/${encodeURIComponent(domain)}/verify`),
     { method: "POST" }
   );
 }
@@ -124,7 +236,7 @@ export async function verifyVercelDomain(domain: string): Promise<VercelDomainRe
 /** Remove o domínio do projeto Vercel. */
 export async function removeVercelDomain(domain: string): Promise<void> {
   await vercelFetch<{ ok: boolean }>(
-    `/v10/projects/${VERCEL_PROJECT_ID}/domains/${encodeURIComponent(domain)}`,
+    await vercelProjectPath(`/domains/${encodeURIComponent(domain)}`),
     { method: "DELETE" }
   );
 }

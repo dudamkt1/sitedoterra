@@ -1,5 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { AdminDomains } from "@/components/admin/AdminDomains";
+import { VercelConfigCard } from "@/components/admin/VercelConfigCard";
+import { getVercelConfigStatus } from "@/lib/vercel";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +27,7 @@ export default async function AdminDominiosPage() {
     <div>
       <h1 className="text-3xl font-semibold mb-1" style={{ fontFamily: "var(--font-display)" }}>Domínios</h1>
       <p className="text-sm text-gray-500 mb-8">Todos os domínios personalizados conectados à plataforma.</p>
+      <VercelConfigCard initial={await getVercelConfigStatus()} />
       <AdminDomains rows={rows as any[]} />
     </div>
   );

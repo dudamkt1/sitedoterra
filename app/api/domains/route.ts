@@ -12,7 +12,7 @@ export const runtime = "nodejs";
 function friendlyInfraError(err: unknown): { error: string; status: number } {
   const msg = err instanceof Error ? err.message : String(err);
   if (/não configurados/i.test(msg)) {
-    return { error: "Integração com a infraestrutura indisponível no momento. Tente novamente em instantes ou fale com o suporte.", status: 500 };
+    return { error: "Integração com a infraestrutura indisponível no momento. O administrador precisa configurar as credenciais da Vercel em /admin/dominios e você poderá tentar novamente.", status: 500 };
   }
   const apiErr = err instanceof VercelApiError ? err : null;
   if (apiErr && (apiErr.status === 401 || apiErr.status === 403)) {
