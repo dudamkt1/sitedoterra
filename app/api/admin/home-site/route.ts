@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser, getProfile } from "@/lib/auth";
 import { getOfficialHomeTenant, invalidateOfficialHomeCache } from "@/lib/site-official";
-import { getPublicTenantByDomain } from "@/lib/tenant";
+import { getPublicTenantBySlug, getPublicTenantByDomain } from "@/lib/tenant";
 import { getPublicBaseUrl } from "@/lib/public-url";
 
 export const runtime = "nodejs";
@@ -60,8 +60,26 @@ function mainDomainHostname(): string | null {
 }
 
 async function resolveOfficialTenantId(admin: ReturnType<typeof createAdminClient>) {
-  // 1) Domínio principal — as informações do /admin/editor-home são SEMPRE
-  //    as do domínio principal (ex.: oleos.topconsultores.com.br).
+  // 1) Slug da HOME (mesma fonte das páginas /login, /checkout e da home
+  //    pública: HOME_TENANT_SLUG). É o caminho que comprovadamente retorna o
+  //    tenant real com conteúdo.
+  const homeSlug = process.env.HOME_TENANT_SLUG || "usuarioteste";
+  try {
+    const bySlug = await getPublicTenantBySlug(homeSlug);
+    const tid = bySlug?.tenant_id || null;
+    if (tid && tid !== "index") {
+      const { data: row } = await admin
+        .from("tenants")
+        .select("id, slug")
+        .eq("id", tid)
+        .maybeSingle();
+      if (row) return { ...(row as { id: string; slug: string }), domain: mainDomainHostname(), source: "slug" as const };
+    }
+  } catch {
+    // tenta as próximas estratégias
+  }
+
+  // 2) Domínio principal (ex.: oleos.topconsultores.com.br).
   const host = mainDomainHostname();
   if (host) {
     try {
@@ -73,25 +91,31 @@ async function resolveOfficialTenantId(admin: ReturnType<typeof createAdminClien
           .select("id, slug")
           .eq("id", tid)
           .maybeSingle();
-        if (row) return { ...(row as { id: string; slug: string }), domain: host };
+        if (row) return { ...(row as { id: string; slug: string }), domain: host, source: "domain" as const };
       }
     } catch {
       // cai para o fallback abaixo
     }
   }
 
-  // 2) Fallback: resolução oficial anterior (RPC / platform_config / superadmin).
+  // 3) Fallback: resolução oficial anterior (RPC / platform_config).
   const official = await getOfficialHomeTenant();
   const tenantId = official?.tenant_id || null;
   // "index"/demo = fallback estático (sem banco) — nada para editar.
-  if (!tenantId || tenantId === "index") return null;
+  if (!tenantId || tenantId === "index") {
+    console.warn("[admin/home-site] nenhum tenant oficial resolvido", { homeSlug, host });
+    return null;
+  }
   const { data: row } = await admin
     .from("tenants")
     .select("id, slug")
     .eq("id", tenantId)
     .maybeSingle();
-  if (!row) return null;
-  return { ...(row as { id: string; slug: string }), domain: host };
+  if (!row) {
+    console.warn("[admin/home-site] tenant oficial sem linha em tenants", { tenantId });
+    return null;
+  }
+  return { ...(row as { id: string; slug: string }), domain: host, source: "official" as const };
 }
 
 export async function GET() {
