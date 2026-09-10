@@ -85,10 +85,16 @@ export default async function CheckoutPage({
       <style dangerouslySetInnerHTML={{ __html: `#tenant-site nav:not(.scrolled){background:rgba(247,242,234,0.92);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid rgba(196,150,58,0.15);} #tenant-site nav:not(.scrolled) .nav-logo{color:var(--verde);} #tenant-site nav:not(.scrolled) .nav-links a{color:var(--cinza);} #tenant-site nav:not(.scrolled) .nav-links a:hover{color:var(--verde);} #tenant-site nav:not(.scrolled) .hamburger span{background:var(--verde);} #tenant-site nav:not(.scrolled) .nav-extra-link{color:var(--ouro);border-color:rgba(196,150,58,0.4);} ` }} />
       <SiteEffects />
       <Header logoText={logoText} logoUrl={logoUrl} logoLightUrl={logoLightUrl} navItems={navItems} extraNav={extraNav} />
-      {/* Isolado do NAV fixo (70px) + respiro generoso — checkout central 100% checkout.png, centralizado, sem invadir rodapé */}
-      <main className="flex-1 bg-[#fcf9f5] pt-[70px]">
-        <div className="max-w-[1160px] mx-auto px-5 sm:px-6 lg:px-8 pt-12 sm:pt-14 pb-16 sm:pb-20 flex justify-center">
-          <div className="w-full max-w-[980px]">
+      {/* Isolado do NAV fixo (70px) + respiro generoso — checkout central moderno, com margens laterais e fundo suave */}
+      <main className="flex-1 bg-gradient-to-b from-[#fcf9f5] via-[#f7f3ea] to-[#fcf9f5] pt-[70px] relative overflow-hidden">
+        {/* Detalhe decorativo sutil — profundidade sem poluir */}
+        <div aria-hidden className="pointer-events-none absolute inset-0">
+          <div className="absolute -top-24 left-1/2 h-72 w-[720px] -translate-x-1/2 rounded-full bg-[#1d5c3a]/[0.05] blur-3xl" />
+          <div className="absolute top-40 -left-24 h-64 w-64 rounded-full bg-[#c4963a]/[0.07] blur-3xl" />
+          <div className="absolute top-64 -right-24 h-64 w-64 rounded-full bg-[#1d5c3a]/[0.06] blur-3xl" />
+        </div>
+        <div className="relative max-w-[1160px] mx-auto px-4 sm:px-8 lg:px-10 pt-10 sm:pt-14 lg:pt-16 pb-16 sm:pb-24 flex justify-center">
+          <div className="w-full max-w-[1020px]">
             <Suspense fallback={<div className="max-w-[640px] mx-auto py-12 text-center text-sm text-slate-500">Carregando checkout...</div>}>
               <CheckoutPageClient planIdParam={planId} />
             </Suspense>

@@ -413,9 +413,9 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
 
   if (checkingAuth && step === "identify") {
     return (
-      <div className="max-w-[520px] mx-auto w-full py-16 text-center">
+      <div className="max-w-[520px] mx-auto w-full px-6 py-16 sm:py-20 text-center">
         <div className="w-10 h-10 rounded-full border-4 border-[#e8efe8] border-t-[#103d2d] animate-spin mx-auto" />
-        <p className="text-sm text-[#6b7a89] mt-4">Carregando checkout...</p>
+        <p className="text-sm text-[#6b7a89] mt-4 leading-relaxed">Carregando checkout...</p>
       </div>
     );
   }
@@ -423,9 +423,9 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
   // IDENTIFY — Etapa 1 (Criar conta / Entrar) — premium, com plano no topo
   if (step === "identify") {
     return (
-      <div className="w-full flex flex-col items-center">
+      <div className="w-full flex flex-col items-center px-2 sm:px-6">
         {/* Stepper discreto — Etapa 1 de 2 */}
-        <div className="w-full max-w-[520px] mb-5 sm:mb-6 flex items-center justify-center gap-2.5">
+        <div className="w-full max-w-[560px] mb-6 sm:mb-8 flex items-center justify-center gap-3">
           <span className="flex items-center gap-2 text-[12px] font-semibold text-[#103d2d]">
             <span className="w-6 h-6 rounded-full bg-[#103d2d] text-white flex items-center justify-center text-[11px] font-bold">1</span>
             Sua conta
@@ -438,8 +438,8 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
         </div>
 
         {/* Plano selecionado — card topo, mesma identidade visual da Etapa 2 */}
-        <div className="w-full max-w-[520px] mb-6 sm:mb-8">
-          <div className="rounded-[16px] bg-white border border-[#e7ece8] shadow-[0_6px_20px_rgba(16,61,45,0.05)] overflow-hidden">
+        <div className="w-full max-w-[560px] mb-6 sm:mb-8 px-1 sm:px-0">
+          <div className="rounded-[20px] bg-white/90 backdrop-blur border border-[#e7ece8] shadow-[0_12px_32px_rgba(16,61,45,0.08)] overflow-hidden">
             <div className="px-5 sm:px-6 py-4 sm:py-5 flex items-center gap-4">
               <span className="w-11 h-11 rounded-[12px] bg-[#eef6ee] border border-[#e2efe4] flex items-center justify-center shrink-0">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#103d2d" strokeWidth="1.6">
@@ -461,25 +461,25 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
           </div>
         </div>
 
-        <div className="w-full max-w-[520px]">
+        <div className="w-full max-w-[560px] px-1 sm:px-0">
           {authMode === "signup" ? (
-            <form onSubmit={handleSignup} className="rounded-[20px] border border-[#e7ece8] bg-white p-6 sm:p-8 space-y-5 shadow-[0_10px_30px_rgba(16,61,45,0.06)]">
-              <div className="text-center pb-1">
-                <h1 className="text-[22px] sm:text-[24px] font-bold tracking-tight text-[#0f1a2a] leading-7">Crie sua conta</h1>
-                <p className="text-[13.5px] leading-5 text-[#6b7a89] mt-1.5">Comece agora seu site profissional.<br className="hidden sm:block" /> Crie sua conta em poucos segundos. Depois você continuará para o pagamento seguro.</p>
+            <form onSubmit={handleSignup} className="rounded-[24px] border border-[#e7ece8] bg-white/95 backdrop-blur p-6 sm:p-10 space-y-6 shadow-[0_16px_48px_rgba(16,61,45,0.09)]">
+              <div className="text-center pb-1 px-1 sm:px-3">
+                <h1 className="text-[22px] sm:text-[26px] font-bold tracking-tight text-[#0f1a2a] leading-snug">Crie sua conta</h1>
+                <p className="text-[14px] sm:text-[14.5px] leading-relaxed text-[#6b7a89] mt-2.5">Comece agora seu site profissional.<br className="hidden sm:block" /> Crie sua conta em poucos segundos. Depois você continuará para o pagamento seguro.</p>
               </div>
-              <div className="space-y-4">
+              <div className="space-y-4 sm:space-y-5">
                 <div>
-                  <label className="block text-[13px] font-semibold text-[#0f1a2a] mb-1.5">Nome completo</label>
-                  <input type="text" required autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Seu nome completo" className="w-full rounded-[12px] border border-[#dde6de] bg-white px-4 py-3.5 text-[15px] text-[#0f1a2a] placeholder:text-[#9aa8b5] focus:outline-none focus:ring-2 focus:ring-[#103d2d]/15 focus:border-[#103d2d] transition" />
+                  <label className="block text-[13px] font-semibold text-[#0f1a2a] mb-2">Nome completo</label>
+                  <input type="text" required autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Seu nome completo" className="w-full rounded-[14px] border border-[#dde6de] bg-white px-4 sm:px-5 py-4 text-[15px] leading-relaxed text-[#0f1a2a] placeholder:text-[#9aa8b5] focus:outline-none focus:ring-2 focus:ring-[#103d2d]/15 focus:border-[#103d2d] transition" />
                 </div>
                 <div>
-                  <label className="block text-[13px] font-semibold text-[#0f1a2a] mb-1.5">E-mail</label>
-                  <input type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="voce@email.com" className="w-full rounded-[12px] border border-[#dde6de] bg-white px-4 py-3.5 text-[15px] text-[#0f1a2a] placeholder:text-[#9aa8b5] focus:outline-none focus:ring-2 focus:ring-[#103d2d]/15 focus:border-[#103d2d] transition" />
+                  <label className="block text-[13px] font-semibold text-[#0f1a2a] mb-2">E-mail</label>
+                  <input type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="voce@email.com" className="w-full rounded-[14px] border border-[#dde6de] bg-white px-4 sm:px-5 py-4 text-[15px] leading-relaxed text-[#0f1a2a] placeholder:text-[#9aa8b5] focus:outline-none focus:ring-2 focus:ring-[#103d2d]/15 focus:border-[#103d2d] transition" />
                 </div>
                 <div>
-                  <label className="block text-[13px] font-semibold text-[#0f1a2a] mb-1.5">Senha</label>
-                  <input type="password" required minLength={6} autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mínimo 6 caracteres" className="w-full rounded-[12px] border border-[#dde6de] bg-white px-4 py-3.5 text-[15px] text-[#0f1a2a] placeholder:text-[#9aa8b5] focus:outline-none focus:ring-2 focus:ring-[#103d2d]/15 focus:border-[#103d2d] transition" />
+                  <label className="block text-[13px] font-semibold text-[#0f1a2a] mb-2">Senha</label>
+                  <input type="password" required minLength={6} autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mínimo 6 caracteres" className="w-full rounded-[14px] border border-[#dde6de] bg-white px-4 sm:px-5 py-4 text-[15px] leading-relaxed text-[#0f1a2a] placeholder:text-[#9aa8b5] focus:outline-none focus:ring-2 focus:ring-[#103d2d]/15 focus:border-[#103d2d] transition" />
                 </div>
               </div>
               {authError && (
@@ -510,19 +510,19 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
               </p>
             </form>
           ) : (
-            <form onSubmit={handleLogin} className="rounded-[20px] border border-[#e7ece8] bg-white p-6 sm:p-8 space-y-5 shadow-[0_10px_30px_rgba(16,61,45,0.06)]">
-              <div className="text-center pb-1">
-                <h1 className="text-[22px] sm:text-[24px] font-bold tracking-tight text-[#0f1a2a] leading-7">Entrar na sua conta</h1>
-                <p className="text-[13.5px] leading-5 text-[#6b7a89] mt-1.5">Voltaremos automaticamente para o pagamento do <b className="text-[#0f1a2a]">{planName}</b>.</p>
+            <form onSubmit={handleLogin} className="rounded-[24px] border border-[#e7ece8] bg-white/95 backdrop-blur p-6 sm:p-10 space-y-6 shadow-[0_16px_48px_rgba(16,61,45,0.09)]">
+              <div className="text-center pb-1 px-1 sm:px-3">
+                <h1 className="text-[22px] sm:text-[26px] font-bold tracking-tight text-[#0f1a2a] leading-snug">Entrar na sua conta</h1>
+                <p className="text-[14px] sm:text-[14.5px] leading-relaxed text-[#6b7a89] mt-2.5">Voltaremos automaticamente para o pagamento do <b className="text-[#0f1a2a]">{planName}</b>.</p>
               </div>
-              <div className="space-y-4">
+              <div className="space-y-4 sm:space-y-5">
                 <div>
-                  <label className="block text-[13px] font-semibold text-[#0f1a2a] mb-1.5">E-mail</label>
-                  <input type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="voce@email.com" className="w-full rounded-[12px] border border-[#dde6de] bg-white px-4 py-3.5 text-[15px] text-[#0f1a2a] placeholder:text-[#9aa8b5] focus:outline-none focus:ring-2 focus:ring-[#103d2d]/15 focus:border-[#103d2d] transition" />
+                  <label className="block text-[13px] font-semibold text-[#0f1a2a] mb-2">E-mail</label>
+                  <input type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="voce@email.com" className="w-full rounded-[14px] border border-[#dde6de] bg-white px-4 sm:px-5 py-4 text-[15px] leading-relaxed text-[#0f1a2a] placeholder:text-[#9aa8b5] focus:outline-none focus:ring-2 focus:ring-[#103d2d]/15 focus:border-[#103d2d] transition" />
                 </div>
                 <div>
-                  <label className="block text-[13px] font-semibold text-[#0f1a2a] mb-1.5">Senha</label>
-                  <input type="password" required autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Sua senha" className="w-full rounded-[12px] border border-[#dde6de] bg-white px-4 py-3.5 text-[15px] text-[#0f1a2a] placeholder:text-[#9aa8b5] focus:outline-none focus:ring-2 focus:ring-[#103d2d]/15 focus:border-[#103d2d] transition" />
+                  <label className="block text-[13px] font-semibold text-[#0f1a2a] mb-2">Senha</label>
+                  <input type="password" required autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Sua senha" className="w-full rounded-[14px] border border-[#dde6de] bg-white px-4 sm:px-5 py-4 text-[15px] leading-relaxed text-[#0f1a2a] placeholder:text-[#9aa8b5] focus:outline-none focus:ring-2 focus:ring-[#103d2d]/15 focus:border-[#103d2d] transition" />
                 </div>
               </div>
               {authError && <p className="rounded-[12px] bg-[#fef2f2] border border-[#fde4e4] px-4 py-3 text-sm text-[#991b1b] leading-5">{authError}</p>}
@@ -557,12 +557,12 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
     );
   }
 
-  // CHECKOUT — idêntico a /checkout.png (centralizado, legível, respiro generoso)
+  // CHECKOUT — moderno, centralizado, legível, com respiro generoso
   if (step === "checkout") {
     return (
-      <div className="w-full flex flex-col items-center">
+      <div className="w-full flex flex-col items-center px-2 sm:px-6">
         {/* Stepper discreto — Etapa 2 de 2 */}
-        <div className="w-full max-w-[980px] mb-6 sm:mb-7 flex items-center justify-center gap-2.5">
+        <div className="w-full max-w-[1020px] mb-6 sm:mb-8 flex items-center justify-center gap-3">
           <span className="flex items-center gap-2 text-[12px] font-medium text-[#8a9aa8]">
             <span className="w-6 h-6 rounded-full bg-[#eaf6ec] border border-[#cfe8d2] text-[#1b6b2e] flex items-center justify-center text-[11px] font-bold">✓</span>
             Sua conta
@@ -575,21 +575,21 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
         </div>
 
         {/* Título centralizado — mais respiro e legibilidade */}
-        <div className="text-center w-full max-w-[980px] mx-auto pt-1 sm:pt-2 pb-1 mb-8 sm:mb-10">
-          <h1 className="text-[26px] sm:text-[32px] font-bold tracking-[-0.02em] text-[#0f1a2a] leading-tight sm:leading-none">
+        <div className="text-center w-full max-w-[1020px] mx-auto px-3 sm:px-6 pt-1 sm:pt-2 pb-1 mb-8 sm:mb-12">
+          <h1 className="text-[26px] sm:text-[34px] lg:text-[36px] font-bold tracking-[-0.02em] text-[#0f1a2a] leading-[1.2] sm:leading-[1.15]">
             Finalize a ativação do seu site
           </h1>
-          <p className="text-[13.5px] sm:text-[15px] leading-7 sm:leading-7 text-[#5a6b7a] mt-4 max-w-[560px] mx-auto px-2 sm:px-0">
+          <p className="text-[14px] sm:text-[15.5px] leading-relaxed text-[#5a6b7a] mt-4 max-w-[600px] mx-auto">
             Escolha a forma de pagamento e ative seu Site Profissional.
           </p>
         </div>
 
-        {/* Grid 2 colunas — exatamente checkout.png: 360px + flex, centralizado, com respiro mobile */}
-        <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-6 lg:gap-6 items-start w-full max-w-[980px] mx-auto px-1 sm:px-0">
+        {/* Grid 2 colunas — 380px + flex, centralizado, com respiro lateral no mobile */}
+        <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-6 lg:gap-8 items-start w-full max-w-[1020px] mx-auto">
           {/* ESQUERDA — Resumo do plano — mais respiro */}
-          <div className="w-full">
-            <div className="rounded-[16px] bg-white border border-[#e7ece8] shadow-[0_8px_24px_rgba(16,61,45,0.06)] overflow-hidden">
-              <div className="p-6 sm:p-7">
+          <div className="w-full px-1 sm:px-0">
+            <div className="rounded-[24px] bg-white/95 backdrop-blur border border-[#e7ece8] shadow-[0_16px_48px_rgba(16,61,45,0.09)] overflow-hidden">
+              <div className="p-6 sm:p-8 lg:p-9">
                 <h2 className="text-[15px] font-bold text-[#0f1a2a] leading-6">Resumo do plano</h2>
 
                 <div className="mt-7 flex gap-4">
@@ -656,8 +656,8 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
           </div>
 
           {/* DIREITA — Pagamento — mais respiro */}
-          <div className="w-full min-w-0 overflow-hidden">
-            <div className="rounded-[16px] bg-white border border-[#e7ece8] shadow-[0_8px_24px_rgba(16,61,45,0.06)] p-6 sm:p-7">
+          <div className="w-full min-w-0 overflow-hidden px-1 sm:px-0">
+            <div className="rounded-[24px] bg-white/95 backdrop-blur border border-[#e7ece8] shadow-[0_16px_48px_rgba(16,61,45,0.09)] p-6 sm:p-8 lg:p-9">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-[15px] font-bold text-[#0f1a2a] leading-6">Pagamento</h2>
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-white border border-[#e6ecef] px-3 py-1.5 shadow-[0_1px_4px_rgba(0,0,0,0.04)] shrink-0">
@@ -791,8 +791,8 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
           </div>
         </div>
 
-        {/* Benefícios — barra única branca exatamente como checkout.png — mais respiro e legibilidade */}
-        <div className="mt-8 w-full max-w-[980px] mx-auto rounded-[16px] bg-white border border-[#e7ece8] shadow-[0_4px_16px_rgba(0,0,0,0.04)] grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-[#eef2ee] overflow-hidden">
+        {/* Benefícios — barra única branca moderna — mais respiro e legibilidade */}
+        <div className="mt-8 sm:mt-10 w-full max-w-[1020px] mx-auto rounded-[20px] bg-white/95 backdrop-blur border border-[#e7ece8] shadow-[0_12px_32px_rgba(16,61,45,0.07)] grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-[#eef2ee] overflow-hidden px-1 sm:px-0">
           <div className="flex gap-3.5 items-center px-6 py-5">
             <span className="w-9 h-9 rounded-xl bg-[#eef6ee] border border-[#e2efe4] flex items-center justify-center text-[#103d2d] shrink-0">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M12 3v13M12 16l-4-4M12 16l4-4" strokeLinecap="round" strokeLinejoin="round" /><rect x="3" y="16" width="18" height="5" rx="1.4" /></svg>
@@ -828,10 +828,10 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
   // PAYMENT
   if (step === "payment") {
     return (
-      <div className="w-full max-w-[680px] mx-auto">
-        <div className="text-center mb-6 sm:mb-8 pt-2">
-          <h1 className="text-[22px] sm:text-[26px] font-bold text-[#0f1a2a] leading-tight">Finalize seu pagamento</h1>
-          <p className="text-sm text-[#6b7a89] mt-2 leading-5">Pague com PIX ou cartão sem sair do site. A ativação é automática após a confirmação.</p>
+      <div className="w-full max-w-[720px] mx-auto px-4 sm:px-6">
+        <div className="text-center mb-6 sm:mb-8 pt-2 px-2 sm:px-4">
+          <h1 className="text-[22px] sm:text-[28px] font-bold tracking-tight text-[#0f1a2a] leading-snug">Finalize seu pagamento</h1>
+          <p className="text-[14px] sm:text-[15px] text-[#6b7a89] mt-2.5 leading-relaxed">Pague com PIX ou cartão sem sair do site. A ativação é automática após a confirmação.</p>
         </div>
 
         <div className="rounded-[16px] border border-[#eef2ee] bg-white shadow-[0_6px_20px_rgba(0,0,0,0.04)] px-5 py-4 flex items-center justify-between gap-4 mb-5">
@@ -843,7 +843,7 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
         </div>
 
         {gateway === "stripe" && stripeClientSecret ? (
-          <div className="rounded-[20px] border border-[#eef2ee] bg-white p-6 sm:p-7 shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
+          <div className="rounded-[24px] border border-[#e7ece8] bg-white/95 p-6 sm:p-9 shadow-[0_16px_48px_rgba(16,61,45,0.08)]">
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-sm font-semibold text-[#0f1a2a] leading-5">Pagamento</h3>
               <span className="text-xs text-[#6b7a89]">Stripe • Seguro</span>
@@ -855,7 +855,7 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
             <p className="text-xs text-[#6b7a89] text-center mt-4 leading-4">Você permanece no site durante todo o processo.</p>
           </div>
         ) : gateway === "mercadopago" && (preferenceId || mpUrl) ? (
-          <div className="rounded-[20px] border border-[#eef2ee] bg-white p-6 sm:p-7 shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
+          <div className="rounded-[24px] border border-[#e7ece8] bg-white/95 p-6 sm:p-9 shadow-[0_16px_48px_rgba(16,61,45,0.08)]">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <h3 className="text-sm font-semibold text-[#0f1a2a] leading-5">Pagamento</h3>
@@ -941,13 +941,13 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
   // PIX — QR Code + copia e cola, tudo dentro do site
   if (step === "pix") {
     return (
-      <div className="w-full max-w-[560px] mx-auto">
-        <div className="text-center mb-6 sm:mb-8 pt-2">
-          <h1 className="text-[22px] sm:text-[26px] font-bold text-[#0f1a2a] leading-tight">Pague com PIX</h1>
-          <p className="text-sm text-[#6b7a89] mt-2 leading-5">Escaneie o QR Code ou use o código copia e cola. A confirmação é automática.</p>
+      <div className="w-full max-w-[600px] mx-auto px-4 sm:px-6">
+        <div className="text-center mb-6 sm:mb-8 pt-2 px-2">
+          <h1 className="text-[22px] sm:text-[28px] font-bold tracking-tight text-[#0f1a2a] leading-snug">Pague com PIX</h1>
+          <p className="text-[14px] sm:text-[15px] text-[#6b7a89] mt-2.5 leading-relaxed">Escaneie o QR Code ou use o código copia e cola. A confirmação é automática.</p>
         </div>
 
-        <div className="rounded-[20px] border border-[#eef2ee] bg-white p-6 sm:p-7 shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
+        <div className="rounded-[24px] border border-[#e7ece8] bg-white/95 p-6 sm:p-9 shadow-[0_16px_48px_rgba(16,61,45,0.08)]">
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-[10.5px] font-semibold tracking-[0.11em] uppercase text-[#8a9aa8]">Total no PIX</p>
@@ -1001,7 +1001,7 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
 
   if (step === "processing") {
     return (
-      <div className="max-w-[520px] mx-auto w-full text-center py-12">
+      <div className="max-w-[560px] mx-auto w-full px-5 sm:px-8 text-center py-12 sm:py-16">
         <div className="w-14 h-14 rounded-full border-4 border-[#e8efe8] border-t-[#103d2d] animate-spin mx-auto" />
         <h3 className="text-[18px] font-semibold text-[#0f1a2a] mt-5">Estamos processando seu pagamento...</h3>
         <p className="text-sm text-[#6b7a89] mt-2 leading-6">Não feche esta janela. Assim que o Mercado Pago confirmar, seu site será ativado automaticamente.</p>
@@ -1015,7 +1015,7 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
 
   if (step === "pending") {
     return (
-      <div className="max-w-[520px] mx-auto w-full text-center py-12">
+      <div className="max-w-[560px] mx-auto w-full px-5 sm:px-8 text-center py-12 sm:py-16">
         <div className="w-14 h-14 rounded-full bg-[#fffbeb] border border-[#fde68a] flex items-center justify-center mx-auto text-xl">⏳</div>
         <h3 className="text-[18px] font-semibold text-[#0f1a2a] mt-5">Pagamento pendente</h3>
         <p className="text-sm text-[#6b7a89] mt-2 leading-6">Assim que o pagamento for confirmado, seu site será ativado automaticamente.</p>
@@ -1033,7 +1033,7 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
 
   if (step === "error") {
     return (
-      <div className="max-w-[520px] mx-auto w-full text-center py-12">
+      <div className="max-w-[560px] mx-auto w-full px-5 sm:px-8 text-center py-12 sm:py-16">
         <div className="w-14 h-14 rounded-full bg-[#fef2f2] border border-[#fecaca] flex items-center justify-center mx-auto text-xl">✕</div>
         <h3 className="text-[18px] font-semibold text-[#0f1a2a] mt-5">Não foi possível concluir o pagamento.</h3>
         <p className="text-sm text-[#6b7a89] mt-2 leading-6">Verifique os dados ou escolha outra forma de pagamento.</p>
@@ -1052,7 +1052,7 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
 
   if (step === "success") {
     return (
-      <div className="max-w-[520px] mx-auto w-full text-center py-12">
+      <div className="max-w-[560px] mx-auto w-full px-5 sm:px-8 text-center py-12 sm:py-16">
         <div className="w-16 h-16 rounded-full bg-[#f0fdf4] border border-[#bbf7d0] flex items-center justify-center mx-auto text-2xl">🎉</div>
         <h3 className="text-[20px] font-semibold text-[#0f1a2a] mt-5">Pagamento confirmado!</h3>
         <p className="text-sm text-[#4a5a6a] mt-2">Seu site foi ativado com sucesso.</p>
