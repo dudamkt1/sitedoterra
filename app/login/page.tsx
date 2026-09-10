@@ -74,25 +74,55 @@ export default async function LoginPage() {
   const footerNavItems = homeNavItems.map((i) => ({ ...i, href: `/${i.href}` }));
 
   return (
-    <div id="tenant-site" data-slug={tenant.slug} className="min-h-screen flex flex-col">
-      <style dangerouslySetInnerHTML={{ __html: themeStyleTag(theme) }} />
-      {/* Garante contraste do NAV fixo sobre fundo claro (sem alterar componente) */}
-      <style dangerouslySetInnerHTML={{ __html: `#tenant-site nav:not(.scrolled){background:rgba(247,242,234,0.92);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid rgba(196,150,58,0.15);} #tenant-site nav:not(.scrolled) .nav-logo{color:var(--verde);} #tenant-site nav:not(.scrolled) .nav-links a{color:var(--cinza);} #tenant-site nav:not(.scrolled) .nav-links a:hover{color:var(--verde);} #tenant-site nav:not(.scrolled) .hamburger span{background:var(--verde);} #tenant-site nav:not(.scrolled) .nav-extra-link{color:var(--ouro);border-color:rgba(196,150,58,0.4);} ` }} />
-      <SiteEffects />
-      <Header logoText={logoText} logoUrl={logoUrl} logoLightUrl={logoLightUrl} navItems={navItems} extraNav={extraNav} />
-      {/* Isolado do NAV fixo (70px) + respiro — conteúdo nunca fica atrás do header */}
-      <main className="flex-1 bg-[#fcf9f5] pt-[70px]">
-        <div className="max-w-[1160px] mx-auto px-5 sm:px-6 lg:px-8 pt-10 sm:pt-14 pb-16 sm:pb-20 flex flex-col items-center">
-          <p className="text-center text-[24px] sm:text-[28px] font-semibold tracking-tight" style={{ fontFamily: "var(--font-display)", color: "var(--verde)" }}>
+    <div className="min-h-screen flex flex-col">
+      {/* Header sob #tenant-site (estilos do site). O <main> fica FORA de
+          #tenant-site de propósito: o reset global `#tenant-site *{margin:0;padding:0}`
+          tem especificidade de ID e anula os paddings/margins do Tailwind. */}
+      <div id="tenant-site" data-slug={tenant.slug}>
+        <style dangerouslySetInnerHTML={{ __html: themeStyleTag(theme) }} />
+        {/* Garante contraste do NAV fixo sobre fundo claro (sem alterar componente) */}
+        <style dangerouslySetInnerHTML={{ __html: `#tenant-site nav:not(.scrolled){background:rgba(247,242,234,0.92);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid rgba(196,150,58,0.15);} #tenant-site nav:not(.scrolled) .nav-logo{color:var(--verde);} #tenant-site nav:not(.scrolled) .nav-links a{color:var(--cinza);} #tenant-site nav:not(.scrolled) .nav-links a:hover{color:var(--verde);} #tenant-site nav:not(.scrolled) .hamburger span{background:var(--verde);} #tenant-site nav:not(.scrolled) .nav-extra-link{color:var(--ouro);border-color:rgba(196,150,58,0.4);} ` }} />
+        <SiteEffects />
+        <Header logoText={logoText} logoUrl={logoUrl} logoLightUrl={logoLightUrl} navItems={navItems} extraNav={extraNav} />
+      </div>
+      {/* Isolado do NAV fixo (70px) — fundo suave com profundidade, respiro generoso */}
+      <main className="flex-1 bg-gradient-to-b from-[#fcf9f5] via-[#f7f3ea] to-[#fcf9f5] pt-[70px] relative overflow-hidden">
+        {/* Detalhe decorativo sutil */}
+        <div aria-hidden className="pointer-events-none absolute inset-0">
+          <div className="absolute -top-24 left-1/2 h-72 w-[720px] -translate-x-1/2 rounded-full bg-[#1d5c3a]/[0.05] blur-3xl" />
+          <div className="absolute top-48 -left-24 h-64 w-64 rounded-full bg-[#c4963a]/[0.07] blur-3xl" />
+          <div className="absolute top-72 -right-24 h-64 w-64 rounded-full bg-[#1d5c3a]/[0.06] blur-3xl" />
+        </div>
+        <div className="relative max-w-[1160px] mx-auto px-4 sm:px-8 lg:px-10 pt-10 sm:pt-14 lg:pt-16 pb-16 sm:pb-24 flex flex-col items-center">
+          <p className="text-center text-[13px] sm:text-sm font-semibold uppercase tracking-[0.18em] text-[#1d5c3a]/70">
+            Acesso à conta
+          </p>
+          <p className="mt-3 text-center text-[26px] sm:text-[34px] font-bold tracking-tight text-[#0f1a2a] leading-[1.2] px-2" style={{ fontFamily: "var(--font-display)", color: "var(--verde)" }}>
             {logoText}
           </p>
-          <div className="mt-7 sm:mt-8 w-full max-w-[480px]">
+          <p className="mt-3 text-center text-[14px] sm:text-[15px] leading-relaxed text-[#5a6b7a] max-w-[520px] px-4 sm:px-6">
+            Gerencie seu site, assinatura e conteúdos em um só lugar.
+          </p>
+          <div className="mt-8 sm:mt-10 w-full max-w-[540px] px-1 sm:px-0">
             <Suspense fallback={<div className="py-12 text-center text-sm text-slate-500">Carregando...</div>}>
               <LoginForm />
             </Suspense>
           </div>
+          {/* Selos de confiança */}
+          <div className="mt-8 sm:mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-2.5 px-4 text-[12px] text-[#6b7a89]">
+            <span className="inline-flex items-center gap-1.5 leading-5">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#1d5c3a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
+              Ambiente seguro
+            </span>
+            <span className="hidden sm:inline w-1 h-1 rounded-full bg-[#cbd5d1]" aria-hidden />
+            <span className="leading-5">Seus dados protegidos com criptografia</span>
+            <span className="hidden sm:inline w-1 h-1 rounded-full bg-[#cbd5d1]" aria-hidden />
+            <span className="leading-5">Suporte via WhatsApp</span>
+          </div>
         </div>
       </main>
+      {/* Rodapé sob #tenant-site (estilos do site), bloco separado do header */}
+      <div id="tenant-site" data-slug={tenant.slug}>
       <Footer
         content={footerContent as never}
         navItems={footerNavItems}
@@ -101,6 +131,7 @@ export default async function LoginPage() {
         contactInstagram={instagram}
         profileName={profileName}
       />
+      </div>
     </div>
   );
 }

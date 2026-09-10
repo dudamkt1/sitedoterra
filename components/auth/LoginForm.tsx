@@ -125,21 +125,21 @@ export function LoginForm() {
   }
 
   return (
-    <div className="w-full">
+    <div className="w-full px-1 sm:px-2">
       {/* ============ CARD DE LOGIN ============ */}
-      <section aria-label="Entrar na conta" className="rounded-[24px] bg-white border border-[#e7ece8] shadow-[0_16px_48px_rgba(16,61,45,0.08)] p-7 sm:p-9">
+      <section aria-label="Entrar na conta" className="rounded-[24px] bg-white/95 backdrop-blur border border-[#e7ece8] shadow-[0_20px_56px_rgba(16,61,45,0.10)] p-6 sm:p-10">
         {!forgotMode ? (
           <>
-            <header className="text-center">
-              <h1 className="text-[26px] sm:text-[28px] font-bold tracking-tight text-[#0f1a2a] leading-tight">
+            <header className="text-center px-1 sm:px-3">
+              <h1 className="text-[24px] sm:text-[28px] font-bold tracking-tight text-[#0f1a2a] leading-snug">
                 Bem-vindo(a)!
               </h1>
-              <p className="text-[14px] leading-6 text-[#6b7a89] mt-2.5">
+              <p className="text-[14px] sm:text-[14.5px] leading-relaxed text-[#6b7a89] mt-2.5 max-w-[380px] mx-auto">
                 Entre na sua conta para acessar seu painel.
               </p>
             </header>
 
-            <form onSubmit={handleSubmit} className="mt-8 space-y-5" noValidate={false}>
+            <form onSubmit={handleSubmit} className="mt-8 sm:mt-9 space-y-5 sm:space-y-6" noValidate={false}>
               <div>
                 <label className="block text-[13px] font-semibold text-[#0f1a2a] mb-2" htmlFor="email">
                   E-mail
@@ -223,8 +223,8 @@ export function LoginForm() {
               </button>
             </form>
 
-            <div className="mt-7 pt-6 border-t border-[#eef2ee] text-center">
-              <p className="text-[13.5px] text-[#6b7a89] leading-5">Ainda não possui uma conta?</p>
+            <div className="mt-8 pt-6 sm:pt-7 border-t border-[#eef2ee] text-center px-1">
+              <p className="text-[13.5px] sm:text-[14px] text-[#6b7a89] leading-relaxed">Ainda não possui uma conta?</p>
               <Link
                 href="/cadastro"
                 className="mt-3 flex items-center justify-center w-full h-[50px] rounded-xl border-[1.5px] border-[#dbe3db] bg-white px-6 text-[14.5px] font-bold text-[#1d5c3a] hover:border-[#1d5c3a] hover:bg-[#f2f8f3] active:bg-[#e9f2ea] transition"
@@ -235,16 +235,16 @@ export function LoginForm() {
           </>
         ) : (
           <>
-            <header className="text-center">
-              <h1 className="text-[24px] sm:text-[26px] font-bold tracking-tight text-[#0f1a2a] leading-tight">
+            <header className="text-center px-1 sm:px-3">
+              <h1 className="text-[24px] sm:text-[27px] font-bold tracking-tight text-[#0f1a2a] leading-snug">
                 Recuperar senha
               </h1>
-              <p className="text-[14px] leading-6 text-[#6b7a89] mt-2.5">
+              <p className="text-[14px] sm:text-[14.5px] leading-relaxed text-[#6b7a89] mt-2.5 max-w-[380px] mx-auto">
                 Informe seu e-mail e enviaremos um link para criar uma nova senha.
               </p>
             </header>
 
-            <form onSubmit={handleForgot} className="mt-8 space-y-5">
+            <form onSubmit={handleForgot} className="mt-8 sm:mt-9 space-y-5 sm:space-y-6">
               <div>
                 <label className="block text-[13px] font-semibold text-[#0f1a2a] mb-2" htmlFor="forgot-email">
                   E-mail cadastrado
@@ -311,18 +311,18 @@ export function LoginForm() {
       </section>
 
       {/* ============ CARD DEMONSTRAÇÃO ============ */}
-      <section aria-label="Experimente a demonstração" className="mt-6 rounded-[24px] border border-[#cfe6d4] bg-gradient-to-br from-[#eef7ef] via-[#f7fbf4] to-white shadow-[0_12px_36px_rgba(29,92,58,0.10)] p-7 sm:p-8">
+      <section aria-label="Experimente a demonstração" className="mt-6 sm:mt-8 rounded-[24px] border border-[#cfe6d4] bg-gradient-to-br from-[#eef7ef] via-[#f7fbf4] to-white shadow-[0_16px_44px_rgba(29,92,58,0.12)] p-6 sm:p-9">
         <span className="inline-flex items-center rounded-full bg-[#1d5c3a] px-3 py-1 text-[10.5px] font-bold uppercase tracking-[0.12em] text-white">
           Acesso rápido • Sem cadastro
         </span>
-        <h2 className="mt-3.5 text-[20px] sm:text-[21px] font-bold tracking-tight text-[#0f1a2a] leading-snug">
+        <h2 className="mt-4 text-[20px] sm:text-[22px] font-bold tracking-tight text-[#0f1a2a] leading-snug">
           ⚡ Experimente antes de começar
         </h2>
-        <p className="mt-2 text-[13.5px] leading-6 text-[#4b5a48]">
+        <p className="mt-2.5 text-[13.5px] sm:text-[14px] leading-relaxed text-[#4b5a48]">
           Acesse a demonstração e explore tudo o que você poderá ter no seu próprio site.
         </p>
 
-        <ul className="mt-5 space-y-2.5">
+        <ul className="mt-5 sm:mt-6 space-y-3">
           {[
             "Explore o painel completo",
             "Teste ferramentas e recursos",
@@ -330,7 +330,7 @@ export function LoginForm() {
             "Alterações ficam somente neste dispositivo",
             "Nada é alterado em sites reais",
           ].map((item) => (
-            <li key={item} className="flex items-start gap-2.5 text-[13.5px] leading-5 text-[#334155]">
+            <li key={item} className="flex items-start gap-2.5 text-[13.5px] sm:text-[14px] leading-relaxed text-[#334155]">
               <span aria-hidden className="mt-[1px] flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#1d5c3a]/10">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#1d5c3a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M20 6 9 17l-5-5" />
@@ -345,7 +345,7 @@ export function LoginForm() {
           type="button"
           onClick={startDemo}
           disabled={demoStarting || loading}
-          className="mt-6 flex items-center justify-center gap-2 w-full h-[52px] rounded-xl bg-[#1d5c3a] px-6 text-[15px] font-bold text-white shadow-[0_10px_28px_rgba(29,92,58,0.28)] hover:bg-[#154730] active:bg-[#103d2d] transition disabled:opacity-70 disabled:cursor-not-allowed disabled:shadow-none"
+          className="mt-6 sm:mt-7 flex items-center justify-center gap-2 w-full h-[52px] rounded-xl bg-[#1d5c3a] px-6 text-[15px] font-bold text-white shadow-[0_10px_28px_rgba(29,92,58,0.28)] hover:bg-[#154730] active:bg-[#103d2d] transition disabled:opacity-70 disabled:cursor-not-allowed disabled:shadow-none"
         >
           {demoStarting ? (
             <>
@@ -356,7 +356,7 @@ export function LoginForm() {
             "⚡ Entrar na demonstração"
           )}
         </button>
-        <p className="mt-3.5 text-center text-[11.5px] leading-4 text-[#8a9aa8]">
+        <p className="mt-4 text-center text-[11.5px] sm:text-[12px] leading-relaxed text-[#8a9aa8]">
           Área de testes • sem cadastro
         </p>
       </section>
