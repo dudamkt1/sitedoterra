@@ -83,6 +83,8 @@ export async function POST(request: Request) {
       activationAmountCents: plan.activation_price_cents,
       planName: plan.name,
       visitorToken,
+      // Config oficial: desconto aplicado SOMENTE se o método efetivo for pix.
+      pixDiscountPercent: gateways.mercadopago.pixDiscountPercent,
       formData,
     });
     return NextResponse.json({

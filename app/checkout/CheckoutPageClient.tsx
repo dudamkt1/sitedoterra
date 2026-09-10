@@ -132,6 +132,8 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
   const [step, setStep] = useState<Step>("identify");
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  /** Método escolhido pelo cliente na tela de resumo ("pix" | "card"). */
+  const [payMethod, setPayMethod] = useState<"pix" | "card" | null>(null);
   const [stripeClientSecret, setStripeClientSecret] = useState<string | null>(null);
   const [mpUrl, setMpUrl] = useState<string | null>(null);
   const [preferenceId, setPreferenceId] = useState<string | null>(null);
@@ -248,7 +250,7 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
     setAuthLoading(false);
   }
 
-  async function startCheckout() {
+  async function startCheckout(method?: "pix" | "card") {
     if (checkoutLoading || checkoutGuardRef.current) return;
     checkoutGuardRef.current = true;
     setCheckoutLoading(true);
@@ -259,11 +261,14 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
     setBrickFailed(false);
     setPix(null);
     setCopiedPix(false);
+    // Método efetivo para alinhar a preferência (fallback) e o Brick.
+    const effectiveMethod = method ?? payMethod ?? (mpPixDiscount > 0 ? "pix" : "card");
+    if (method) setPayMethod(method);
     try {
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planId, embedded: true }),
+        body: JSON.stringify({ planId, embedded: true, payMethod: effectiveMethod }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -400,10 +405,13 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
   const mpInstallmentsWithoutInterest = gatewayInfo?.mercadopago?.installmentsWithoutInterest !== false;
   const pixCents = pixCentsFrom(activationCents, mpPixDiscount);
   const installmentLabel = installmentText(activationCents, mpInstallments, mpInstallmentsWithoutInterest);
-  const hasMpConditions = gateway === "mercadopago" && (mpPixDiscount > 0 || mpInstallments > 0);
+  // Método efetivo: escolha do cliente; padrão = PIX quando há desconto, senão cartão.
+  const selectedMethod: "pix" | "card" = payMethod ?? (mpPixDiscount > 0 ? "pix" : "card");
+  const selectedTotalCents = selectedMethod === "pix" ? pixCents : activationCents;
+  const cardPerInstallment = mpInstallments > 0 ? brl(Math.round(activationCents / mpInstallments)) : null;
   const gatewayLabel = gateway === "mercadopago" ? "Mercado Pago" : "Stripe";
   const mpPublicKey = gatewayInfo?.mercadopago?.publicKey || null;
-  const brickAmount = Math.round(activationCents) / 100;
+  const brickAmount = Math.round(selectedTotalCents) / 100;
   const brickMaxInstallments = mpInstallments > 0 ? mpInstallments : 1;
   const canUseBrick = gateway === "mercadopago" && !!mpPublicKey && !brickFailed;
   const gatewaySecureText =
@@ -681,76 +689,96 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
                 {gateway === "mercadopago" ? "Escolha sua forma de pagamento abaixo." : "Pagamento com cartão via Stripe — seguro e sem sair do site."}
               </p>
 
-              {/* Selector — borda verde exata da referência — conteúdo dinâmico */}
-              <div className="mt-6 rounded-[12px] border-[1.5px] border-[#a7d0b4] bg-[#fbfdfb] px-4 py-4 flex items-center gap-3.5">
-                <span className="w-[20px] h-[20px] rounded-full border-[5px] border-[#103d2d] bg-white flex items-center justify-center shrink-0" />
-                <span className="w-8 h-8 rounded-[9px] bg-[#eef6ee] border border-[#e2efe4] flex items-center justify-center shrink-0">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#103d2d" strokeWidth="1.5"><rect x="2.5" y="5.5" width="19" height="13" rx="1.8" /><path d="M2.5 9.2H21.5" /></svg>
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[13px] font-semibold text-[#0f1a2a] leading-6">
-                    {gateway === "mercadopago" ? "PIX e cartão — sem sair do site" : "Cartão de crédito — sem sair do site"}
-                  </p>
-                  <p className="text-[12px] text-[#64748b] leading-5">
-                    {gateway === "mercadopago"
-                      ? hasMpConditions
-                        ? `${mpInstallments > 0 ? installmentLabel : "Cartão disponível"}${mpInstallments > 0 && mpPixDiscount > 0 ? " • " : ""}${mpPixDiscount > 0 ? `PIX ${mpPixDiscount}% OFF` : "PIX em segundos"}`
-                        : "Aprovação em segundos via PIX"
-                      : "Processamento instantâneo e seguro"}
-                  </p>
-                </div>
-                <span className="hidden sm:inline-flex items-center rounded-full bg-[#eaf6ec] border border-[#cfe8d2] px-2.5 py-1 text-[11px] font-bold text-[#1b6b2e] whitespace-nowrap tracking-tight leading-4">100% seguro</span>
-              </div>
-
-              {/* Condições dinâmicas reais do Mercado Pago — só aparecem quando configuradas */}
-              {gateway === "mercadopago" && hasMpConditions && (
-                <div className="mt-4 rounded-[12px] border border-[#e7ece8] bg-[#fafdfb] overflow-hidden divide-y divide-[#eef2ee]">
-                  {mpInstallments > 0 && (
-                    <div className="flex items-center justify-between gap-3 px-4 py-3.5">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <span className="w-8 h-8 rounded-[9px] bg-white border border-[#e2efe4] flex items-center justify-center shrink-0 text-[13px]">💳</span>
-                        <div className="min-w-0">
-                          <p className="text-[13px] font-semibold text-[#0f1a2a] leading-5">Cartão de crédito</p>
-                          <p className="text-[12px] text-[#64748b] leading-4">
-                            Até <b className="text-[#0f1a2a]">{mpInstallments}x {mpInstallmentsWithoutInterest ? "sem juros" : "com juros"}</b>
-                          </p>
-                        </div>
-                      </div>
-                      <span className="text-[12.5px] font-bold text-[#13402e] shrink-0 text-right leading-5">
-                        {mpInstallments}x de {brl(Math.round(activationCents / mpInstallments))} {mpInstallmentsWithoutInterest ? "s/ juros" : ""}
-                      </span>
-                    </div>
-                  )}
-                  {mpPixDiscount > 0 && (
-                    <div className="flex items-center justify-between gap-3 px-4 py-3.5 bg-[#f0fdf4]/40">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <span className="w-8 h-8 rounded-[9px] bg-[#eef6ee] border border-[#cfe8d2] flex items-center justify-center shrink-0">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="1.7"><path d="M12 2.8l6.8 3.4v6.3c0 3.2-1.9 5.9-6.8 7.7C7.1 18.4 5.2 15.7 5.2 12.5V6.2L12 2.8Z" /><path d="M8.5 12.2l2.2 2.2 4.3-4.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              {/* Escolha do método — o cliente decide e o MP finaliza com a opção desejada */}
+              {gateway === "mercadopago" ? (
+                <div className="mt-6">
+                  <p className="text-[13px] font-semibold text-[#0f1a2a] leading-6 mb-3 px-1">Como você quer pagar?</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" role="radiogroup" aria-label="Forma de pagamento">
+                    {/* PIX */}
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={selectedMethod === "pix"}
+                      onClick={() => setPayMethod("pix")}
+                      className={`relative rounded-[14px] border-[1.5px] px-4 py-4 flex items-center gap-3 text-left transition-all ${
+                        selectedMethod === "pix"
+                          ? "border-[#16a34a] bg-[#f0fdf4] shadow-[0_6px_18px_rgba(22,163,74,0.12)]"
+                          : "border-[#e2e8e4] bg-white hover:border-[#a7d0b4] hover:bg-[#fbfdfb]"
+                      }`}
+                    >
+                      {mpPixDiscount > 0 && (
+                        <span className="absolute -top-2.5 left-3 inline-flex items-center rounded-full bg-[#16a34a] px-2.5 py-0.5 text-[10px] font-extrabold tracking-wide uppercase text-white leading-4">
+                          {mpPixDiscount}% OFF
                         </span>
-                        <div className="min-w-0">
-                          <p className="text-[13px] font-semibold text-[#0f1a2a] leading-5">PIX</p>
-                          <p className="text-[12px] font-semibold text-[#16a34a] leading-4">{mpPixDiscount}% de desconto</p>
-                        </div>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className="text-[13px] font-extrabold text-[#16a34a] leading-5">{brl(pixCents)}</p>
-                        <p className="text-[11px] text-[#64748b] line-through leading-4">{brl(activationCents)}</p>
-                      </div>
-                    </div>
-                  )}
+                      )}
+                      <span className={`w-[20px] h-[20px] rounded-full flex items-center justify-center shrink-0 transition-all ${selectedMethod === "pix" ? "border-[6px] border-[#16a34a] bg-white" : "border-2 border-[#cbd5d1] bg-white"}`} />
+                      <span className="w-9 h-9 rounded-[10px] bg-[#eef6ee] border border-[#cfe8d2] flex items-center justify-center shrink-0 text-[16px]" aria-hidden>⚡</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[13.5px] font-bold text-[#0f1a2a] leading-5">PIX</span>
+                        <span className="block text-[12px] text-[#64748b] leading-5 mt-0.5">Aprovação em segundos</span>
+                        <span className="block mt-1 leading-5">
+                          <span className="text-[14px] font-extrabold text-[#16a34a]">{brl(pixCents)}</span>
+                          {mpPixDiscount > 0 && <span className="text-[11.5px] text-[#8a9aa8] line-through ml-1.5">{brl(activationCents)}</span>}
+                        </span>
+                      </span>
+                    </button>
+                    {/* CARTÃO */}
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={selectedMethod === "card"}
+                      onClick={() => setPayMethod("card")}
+                      className={`relative rounded-[14px] border-[1.5px] px-4 py-4 flex items-center gap-3 text-left transition-all ${
+                        selectedMethod === "card"
+                          ? "border-[#103d2d] bg-[#f4f8f5] shadow-[0_6px_18px_rgba(16,61,45,0.12)]"
+                          : "border-[#e2e8e4] bg-white hover:border-[#a7d0b4] hover:bg-[#fbfdfb]"
+                      }`}
+                    >
+                      {mpInstallments > 0 && mpInstallmentsWithoutInterest && (
+                        <span className="absolute -top-2.5 left-3 inline-flex items-center rounded-full bg-[#103d2d] px-2.5 py-0.5 text-[10px] font-extrabold tracking-wide uppercase text-white leading-4">
+                          sem juros
+                        </span>
+                      )}
+                      <span className={`w-[20px] h-[20px] rounded-full flex items-center justify-center shrink-0 transition-all ${selectedMethod === "card" ? "border-[6px] border-[#103d2d] bg-white" : "border-2 border-[#cbd5d1] bg-white"}`} />
+                      <span className="w-9 h-9 rounded-[10px] bg-[#eef6ee] border border-[#e2efe4] flex items-center justify-center shrink-0">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#103d2d" strokeWidth="1.5"><rect x="2.5" y="5.5" width="19" height="13" rx="1.8" /><path d="M2.5 9.2H21.5" /></svg>
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[13.5px] font-bold text-[#0f1a2a] leading-5">Cartão de crédito</span>
+                        <span className="block text-[12px] text-[#64748b] leading-5 mt-0.5">
+                          {mpInstallments > 0 ? <>em até <b className="text-[#0f1a2a]">{mpInstallments}x {mpInstallmentsWithoutInterest ? "sem juros" : ""}</b></> : "à vista, sem sair do site"}
+                        </span>
+                        <span className="block mt-1 leading-5">
+                          <span className="text-[14px] font-extrabold text-[#0f1a2a]">{brl(activationCents)}</span>
+                          {cardPerInstallment && <span className="block text-[11.5px] font-semibold text-[#1a6b4a]">{mpInstallments}x de {cardPerInstallment}{mpInstallmentsWithoutInterest ? " s/ juros" : ""}</span>}
+                        </span>
+                      </span>
+                    </button>
+                  </div>
+                  <p className="mt-3 flex items-center justify-center gap-1.5 text-[11.5px] text-[#6b7a89] leading-5 px-1">
+                    <span className="inline-flex items-center rounded-full bg-[#eaf6ec] border border-[#cfe8d2] px-2 py-0.5 text-[10.5px] font-bold text-[#1b6b2e] whitespace-nowrap leading-4">100% seguro</span>
+                    via Mercado Pago, sem sair do site
+                  </p>
                 </div>
-              )}
-              {gateway === "mercadopago" && !hasMpConditions && (
-                <p className="mt-3 text-[11.5px] text-[#6b7a89] leading-5 px-1">
-                  PIX copia e cola e cartão disponíveis após clicar em pagar. Condições de parcelamento e desconto no PIX são configuradas pelo admin.
-                </p>
+              ) : (
+                <div className="mt-6 rounded-[12px] border-[1.5px] border-[#a7d0b4] bg-[#fbfdfb] px-4 py-4 flex items-center gap-3.5">
+                  <span className="w-[20px] h-[20px] rounded-full border-[5px] border-[#103d2d] bg-white flex items-center justify-center shrink-0" />
+                  <span className="w-8 h-8 rounded-[9px] bg-[#eef6ee] border border-[#e2efe4] flex items-center justify-center shrink-0">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#103d2d" strokeWidth="1.5"><rect x="2.5" y="5.5" width="19" height="13" rx="1.8" /><path d="M2.5 9.2H21.5" /></svg>
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13px] font-semibold text-[#0f1a2a] leading-6">Cartão de crédito — sem sair do site</p>
+                    <p className="text-[12px] text-[#64748b] leading-5">Processamento instantâneo e seguro</p>
+                  </div>
+                  <span className="hidden sm:inline-flex items-center rounded-full bg-[#eaf6ec] border border-[#cfe8d2] px-2.5 py-1 text-[11px] font-bold text-[#1b6b2e] whitespace-nowrap tracking-tight leading-4">100% seguro</span>
+                </div>
               )}
 
               {checkoutError && <p className="mt-5 rounded-xl bg-[#fef2f2] border border-[#fde4e4] px-4 py-3 text-sm leading-6 text-[#991b1b]">{checkoutError}</p>}
 
               <button
                 type="button"
-                onClick={startCheckout}
+                onClick={() => startCheckout(selectedMethod)}
                 disabled={checkoutLoading}
                 className="mt-6 w-full rounded-[12px] bg-[#0f3d2d] hover:bg-[#0c3326] active:bg-[#0a2e22] px-6 py-4 text-center shadow-[0_6px_18px_rgba(15,61,45,0.2)] hover:shadow-[0_8px_22px_rgba(15,61,45,0.24)] transition-all disabled:opacity-60 disabled:cursor-not-allowed disabled:shadow-none"
               >
@@ -759,7 +787,17 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
                   {checkoutLoading ? "Processando pagamento..." : "🔒 Pagar e ativar meu site"}
                 </span>
                 <span className="block text-[12px] font-medium text-white/80 mt-1.5 leading-5">
-                  {checkoutLoading ? "Aguarde um instante" : mpPixDiscount > 0 ? `PIX ${brl(pixCents)} com ${mpPixDiscount}% OFF ou ${brl(activationCents)} no cartão` : `Pagamento único de ${brl(activationCents)} hoje`}
+                  {checkoutLoading
+                    ? "Aguarde um instante"
+                    : gateway === "mercadopago"
+                      ? selectedMethod === "pix"
+                        ? mpPixDiscount > 0
+                          ? `PIX ${brl(pixCents)} com ${mpPixDiscount}% OFF hoje`
+                          : `PIX ${brl(pixCents)} hoje • aprovação imediata`
+                        : installmentLabel
+                          ? `Cartão ${installmentLabel} • total ${brl(activationCents)} hoje`
+                          : `Cartão ${brl(activationCents)} hoje`
+                      : `Pagamento único de ${brl(activationCents)} hoje`}
                 </span>
               </button>
 
@@ -837,9 +875,25 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
         <div className="rounded-[16px] border border-[#eef2ee] bg-white shadow-[0_6px_20px_rgba(0,0,0,0.04)] px-5 py-4 flex items-center justify-between gap-4 mb-5">
           <div>
             <p className="text-[10.5px] font-semibold tracking-[0.11em] uppercase text-[#8a9aa8]">Total hoje</p>
-            <p className="text-[18px] font-bold text-[#103d2d] leading-none mt-1.5">{brl(activationCents)}</p>
+            <p className="text-[18px] font-bold text-[#103d2d] leading-none mt-1.5">
+              {gateway === "mercadopago" ? brl(selectedTotalCents) : brl(activationCents)}
+            </p>
+            {gateway === "mercadopago" && (
+              <p className="text-[11.5px] font-semibold text-[#1a6b4a] mt-1.5 leading-4">
+                {selectedMethod === "pix"
+                  ? mpPixDiscount > 0 ? `PIX com ${mpPixDiscount}% OFF` : "PIX • aprovação imediata"
+                  : installmentLabel ? `Cartão • ${installmentLabel}` : "Cartão de crédito"}
+              </p>
+            )}
           </div>
-          <p className="text-xs text-[#6b7a89] text-right leading-5">{planName}<br />{brl(monthlyCents)}/mês após {trialMonths}m</p>
+          <div className="text-right shrink-0">
+            <p className="text-xs text-[#6b7a89] text-right leading-5">{planName}<br />{brl(monthlyCents)}/mês após {trialMonths}m</p>
+            {gateway === "mercadopago" && (
+              <button type="button" onClick={() => setStep("checkout")} className="mt-1.5 text-[11.5px] font-semibold text-[#1a6b4a] hover:text-[#103d2d] hover:underline leading-4">
+                trocar método
+              </button>
+            )}
+          </div>
         </div>
 
         {gateway === "stripe" && stripeClientSecret ? (
@@ -860,7 +914,11 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
               <div>
                 <h3 className="text-sm font-semibold text-[#0f1a2a] leading-5">Pagamento</h3>
                 <p className="text-sm text-[#6b7a89] mt-1 leading-5">
-                  {canUseBrick ? "Preencha abaixo sem sair do site. A confirmação é automática." : "Conclua o pagamento com segurança."}
+                  {canUseBrick
+                    ? selectedMethod === "pix"
+                      ? `Você escolheu PIX${mpPixDiscount > 0 ? ` com ${mpPixDiscount}% OFF (${brl(selectedTotalCents)})` : ` (${brl(selectedTotalCents)})`}. Conclua abaixo — a confirmação é automática.`
+                      : `Você escolheu cartão${installmentLabel ? ` (${installmentLabel})` : ""}. Preencha abaixo sem sair do site.`
+                    : "Conclua o pagamento com segurança."}
                 </p>
               </div>
               <span className="shrink-0 inline-flex items-center rounded-full bg-[#009ee3]/10 border border-[#009ee3]/15 px-3 py-1.5 text-xs font-semibold text-[#009ee3]">Mercado Pago</span>
@@ -869,6 +927,7 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
             {canUseBrick ? (
               <div className="mt-6">
                 <MercadoPagoBrick
+                  key={`${selectedMethod}-${brickAmount}-${brickMaxInstallments}`}
                   publicKey={mpPublicKey!}
                   preferenceId={preferenceId}
                   amount={brickAmount}
@@ -894,7 +953,9 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
                 <div className="mt-6 rounded-xl border border-[#e6ecef] bg-[#f8faf8] p-5 sm:p-6 text-center">
                   <p className="text-sm font-semibold text-[#0f1a2a] leading-6">Pagamento em ambiente seguro do Mercado Pago</p>
                   <p className="text-[13px] text-[#64748b] mt-1.5 leading-5">
-                    {brl(activationCents)} {mpPixDiscount > 0 ? `(ou ${brl(pixCents)} no PIX)` : ""} • Após a confirmação, voltamos para ativar seu site automaticamente.
+                    {selectedMethod === "pix"
+                      ? `${brl(selectedTotalCents)} no PIX${mpPixDiscount > 0 ? ` (${mpPixDiscount}% OFF aplicado)` : ""}`
+                      : `${brl(selectedTotalCents)} no cartão${installmentLabel ? ` (${installmentLabel})` : ""}`} • Após a confirmação, voltamos para ativar seu site automaticamente.
                   </p>
                   {mpUrl ? (
                     <a

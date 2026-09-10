@@ -32,6 +32,11 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const planId = body.planId as string | undefined;
   const embedded = Boolean(body.embedded);
+  // Método escolhido pelo cliente na tela de pagamento ("pix" | "card").
+  // Usado SOMENTE para alinhar o valor da preferência no fluxo fallback
+  // (nova aba). No Brick, o valor é decidido em /mp/process pelo método
+  // efetivo — o frontend nunca é fonte de verdade.
+  const payMethod = body.payMethod === "pix" ? "pix" : "card";
   // Destino pós-pagamento (whitelist interna — evita open redirect).
   const rawSuccessPath = typeof body.successPath === "string" ? body.successPath : "";
   const successPath = /^\/painel\/meu-site(\?.*)?$/.test(rawSuccessPath)
@@ -74,12 +79,18 @@ export async function POST(request: Request) {
         { status: 503 }
       );
     }
+    const pixDiscount = Math.min(50, Math.max(0, Number(gateways.mercadopago.pixDiscountPercent) || 0));
+    // Se o cliente escolheu PIX, a preferência já sai com o valor descontado.
+    const preferenceAmountCents =
+      payMethod === "pix" && pixDiscount > 0
+        ? Math.round((plan.activation_price_cents * (100 - pixDiscount)) / 100)
+        : plan.activation_price_cents;
     const preference = await createActivationPreference({
       tenantId: tenant.id,
       planId: plan.id,
       email: profile.email,
       name: profile.name,
-      activationAmountCents: plan.activation_price_cents,
+      activationAmountCents: preferenceAmountCents,
       planName: plan.name,
       visitorToken,
       successPath,

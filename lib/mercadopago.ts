@@ -198,6 +198,9 @@ export interface BrickPaymentInput {
   activationAmountCents: number;
   planName: string;
   visitorToken?: string | null;
+  /** Desconto oficial do PIX (%) vindo de resolveGateways(). Aplicado SOMENTE
+   *  quando o método efetivo for pix — o frontend nunca define o valor. */
+  pixDiscountPercent?: number | null;
   formData: BrickFormData;
 }
 
@@ -212,8 +215,8 @@ export interface BrickPaymentInput {
  * webhook (fonte de verdade), nunca pelo retorno do frontend.
  */
 export async function processBrickPayment(input: BrickPaymentInput): Promise<MpPayment> {
-  const amount = Math.round(input.activationAmountCents) / 100;
-  if (!Number.isFinite(amount) || amount <= 0) throw new Error("Valor de ativação inválido");
+  const fullAmount = Math.round(input.activationAmountCents) / 100;
+  if (!Number.isFinite(fullAmount) || fullAmount <= 0) throw new Error("Valor de ativação inválido");
 
   const fd = input.formData || {};
   const methodId =
@@ -222,6 +225,13 @@ export async function processBrickPayment(input: BrickPaymentInput): Promise<MpP
       : null;
   if (!methodId) throw new Error("Método de pagamento não informado");
   const isPix = methodId === "pix";
+
+  // Desconto do PIX aplicado no SERVIDOR a partir da config oficial —
+  // o cliente escolhe o método, mas nunca o valor cobrado.
+  const pixDiscount = Math.min(50, Math.max(0, Number(input.pixDiscountPercent) || 0));
+  const amount = isPix && pixDiscount > 0
+    ? Math.round(fullAmount * (100 - pixDiscount)) / 100
+    : fullAmount;
 
   const token = typeof fd.token === "string" && fd.token.trim() ? fd.token.trim() : null;
   if (!isPix && !token) throw new Error("Token do cartão não gerado. Tente novamente.");

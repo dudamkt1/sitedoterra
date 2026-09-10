@@ -82,10 +82,18 @@ export async function resolveGateways(): Promise<ResolvedGateways> {
     process.env.MERCADOPAGO_PUBLIC_KEY ||
     null;
 
+  // Condições comerciais do Mercado Pago.
+  // NULL (nunca configurado no admin e sem env) → oferta padrão da casa:
+  // 5% OFF no PIX e até 3x sem juros no cartão. Zero EXPLÍCITO (0 salvo no
+  // admin) continua significando "desativado" — o admin mantém o controle.
   const rawPix = (row as unknown as Record<string, unknown>)?.mercadopago_pix_discount_percent;
-  const pixDiscount = rawPix != null ? Math.min(50, Math.max(0, Number(rawPix) || 0)) : Number(process.env.MERCADOPAGO_PIX_DISCOUNT_PERCENT || 0) || 0;
+  const pixDiscount = rawPix != null
+    ? Math.min(50, Math.max(0, Number(rawPix) || 0))
+    : Math.min(50, Math.max(0, Number(process.env.MERCADOPAGO_PIX_DISCOUNT_PERCENT || 5) || 0));
   const rawInst = (row as unknown as Record<string, unknown>)?.mercadopago_installments;
-  const installments = rawInst != null ? Math.min(12, Math.max(0, Math.round(Number(rawInst) || 0))) : Math.round(Number(process.env.MERCADOPAGO_INSTALLMENTS || 0) || 0);
+  const installments = rawInst != null
+    ? Math.min(12, Math.max(0, Math.round(Number(rawInst) || 0)))
+    : Math.min(12, Math.max(0, Math.round(Number(process.env.MERCADOPAGO_INSTALLMENTS || 3) || 0)));
   const rawInstWo = (row as unknown as Record<string, unknown>)?.mercadopago_installments_without_interest;
   const installmentsWithoutInterest = typeof rawInstWo === "boolean" ? rawInstWo : (process.env.MERCADOPAGO_INSTALLMENTS_WITHOUT_INTEREST ?? "true") !== "false";
 
