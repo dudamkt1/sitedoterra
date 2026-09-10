@@ -15,6 +15,6 @@ select
   false,
   125,
   '{"showInNav": false}'::jsonb,
-  '{"eyebrow": "Ganhe indicando", "title": "Indique. Sua colega ativa. Você recebe.", "subtitle": "Transforme sua rede de consultoras em renda extra.", "buttonText": "Saiba como funciona", "buttonUrl": "/afiliados"}'::jsonb,
+  '{"eyebrow": "Ganhe indicando", "title": "Indique. Seu colega ativa. Você recebe.", "subtitle": "Transforme sua rede de consultores em renda extra.", "buttonText": "Saiba como funciona", "buttonUrl": "/afiliados"}'::jsonb,
   '{"can_edit": true, "can_toggle": true, "can_edit_image": false, "can_edit_video": false, "can_edit_button": true, "can_edit_colors": true, "can_edit_layout": true, "available_to_all": true}'::jsonb
 where not exists (select 1 from public.site_sections where type = 'affiliates');

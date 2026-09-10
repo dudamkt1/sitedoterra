@@ -348,8 +348,8 @@ export const DEFAULT_SECTION_CONTENT: Record<SectionType, Record<string, unknown
   },
   affiliates: {
     eyebrow: "Ganhe indicando",
-    title: "Indique. Sua colega ativa. Você recebe.",
-    subtitle: "Transforme sua rede de consultoras em renda extra.",
+    title: "Indique. Seu colega ativa. Você recebe.",
+    subtitle: "Transforme sua rede de consultores em renda extra.",
     buttonText: "Saiba como funciona",
     buttonUrl: "/afiliados",
   },

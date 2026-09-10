@@ -26,7 +26,7 @@ export function AffiliatesCalculator({ commissionPercent, activationPriceCents }
         Calculadora de ganhos
       </p>
       <label htmlFor="aff-indicacoes" className="mt-4 flex items-center justify-between gap-4 text-[14px] sm:text-[15px] font-semibold text-[#0f1a2a] leading-relaxed">
-        <span>Quantas consultoras você indica por mês?</span>
+        <span>Quantos consultores você indica por mês?</span>
         <span className="shrink-0 inline-flex items-center justify-center min-w-[52px] h-[38px] px-3 rounded-xl bg-[#eef6ee] border border-[#cfe6d4] text-[16px] font-extrabold text-[#1d5c3a]">
           {count}
         </span>

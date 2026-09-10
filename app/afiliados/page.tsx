@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Programa de Afiliados | TopConsultores",
-  description: "Indique consultoras para o TopConsultores e receba comissão via Pix a cada ativação. Sem limite, sem taxa.",
+  description: "Indique consultores para o TopConsultores e receba comissão via Pix a cada ativação. Sem limite, sem taxa.",
 };
 
 function brl(cents: number) {
@@ -83,9 +83,9 @@ export default async function AfiliadosPage() {
   const minPayout = brl(Math.round(affConfig.min_payout_amount * 100));
 
   const steps = [
-    { icon: "🔗", title: "Pegue seu link exclusivo", text: "No painel, seu link de afiliada é gerado automaticamente. Copie com um clique." },
-    { icon: "💬", title: "Compartilhe com consultoras", text: "Envie no WhatsApp, Instagram e grupos. Quem chegar pelo seu link fica vinculada a você." },
-    { icon: "⚡", title: "Receba via Pix", text: `Quando a indicada ativar o site, sua comissão de ${pct}% entra no painel automaticamente.` },
+    { icon: "🔗", title: "Pegue seu link exclusivo", text: "No painel, seu link de afiliado é gerado automaticamente. Copie com um clique." },
+    { icon: "💬", title: "Compartilhe com consultores", text: "Envie no WhatsApp, Instagram e grupos. Quem chegar pelo seu link fica vinculado a você." },
+    { icon: "⚡", title: "Receba via Pix", text: `Quando sua indicação ativar o site, sua comissão de ${pct}% entra no painel automaticamente.` },
   ];
 
   const trust = [
@@ -130,13 +130,13 @@ export default async function AfiliadosPage() {
                 Ganhe dinheiro indicando o site que você já usa
               </h1>
               <p className="mt-4 text-[14.5px] sm:text-[16.5px] leading-relaxed text-[#5a6b7a] max-w-[620px] mx-auto">
-                Sem vender nada: é só compartilhar seu link. A cada colega que ativar o site, você recebe {pct}% de comissão.
+                Sem vender nada: é só compartilhar seu link. A cada indicação que ativar o site, você recebe {pct}% de comissão.
               </p>
               <a
                 href={ctaHref}
                 className="mt-7 inline-flex items-center justify-center gap-2 rounded-[14px] bg-[#1d5c3a] hover:bg-[#154730] active:bg-[#103d2d] px-8 py-4 text-[15px] sm:text-[16px] font-bold text-white shadow-[0_10px_28px_rgba(29,92,58,0.28)] transition"
               >
-                Quero ser afiliada(o) <span aria-hidden>→</span>
+                Quero ser afiliado <span aria-hidden>→</span>
               </a>
               <p className="mt-3 text-[12.5px] text-[#8a9aa8] leading-relaxed">
                 Grátis · Sem taxa de participação · {brl(perSaleCents)} por ativação
@@ -229,13 +229,13 @@ export default async function AfiliadosPage() {
                 Sua rede já vale renda extra.<br className="hidden sm:block" /> Ative seu link agora.
               </p>
               <p className="mt-3 text-[14px] sm:text-[15px] leading-relaxed text-[#5a6b7a] max-w-[520px] mx-auto">
-                Leva menos de 1 minuto: entre no painel e seu link de afiliada está pronto para compartilhar.
+                Leva menos de 1 minuto: entre no painel e seu link de afiliado está pronto para compartilhar.
               </p>
               <a
                 href={ctaHref}
                 className="mt-7 inline-flex items-center justify-center gap-2 rounded-[14px] bg-[#1d5c3a] hover:bg-[#154730] active:bg-[#103d2d] px-8 py-4 text-[15px] sm:text-[16px] font-bold text-white shadow-[0_10px_28px_rgba(29,92,58,0.28)] transition"
               >
-                Aceitar e ativar meu link de afiliada <span aria-hidden>→</span>
+                Aceitar e ativar meu link de afiliado <span aria-hidden>→</span>
               </a>
               {!user && (
                 <p className="mt-3 text-[12.5px] text-[#8a9aa8] leading-relaxed">
