@@ -184,11 +184,6 @@ async function vercelProjectPath(suffix: string): Promise<string> {
   return `/v10/projects/${creds.projectId}${suffix}`;
 }
 
-async function vercelProjectPath(suffix: string): Promise<string> {
-  const creds = await getVercelCredentials();
-  return `/v10/projects/${creds.projectId}${suffix}`;
-}
-
 /**
  * Adiciona o domínio (ou subdomínio www) ao projeto Vercel.
  * Idempotente: se o domínio já existe no projeto (ex.: tentativa anterior
