@@ -13,7 +13,7 @@ export default async function PainelLayout({ children }: { children: ReactNode }
   const siteSlug = isDemo ? null : ctx.tenant?.slug ?? null;
 
   return (
-    <div className="flex min-h-screen bg-[#faf8f2]">
+    <div className="flex min-h-screen w-full max-w-[100vw] flex-col overflow-x-clip bg-gradient-to-b from-[#eef5ef] via-[#faf8f2] to-[#faf8f2] md:flex-row">
       {isDemo && <DemoFetchBridge />}
       <DashboardSidebar
         name={name}
@@ -22,10 +22,12 @@ export default async function PainelLayout({ children }: { children: ReactNode }
         siteSlug={siteSlug}
         isDemo={isDemo}
       />
-      <main className="flex-1 px-4 sm:px-6 md:px-8 py-6 sm:py-8 max-w-6xl">
-        {isDemo && <DashboardBannerDemo />}
-        {!isDemo && <FeedbackBanner />}
-        {children}
+      <main className="w-full min-w-0 flex-1 overflow-x-hidden px-4 pb-24 pt-5 sm:px-6 md:px-8 md:py-8 md:pb-10">
+        <div className="mx-auto w-full min-w-0 max-w-6xl">
+          {isDemo && <DashboardBannerDemo />}
+          {!isDemo && <FeedbackBanner />}
+          {children}
+        </div>
       </main>
     </div>
   );

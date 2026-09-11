@@ -157,16 +157,20 @@ export function StatCard({
   icon?: ReactNode;
 }) {
   return (
-    <div className="card">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-xs uppercase tracking-wider text-gray-400 font-semibold">{label}</p>
-          <p className="mt-2 text-2xl font-semibold" style={{ fontFamily: "var(--font-display)" }}>
+    <div className="card group min-w-0 !p-4 transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_32px_-16px_rgba(29,92,58,0.35)] sm:!p-5">
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400">{label}</p>
+          <div className="mt-2 min-w-0 break-words text-xl font-semibold leading-snug sm:text-2xl" style={{ fontFamily: "var(--font-display)" }}>
             {value}
-          </p>
-          {sub && <p className="mt-1 text-xs text-gray-400">{sub}</p>}
+          </div>
+          {sub && <div className="mt-1 min-w-0 break-words text-xs leading-relaxed text-gray-400">{sub}</div>}
         </div>
-        {icon && <span className="text-2xl">{icon}</span>}
+        {icon && (
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#e5f4ea] to-[#d3e9da] text-xl shadow-inner">
+            {icon}
+          </span>
+        )}
       </div>
     </div>
   );
