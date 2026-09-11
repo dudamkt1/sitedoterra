@@ -53,7 +53,7 @@ function isMobileDevice(): boolean {
 }
 
 export function PwaRegister(props: PwaRegisterProps) {
-  const { enabled, slug, swUrl, scope, appName } = props;
+  const { enabled, slug, manifestUrl, swUrl, scope, appName } = props;
 
   const [visible, setVisible] = useState(false);
   const [manualSteps, setManualSteps] = useState(false);
@@ -71,6 +71,18 @@ export function PwaRegister(props: PwaRegisterProps) {
 
   useEffect(() => {
     if (!enabled || typeof window === "undefined") return;
+
+    // 0) Garante <link rel="manifest"> no <head> (rede de segurança: se o
+    //    metadata do servidor não emitiu, o navegador ainda encontra o
+    //    manifest e mostra o logotipo na instalação).
+    try {
+      if (!document.querySelector('link[rel="manifest"]') && manifestUrl) {
+        const link = document.createElement("link");
+        link.rel = "manifest";
+        link.href = manifestUrl;
+        document.head.appendChild(link);
+      }
+    } catch {}
 
     // 1) Service worker (escopo do usuário)
     if ("serviceWorker" in navigator) {
@@ -118,7 +130,7 @@ export function PwaRegister(props: PwaRegisterProps) {
       window.removeEventListener("beforeinstallprompt", onPrompt);
       window.removeEventListener("appinstalled", onInstalled);
     };
-  }, [enabled, slug, swUrl, scope, isStandalone]);
+  }, [enabled, slug, manifestUrl, swUrl, scope, isStandalone]);
 
   async function installNow() {
     const p = deferredPrompt.current;

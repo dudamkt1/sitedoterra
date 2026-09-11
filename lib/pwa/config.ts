@@ -84,11 +84,28 @@ export function pwaVersionToken(s: PwaSettings): string {
 
 function withVersion(url: string, v: string): string {
   if (!url) return url;
-  // Mantém ?query string existente, mas injeta/atualiza o token v
+  // URLs absolutas: usa URL API (preserva origem).
+  if (/^https?:\/\//i.test(url)) {
+    try {
+      const u = new URL(url);
+      u.searchParams.set("v", v);
+      return u.toString();
+    } catch {
+      return url;
+    }
+  }
+  // URLs relativas (/...): injeta/atualiza ?v= manualmente SEM trocar a origem.
+  // (Bug antigo: new URL(rel, "https://placeholder.local") vazava o host
+  // placeholder para o manifest → ícone quebrado no celular.)
   try {
-    const u = new URL(url, "https://placeholder.local");
-    u.searchParams.set("v", v);
-    return u.toString();
+    const hashIdx = url.indexOf("#");
+    const hash = hashIdx >= 0 ? url.slice(hashIdx) : "";
+    const withoutHash = hashIdx >= 0 ? url.slice(0, hashIdx) : url;
+    const qIdx = withoutHash.indexOf("?");
+    const path = qIdx >= 0 ? withoutHash.slice(0, qIdx) : withoutHash;
+    const params = new URLSearchParams(qIdx >= 0 ? withoutHash.slice(qIdx + 1) : "");
+    params.set("v", v);
+    return `${path}?${params.toString()}${hash}`;
   } catch {
     return url;
   }
@@ -112,11 +129,39 @@ function joinOrigin(origin: string, path: string) {
 }
 
 /**
+ * Caminhos (relativos) dos ícones PNG servidos pelo PRÓPRIO domínio.
+ *
+ * Arquitetura "100% à prova de logo quebrado":
+ * - As rotas `/pwa/icon-192.png`, `/pwa/icon-512.png`,
+ *   `/pwa/icon-maskable-512.png` e `/pwa/apple-touch-icon.png` (na raiz em
+ *   domínio próprio/HOME ou em `/{slug}/pwa/...` na plataforma) fazem proxy
+ *   do upload do usuário (normalizado em tamanho exato via sharp) ou geram
+ *   um tile PNG com a identidade do app quando não há upload.
+ * - Manifest e <head> referenciam SEMPRE essas URLs same-origin → zero CORS,
+ *   zero URL quebrada, tamanho exato garantido no Android e no iOS.
+ */
+export function pwaIconPaths(basePath: string): {
+  icon192: string;
+  icon512: string;
+  maskable: string;
+  apple: string;
+} {
+  const base = basePath.endsWith("/") ? basePath : `${basePath}/`;
+  return {
+    icon192: `${base}pwa/icon-192.png`,
+    icon512: `${base}pwa/icon-512.png`,
+    maskable: `${base}pwa/icon-maskable-512.png`,
+    apple: `${base}pwa/apple-touch-icon.png`,
+  };
+}
+
+/**
  * Monta o manifest dinâmico do usuário.
  * - start_url/scope respeitam a origem de acesso
- * - icons inclui 192×192, 512×512 (any e maskable) e 180×180 (apple-touch)
- * - todas as URLs de imagem recebem `?v=<token>` para forçar revalidação
- *   quando o usuário trocar o ícone (cache-busting do SW do PWA).
+ * - icons SEMPRE inclui PNGs 180/192/512 (any) + 512 maskable servidos pelo
+ *   próprio domínio (proxy normalizado — nunca quebra, nunca sofre CORS),
+ *   com `?v=<token>` para forçar revalidação quando o usuário trocar o ícone.
+ * - fallback SVG (monograma) por último, para navegadores que o aceitam.
  */
 export function buildManifest(
   s: PwaSettings,
@@ -126,60 +171,21 @@ export function buildManifest(
   const name = s.app_name || "Meu Aplicativo";
   const shortName = s.short_name || name.slice(0, 12);
   const v = pwaVersionToken(s);
+  const paths = pwaIconPaths(scopeBase);
+  const absV = (rel: string) => abs(withVersion(rel, v), ctx.origin);
 
-  // Cada tamanho tem seu próprio campo no banco — permite qualidade nativa
-  // sem depender de redimensionamento do navegador.
-  const icon180 = s.icon_180_url || s.icon_192_url || s.icon_512_url;
-  const icon192 = s.icon_192_url || s.icon_512_url;
-  const icon512 = s.icon_512_url || s.icon_192_url;
-  const iconMaskable512 = s.icon_maskable_512_url || s.icon_512_url || s.icon_192_url;
+  const icons: Record<string, unknown>[] = [
+    // iOS também lê o manifest em alguns fluxos — 180 first.
+    { src: absV(paths.apple), sizes: "180x180", type: "image/png", purpose: "any" },
+    // Android: 192×192 (mínimo histórico, manifest spec)
+    { src: absV(paths.icon192), sizes: "192x192", type: "image/png", purpose: "any" },
+    // Android: 512×512 (splash + home screen em alta densidade)
+    { src: absV(paths.icon512), sizes: "512x512", type: "image/png", purpose: "any" },
+    // Android: 512×512 maskable — safe zone de 80% gerada no servidor.
+    { src: absV(paths.maskable), sizes: "512x512", type: "image/png", purpose: "maskable" },
+  ];
 
-  const icons: Record<string, unknown>[] = [];
-
-  // Apple touch icon 180×180 (iOS Safari — "Adicionar à Tela de Início")
-  if (icon180) {
-    icons.push({
-      src: abs(withVersion(icon180, v), ctx.origin),
-      sizes: "180x180",
-      type: guessType(icon180),
-      purpose: "any",
-    });
-  }
-
-  // Android: 192×192 (mínimo histórico, manifest spec)
-  if (icon192) {
-    icons.push({
-      src: abs(withVersion(icon192, v), ctx.origin),
-      sizes: "192x192",
-      type: guessType(icon192),
-      purpose: "any",
-    });
-  }
-
-  // Android: 512×512 (splash + home screen em alta densidade)
-  if (icon512) {
-    icons.push({
-      src: abs(withVersion(icon512, v), ctx.origin),
-      sizes: "512x512",
-      type: guessType(icon512),
-      purpose: "any",
-    });
-  }
-
-  // Android: 512×512 maskable — ícone preparado para safe zone (padding ~10%).
-  // Usa campo dedicado se existir; caso contrário, cai para o 512 normal.
-  if (iconMaskable512) {
-    icons.push({
-      src: abs(withVersion(iconMaskable512, v), ctx.origin),
-      sizes: "512x512",
-      type: guessType(iconMaskable512),
-      purpose: "maskable",
-    });
-  }
-
-  // Fallback SVG (gerado dinamicamente, monograma do app) — Chrome e Edge
-  // aceitam SVG com `any maskable` porque o SVG é vetorial e o navegador
-  // cuida da máscara. Garante que mesmo sem upload o PWA ainda tem ícone.
+  // Fallback SVG (monograma do app) — Chrome e Edge aceitam `any maskable`.
   const svgIcon = joinOrigin(ctx.origin, `${scopeBase}pwa/icon.svg`);
   icons.push({
     src: svgIcon,
@@ -210,14 +216,6 @@ function abs(url: string, origin: string): string {
   return joinOrigin(origin, url);
 }
 
-function guessType(url: string): string {
-  if (/\.png($|\?)/i.test(url)) return "image/png";
-  if (/\.jpe?g($|\?)/i.test(url)) return "image/jpeg";
-  if (/\.svg($|\?)/i.test(url)) return "image/svg+xml";
-  if (/\.webp($|\?)/i.test(url)) return "image/webp";
-  return "image/png";
-}
-
 // ------------------------------------------------------------ STATUS ----
 
 export interface PwaChecklist {
@@ -240,7 +238,7 @@ export function computePwaStatus(s: PwaSettings): PwaStatus {
   const checks: PwaChecklist = {
     nome: Boolean(s.app_name && s.short_name),
     logo: Boolean(s.logo_url),
-    icone: Boolean(s.icon_192_url || s.icon_512_url || true), // fallback SVG sempre existe
+    icone: Boolean(s.icon_192_url || s.icon_512_url || s.icon_180_url),
     cores: Boolean(s.theme_color && s.background_color),
     manifest: Boolean(s.app_name),
     serviceWorker: true, // servido automaticamente quando a PWA está ativa

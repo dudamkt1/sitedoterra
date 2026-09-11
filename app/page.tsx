@@ -9,7 +9,7 @@ import { resolveHomeSections } from "@/lib/home";
 import { getPublicTenantBySlug } from "@/lib/tenant";
 import { getOfficialHomeTenant } from "@/lib/site-official";
 import { resolvePwaForRequest } from "@/lib/pwa/resolver";
-import { pwaUrls } from "@/lib/pwa/config";
+import { pwaUrls, pwaIconPaths, pwaVersionToken } from "@/lib/pwa/config";
 import { themePrimaryColor, type SiteThemeConfig } from "@/lib/site-theme";
 import { getPublicBaseUrl } from "@/lib/public-url";
 import { resolveAffiliateDestination } from "@/lib/affiliate-destination";
@@ -75,27 +75,15 @@ export async function generateMetadata(): Promise<Metadata> {
     }
     if (pwa?.settings.enabled) {
       const { manifestUrl } = pwaUrls(pwa.basePath);
-      const ts = pwa.settings.updated_at ? new Date(pwa.settings.updated_at).getTime() : Date.now();
-      const v = Number.isNaN(ts) ? Date.now().toString(36) : ts.toString(36);
+      const v = pwaVersionToken(pwa.settings);
+      const paths = pwaIconPaths(pwa.basePath);
+      const withV = (rel: string) => `${rel}?v=${v}`;
 
-      if (pwa.settings.icon_180_url) {
-        const bust = pwa.settings.icon_180_url.includes("?")
-          ? `${pwa.settings.icon_180_url}&v=${v}`
-          : `${pwa.settings.icon_180_url}?v=${v}`;
-        iconList.push({ url: bust, type: "image/png", sizes: "180x180", rel: "apple-touch-icon" });
-      }
-      if (pwa.settings.icon_192_url) {
-        const bust = pwa.settings.icon_192_url.includes("?")
-          ? `${pwa.settings.icon_192_url}&v=${v}`
-          : `${pwa.settings.icon_192_url}?v=${v}`;
-        iconList.push({ url: bust, type: "image/png", sizes: "192x192" });
-      }
-      if (pwa.settings.icon_512_url) {
-        const bust = pwa.settings.icon_512_url.includes("?")
-          ? `${pwa.settings.icon_512_url}&v=${v}`
-          : `${pwa.settings.icon_512_url}?v=${v}`;
-        iconList.push({ url: bust, type: "image/png", sizes: "512x512" });
-      }
+      // Ícones SEMPRE same-origin (proxy normalizado ou tile gerado) —
+      // iOS exige apple-touch-icon PNG; Android exige 192+512 PNG.
+      iconList.push({ url: withV(paths.apple), type: "image/png", sizes: "180x180", rel: "apple-touch-icon" });
+      iconList.push({ url: withV(paths.icon192), type: "image/png", sizes: "192x192" });
+      iconList.push({ url: withV(paths.icon512), type: "image/png", sizes: "512x512" });
 
       return {
         manifest: manifestUrl,

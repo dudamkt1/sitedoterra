@@ -81,7 +81,7 @@ self.addEventListener("fetch", (event) => {
   // próxima visita — sem isso, o cache-first mostraria o ícone antigo.
   // Inclui todas as variantes (180/192/512/maskable) + o SVG de fallback.
   const isPwaAsset = url.pathname.endsWith("/manifest.webmanifest") ||
-                      /\\/(pwa\\/icon\\.svg|icon-180|icon-192|icon-512|icon-maskable)/.test(url.pathname) ||
+                      /\\/(pwa\\/icon\\.svg|icon-180|icon-192|icon-512|icon-maskable|apple-touch-icon)/.test(url.pathname) ||
                       /\\/pwa\\/icon/.test(url.pathname) ||
                       url.searchParams.has("v"); // qualquer asset com ?v=<token> é versionado
   if (isPwaAsset) {

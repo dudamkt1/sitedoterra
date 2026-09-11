@@ -11,7 +11,7 @@ import { resolveHomeSections } from "@/lib/home";
 import { getCurrentUser } from "@/lib/auth";
 import { getOfficialHomeTenant, isOfficialHomeTenantById } from "@/lib/site-official";
 import { resolvePwaForRequest } from "@/lib/pwa/resolver";
-import { pwaUrls } from "@/lib/pwa/config";
+import { pwaUrls, pwaIconPaths, pwaVersionToken } from "@/lib/pwa/config";
 import { themePrimaryColor, type SiteThemeConfig } from "@/lib/site-theme";
 import { resolveAffiliateDestination } from "@/lib/affiliate-destination";
 import {
@@ -33,9 +33,16 @@ export async function generateMetadata({ params }: { params: { slug: string } })
       robots: { index: false },
     };
     if (pwa?.settings.enabled) {
-      const { manifestUrl, iconUrl } = pwaUrls(pwa.basePath);
+      const { manifestUrl } = pwaUrls(pwa.basePath);
+      const v = pwaVersionToken(pwa.settings);
+      const paths = pwaIconPaths(pwa.basePath);
+      const withV = (rel: string) => `${rel}?v=${v}`;
       meta.manifest = manifestUrl;
-      meta.icons = [{ url: iconUrl, type: "image/svg+xml" }];
+      meta.icons = [
+        { url: withV(paths.apple), type: "image/png", sizes: "180x180", rel: "apple-touch-icon" },
+        { url: withV(paths.icon192), type: "image/png", sizes: "192x192" },
+        { url: withV(paths.icon512), type: "image/png", sizes: "512x512" },
+      ];
       meta.appleWebApp = {
         capable: true,
         title: pwa.settings.short_name || pwa.settings.app_name,
@@ -65,40 +72,22 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   //  - iOS Safari use o apple-touch-icon 180x180 ao "Adicionar à Tela de Início"
   //    (iOS NÃO consulta o manifest na instalação — usa o apple-touch-icon)
   //  - Chrome Desktop mostre o favicon correto na aba
-  // O PWA icon vem SEMPRE à frente do favicon do site; o favicon é fallback.
+  // As URLs são SEMPRE same-origin (`/{slug}/pwa/*.png` ou `/pwa/*.png`):
+  // proxy normalizado no próprio domínio (upload do usuário ou tile gerado).
+  // Nunca quebra por CORS do R2/CDN nem por URL relativa no banco.
   const iconList: { url: string; type?: string; sizes?: string; rel?: string }[] = [];
   if (pwa?.settings.enabled) {
-    const ts = pwa.settings.updated_at ? new Date(pwa.settings.updated_at).getTime() : Date.now();
-    const v = Number.isNaN(ts) ? Date.now().toString(36) : ts.toString(36);
-
-    // apple-touch-icon 180x180 (iOS "Adicionar à Tela de Início")
-    if (pwa.settings.icon_180_url) {
-      const bust = pwa.settings.icon_180_url.includes("?")
-        ? `${pwa.settings.icon_180_url}&v=${v}`
-        : `${pwa.settings.icon_180_url}?v=${v}`;
-      iconList.push({ url: bust, type: "image/png", sizes: "180x180", rel: "apple-touch-icon" });
-    }
+    const v = pwaVersionToken(pwa.settings);
+    const paths = pwaIconPaths(pwa.basePath);
+    const withV = (rel: string) => `${rel}?v=${v}`;
+    // apple-touch-icon 180x180 (iOS "Adicionar à Tela de Início") — SEMPRE.
+    iconList.push({ url: withV(paths.apple), type: "image/png", sizes: "180x180", rel: "apple-touch-icon" });
     // 192x192 (Android legacy)
-    if (pwa.settings.icon_192_url) {
-      const bust = pwa.settings.icon_192_url.includes("?")
-        ? `${pwa.settings.icon_192_url}&v=${v}`
-        : `${pwa.settings.icon_192_url}?v=${v}`;
-      iconList.push({ url: bust, type: "image/png", sizes: "192x192" });
-    }
+    iconList.push({ url: withV(paths.icon192), type: "image/png", sizes: "192x192" });
     // 512x512 (Android splash/home)
-    if (pwa.settings.icon_512_url) {
-      const bust = pwa.settings.icon_512_url.includes("?")
-        ? `${pwa.settings.icon_512_url}&v=${v}`
-        : `${pwa.settings.icon_512_url}?v=${v}`;
-      iconList.push({ url: bust, type: "image/png", sizes: "512x512" });
-    }
-    // 32x32 favicon fallback
-    if (pwa.settings.icon_192_url) {
-      const bust = pwa.settings.icon_192_url.includes("?")
-        ? `${pwa.settings.icon_192_url}&v=${v}`
-        : `${pwa.settings.icon_192_url}?v=${v}`;
-      iconList.push({ url: bust, type: "image/png", sizes: "32x32" });
-    }
+    iconList.push({ url: withV(paths.icon512), type: "image/png", sizes: "512x512" });
+    // 32x32 favicon
+    iconList.push({ url: withV(paths.icon192), type: "image/png", sizes: "32x32" });
   }
   if (faviconUrl) {
     const bust = faviconUrl.includes("?") ? faviconUrl : `${faviconUrl}?v=2`;
