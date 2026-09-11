@@ -58,7 +58,13 @@ export function PwaRegister(props: PwaRegisterProps) {
   const [visible, setVisible] = useState(false);
   const [manualSteps, setManualSteps] = useState(false);
   const [platform, setPlatform] = useState<Platform>("outro");
+  // true quando o navegador entregou o prompt nativo (Android/Chrome).
+  // Sem isso (iOS sempre; Android sem evento), o botão guia o passo a passo.
+  const [canNativeInstall, setCanNativeInstall] = useState(false);
+  // Pulso visual quando o passo a passo é revelado pelo toque.
+  const [stepsPulse, setStepsPulse] = useState(false);
   const deferredPrompt = useRef<BeforeInstallPromptEvent | null>(null);
+  const stepsRef = useRef<HTMLOListElement | null>(null);
 
   const isStandalone = useCallback(() => {
     if (typeof window === "undefined") return false;
@@ -103,12 +109,15 @@ export function PwaRegister(props: PwaRegisterProps) {
     setPlatform(detectPlatform());
 
     // 5) Evento nativo (Android/Chrome) guarda o prompt para o botão instalar.
+    //    Quando ele chega, o botão vira instalação em 1 toque de verdade.
     function onPrompt(e: Event) {
       e.preventDefault();
       deferredPrompt.current = e as BeforeInstallPromptEvent;
+      setCanNativeInstall(true);
     }
     function onInstalled() {
       deferredPrompt.current = null;
+      setCanNativeInstall(false);
       setVisible(false);
       setManualSteps(false);
       try {
@@ -132,20 +141,47 @@ export function PwaRegister(props: PwaRegisterProps) {
     };
   }, [enabled, slug, manifestUrl, swUrl, scope, isStandalone]);
 
+  function revealSteps() {
+    // Feedback tátil imediato: o toque SEMPRE responde.
+    try {
+      (window.navigator as Navigator & { vibrate?: (p: number) => boolean }).vibrate?.(15);
+    } catch {}
+    setManualSteps(true);
+    // Pulso + rolagem até o passo a passo: impossível "nada acontecer".
+    setStepsPulse(true);
+    window.setTimeout(() => setStepsPulse(false), 1600);
+    window.setTimeout(() => {
+      try {
+        stepsRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      } catch {}
+    }, 60);
+  }
+
   async function installNow() {
+    try {
+      (window.navigator as Navigator & { vibrate?: (p: number) => boolean }).vibrate?.(15);
+    } catch {}
     const p = deferredPrompt.current;
     if (!p) {
-      // Prompt nativo indisponível: ensina o caminho manual em vez de deixar
-      // o botão sem ação.
-      setManualSteps(true);
+      // Sem prompt nativo (iOS sempre; Android sem evento): guia visual.
+      revealSteps();
       return;
     }
-    await p.prompt();
     try {
+      await p.prompt();
       const choice = await p.userChoice;
-      if (choice.outcome === "accepted") dismiss();
-    } catch {}
-    deferredPrompt.current = null;
+      if (choice.outcome === "accepted") {
+        dismiss();
+        return;
+      }
+      // Recusou/dispensou o diálogo nativo: mostra o caminho manual.
+      revealSteps();
+    } catch {
+      revealSteps();
+    } finally {
+      deferredPrompt.current = null;
+      setCanNativeInstall(false);
+    }
   }
 
   function dismiss() {
@@ -188,25 +224,45 @@ export function PwaRegister(props: PwaRegisterProps) {
                 )}
 
                 {manualSteps && (
-                  <ol className="mt-3 text-xs text-gray-700 space-y-1.5 list-decimal list-inside">
+                  <ol
+                    ref={stepsRef}
+                    className={`mt-3 text-xs text-gray-700 space-y-1.5 list-decimal list-inside rounded-xl border p-3 transition-all ${
+                      stepsPulse
+                        ? "border-emerald-500 bg-emerald-50 shadow-[0_0_0_3px_rgba(29,92,58,0.15)]"
+                        : "border-gray-200 bg-gray-50"
+                    }`}
+                  >
                     {platform === "ios" ? (
                       <>
                         <li>
-                          Toque em <strong>Compartilhar</strong> (ícone ▲ na
-                          barra do Safari).
+                          Toque em <strong>Compartilhar</strong>{" "}
+                          <svg
+                            viewBox="0 0 24 24"
+                            className="inline h-3.5 w-3.5 -mt-0.5 text-gray-700"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden
+                          >
+                            <path d="M12 3v13" />
+                            <path d="m7 8 5-5 5 5" />
+                            <path d="M5 12v8h14v-8" />
+                          </svg>{" "}
+                          na barra do Safari.
                         </li>
                         <li>
-                          Escolha <strong>Adicionar à Tela de Início</strong>.
+                          Role e escolha <strong>Adicionar à Tela de Início</strong>.
                         </li>
                         <li>
-                          Confirme tocando em <strong>Adicionar</strong>.
+                          Confirme tocando em <strong>Adicionar</strong> no topo.
                         </li>
                       </>
                     ) : (
                       <>
                         <li>
-                          Abra o menu do navegador (<strong>⋮</strong> ou{" "}
-                          <strong>⋯</strong>).
+                          Abra o menu do navegador (<strong>⋮</strong> no Chrome).
                         </li>
                         <li>
                           Toque em <strong>Instalar app</strong> ou{" "}
@@ -234,19 +290,24 @@ export function PwaRegister(props: PwaRegisterProps) {
               <button
                 type="button"
                 onClick={installNow}
-                className="flex-1 rounded-lg px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-white hover:opacity-90 transition-opacity"
+                className="flex-1 rounded-lg px-4 py-3 text-xs font-bold uppercase tracking-wide text-white hover:opacity-90 active:scale-[0.98] transition-all"
                 style={{ background: props.themeColor }}
               >
-                ⚡ Instalar agora
+                {canNativeInstall ? "⚡ Instalar agora" : "📲 Como instalar"}
               </button>
               <button
                 type="button"
                 onClick={dismiss}
-                className="rounded-lg px-4 py-2.5 text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors"
+                className="rounded-lg px-4 py-3 text-xs font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 active:scale-[0.98] transition-all"
               >
                 Agora não
               </button>
             </div>
+            {!canNativeInstall && !manualSteps && (
+              <p className="mt-2 text-[0.65rem] text-gray-400 text-center">
+                Toque acima e siga o passo a passo de 10 segundos
+              </p>
+            )}
 
             <p className="mt-2 text-[0.65rem] text-gray-400 text-center truncate">
               {appName}
