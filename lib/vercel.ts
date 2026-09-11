@@ -82,6 +82,8 @@ export async function getVercelConfigStatus(): Promise<{
   projectIdSource: "env" | "admin" | null;
   hasToken: boolean;
   teamIdSource: "env" | "admin" | null;
+  verifiedAt: string | null;
+  projectName: string | null;
 }> {
   const envPid = process.env.VERCEL_PROJECT_ID || null;
   const envToken = process.env.VERCEL_API_TOKEN || null;
@@ -89,30 +91,99 @@ export async function getVercelConfigStatus(): Promise<{
   let dbPid: string | null = null;
   let dbToken = false;
   let dbTeam: string | null = null;
+  let verifiedAt: string | null = null;
+  let projectName: string | null = null;
   try {
     const { createAdminClient } = await import("@/lib/supabase/admin");
     const admin = createAdminClient();
     const { data } = await admin
       .from("platform_config")
       .select("key, value")
-      .in("key", ["vercel_project_id", "vercel_api_token", "vercel_team_id"]);
+      .in("key", ["vercel_project_id", "vercel_api_token", "vercel_team_id", "vercel_verified_at", "vercel_project_name"]);
     for (const r of (data || []) as { key: string; value: unknown }[]) {
       const v = cfgStr(r.value);
       if (r.key === "vercel_project_id" && v) dbPid = v;
       if (r.key === "vercel_api_token" && v) dbToken = true;
       if (r.key === "vercel_team_id" && v) dbTeam = v;
+      if (r.key === "vercel_verified_at" && v) verifiedAt = v;
+      if (r.key === "vercel_project_name" && v) projectName = v;
     }
   } catch {}
   return {
     projectIdSource: envPid ? "env" : dbPid ? "admin" : null,
     hasToken: Boolean(envToken) || dbToken,
     teamIdSource: envTeam ? "env" : dbTeam ? "admin" : null,
+    verifiedAt,
+    projectName,
   };
 }
 
 /** Invalida o cache de credenciais (após salvar no admin). */
 export function invalidateVercelCredsCache(): void {
   credsCache = null;
+}
+
+export interface VercelLiveTest {
+  ok: boolean;
+  projectName?: string | null;
+  /** Mensagem pronta para exibir ao admin (PT-BR, acionável). */
+  message: string;
+}
+
+/**
+ * Testa as credenciais AO VIVO contra a API Vercel (GET projeto).
+ * Usado no save de /admin/dominios e no botão "Testar conexão": o admin só
+ * vê "funcionando" quando a API responde de verdade — sem adivinhação.
+ */
+export async function testVercelConnection(creds?: VercelCredentials | null): Promise<VercelLiveTest> {
+  const c = creds || (await getVercelCredentials());
+  if (!c.projectId || !c.token) {
+    return {
+      ok: false,
+      message: "Faltam Project ID e/ou API Token. Preencha os dois campos e salve.",
+    };
+  }
+  const sep = "?";
+  const team = c.teamId ? `${sep}teamId=${encodeURIComponent(c.teamId)}` : "";
+  try {
+    const res = await fetch(`${VERCEL_API}/v10/projects/${encodeURIComponent(c.projectId)}${team}`, {
+      headers: { Authorization: `Bearer ${c.token}` },
+      cache: "no-store",
+    });
+    const body = (await res.json().catch(() => ({}))) as {
+      name?: string;
+      error?: { code?: string; message?: string };
+    };
+    if (res.ok) {
+      return {
+        ok: true,
+        projectName: body.name || null,
+        message: `Conectado ao projeto “${body.name || c.projectId}”. Usuários já podem conectar domínios.`,
+      };
+    }
+    if (res.status === 401 || res.status === 403) {
+      const needsTeam =
+        /team/i.test(body.error?.message || "") || body.error?.code === "forbidden";
+      return {
+        ok: false,
+        message: needsTeam && !c.teamId
+          ? "Token válido, mas o projeto está dentro de um Time: preencha o Team ID (Vercel → Time → Settings → General) e teste de novo."
+          : "Token inválido ou sem acesso ao projeto. Crie um token novo em vercel.com → Account Settings → Tokens e cole aqui.",
+      };
+    }
+    if (res.status === 404) {
+      return {
+        ok: false,
+        message: "Project ID não encontrado (ou pertence a outro Time — aí preencha o Team ID). Confira em Vercel → projeto → Settings → General.",
+      };
+    }
+    return {
+      ok: false,
+      message: `Vercel respondeu ${res.status}: ${body.error?.message || "tente novamente em instantes."}`,
+    };
+  } catch {
+    return { ok: false, message: "Sem resposta da API Vercel. Verifique a internet do servidor e tente de novo." };
+  }
 }
 
 interface VercelDomainResponse {

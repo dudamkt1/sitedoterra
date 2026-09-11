@@ -86,7 +86,8 @@ export function normalizeDomain(input: string): string {
     .toLowerCase()
     .replace(/^https?:\/\//, "")
     .replace(/^\/+|\/+$/g, "")
-    .replace(/\/.*$/, "");
+    .replace(/\/.*$/, "")
+    .replace(/\.+$/, "");
 }
 
 // Sufixos públicos de duas partes (ex.: .com.br) — usados para detectar o apex real.

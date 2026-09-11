@@ -48,6 +48,12 @@ export async function POST(
     const vercelError = err instanceof Error ? err.message : String(err);
     console.error("Falha ao consultar domínio na Vercel", { domain: domainRow.domain, error: vercelError });
     await admin.from("domains").update({ status: "error", error_message: `Vercel: ${vercelError}` }).eq("id", domainRow.id);
+    if (/não configurados/i.test(vercelError)) {
+      return NextResponse.json(
+        { error: "Integração com a infraestrutura indisponível no momento. Tente novamente em instantes ou fale com o suporte." },
+        { status: 500 }
+      );
+    }
     return NextResponse.json(
       { error: `Falha ao consultar Vercel: ${vercelError}` },
       { status: 502 }

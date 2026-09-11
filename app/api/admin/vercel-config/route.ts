@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser, getProfile } from "@/lib/auth";
-import { getVercelConfigStatus, invalidateVercelCredsCache } from "@/lib/vercel";
+import {
+  getVercelConfigStatus,
+  getVercelCredentials,
+  invalidateVercelCredsCache,
+  testVercelConnection,
+} from "@/lib/vercel";
 
 export const runtime = "nodejs";
 
@@ -23,9 +28,15 @@ async function requireSuperAdmin() {
   return { actor };
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const guard = await requireSuperAdmin();
   if (guard.error) return guard.error;
+  const url = new URL(request.url);
+  // ?test=1 → testa AO VIVO contra a API Vercel (sem salvar nada).
+  if (url.searchParams.get("test") === "1") {
+    const live = await testVercelConnection();
+    return NextResponse.json({ ...(await getVercelConfigStatus()), live });
+  }
   return NextResponse.json(await getVercelConfigStatus());
 }
 
@@ -63,5 +74,25 @@ export async function PUT(request: Request) {
   }
 
   invalidateVercelCredsCache();
-  return NextResponse.json({ success: true, ...(await getVercelConfigStatus()) });
+
+  // Validação AO VIVO: o admin só vê "liberado" se a API Vercel respondeu.
+  const live = await testVercelConnection(await getVercelCredentials());
+  if (live.ok) {
+    await admin
+      .from("platform_config")
+      .upsert(
+        { key: "vercel_verified_at", value: JSON.stringify(new Date().toISOString()) },
+        { onConflict: "key" }
+      );
+    if (live.projectName) {
+      await admin
+        .from("platform_config")
+        .upsert(
+          { key: "vercel_project_name", value: JSON.stringify(live.projectName) },
+          { onConflict: "key" }
+        );
+    }
+  }
+
+  return NextResponse.json({ success: true, ...(await getVercelConfigStatus()), live });
 }
