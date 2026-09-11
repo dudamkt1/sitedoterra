@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Cormorant_Garamond, DM_Sans, Manrope } from "next/font/google";
+import { PwaPromptCapture } from "@/components/site/PwaPromptCapture";
 import "@/app/globals.css";
 
 const display = Cormorant_Garamond({
@@ -40,6 +41,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="pt-BR">
       <body className={`${display.variable} ${body.variable} ${sansDisplay.variable}`}>
+        <PwaPromptCapture />
         <div className="app-shell">{children}</div>
       </body>
     </html>

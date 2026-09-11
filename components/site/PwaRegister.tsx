@@ -43,6 +43,14 @@ function detectPlatform(): Platform {
   return "outro";
 }
 
+function isInAppBrowser(): boolean {
+  if (typeof window === "undefined") return false;
+  const ua = window.navigator.userAgent || "";
+  // WebViews de Instagram/Facebook/WhatsApp/TikTok: sem API de instalação.
+  // É preciso abrir no Chrome/Safari primeiro.
+  return /Instagram|FBAN|FBAV|FB_IAB|FB4A|Line\/|Twitter|WhatsApp|TikTok|Snapchat|Pinterest|KAKAOTALK|Naver|; wv/i.test(ua);
+}
+
 function isMobileDevice(): boolean {
   const ua = window.navigator.userAgent;
   return (
@@ -63,6 +71,8 @@ export function PwaRegister(props: PwaRegisterProps) {
   const [canNativeInstall, setCanNativeInstall] = useState(false);
   // Pulso visual quando o passo a passo é revelado pelo toque.
   const [stepsPulse, setStepsPulse] = useState(false);
+  // Navegador dentro de outro app (Instagram/WhatsApp): sem API de instalação.
+  const [inAppBrowser, setInAppBrowser] = useState(false);
   const deferredPrompt = useRef<BeforeInstallPromptEvent | null>(null);
   const stepsRef = useRef<HTMLOListElement | null>(null);
 
@@ -107,13 +117,31 @@ export function PwaRegister(props: PwaRegisterProps) {
     } catch {}
 
     setPlatform(detectPlatform());
+    setInAppBrowser(isInAppBrowser());
 
     // 5) Evento nativo (Android/Chrome) guarda o prompt para o botão instalar.
     //    Quando ele chega, o botão vira instalação em 1 toque de verdade.
+    //    O PwaPromptCapture (beforeInteractive) pode já ter guardado o evento
+    //    em window.__pwaBIP antes da hidratação — consome aqui para nunca
+    //    perder a instalação automática.
+    function takeStashedPrompt(): boolean {
+      try {
+        const stashed = window.__pwaBIP;
+        if (stashed) {
+          deferredPrompt.current = stashed as BeforeInstallPromptEvent;
+          setCanNativeInstall(true);
+          return true;
+        }
+      } catch {}
+      return false;
+    }
     function onPrompt(e: Event) {
       e.preventDefault();
       deferredPrompt.current = e as BeforeInstallPromptEvent;
       setCanNativeInstall(true);
+    }
+    function onStashedReady() {
+      takeStashedPrompt();
     }
     function onInstalled() {
       deferredPrompt.current = null;
@@ -125,7 +153,10 @@ export function PwaRegister(props: PwaRegisterProps) {
       } catch {}
     }
     window.addEventListener("beforeinstallprompt", onPrompt);
+    window.addEventListener("pwa:bip-ready", onStashedReady as EventListener);
     window.addEventListener("appinstalled", onInstalled);
+    // Evento pode ter chegado antes da hidratação: consome o guardado.
+    takeStashedPrompt();
 
     // 6) Mostra em todo acesso mobile — mesmo antes do evento nativo chegar.
     const t = setTimeout(() => {
@@ -137,6 +168,7 @@ export function PwaRegister(props: PwaRegisterProps) {
     return () => {
       clearTimeout(t);
       window.removeEventListener("beforeinstallprompt", onPrompt);
+      window.removeEventListener("pwa:bip-ready", onStashedReady as EventListener);
       window.removeEventListener("appinstalled", onInstalled);
     };
   }, [enabled, slug, manifestUrl, swUrl, scope, isStandalone]);
@@ -223,6 +255,17 @@ export function PwaRegister(props: PwaRegisterProps) {
                   </p>
                 )}
 
+                {manualSteps && inAppBrowser && (
+                  <div className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 leading-relaxed">
+                    <strong>⚠️ Você está abrindo pelo navegador de outro app</strong>
+                    <br />
+                    Toque em <strong>⋯</strong> e escolha{" "}
+                    <strong>“Abrir no Chrome”</strong> (Android) ou{" "}
+                    <strong>“Abrir no Safari”</strong> (iPhone) — só o navegador
+                    principal instala o aplicativo.
+                  </div>
+                )}
+
                 {manualSteps && (
                   <ol
                     ref={stepsRef}
@@ -293,7 +336,7 @@ export function PwaRegister(props: PwaRegisterProps) {
                 className="flex-1 rounded-lg px-4 py-3 text-xs font-bold uppercase tracking-wide text-white hover:opacity-90 active:scale-[0.98] transition-all"
                 style={{ background: props.themeColor }}
               >
-                {canNativeInstall ? "⚡ Instalar agora" : "📲 Como instalar"}
+                ⚡ Instalar
               </button>
               <button
                 type="button"
@@ -305,7 +348,7 @@ export function PwaRegister(props: PwaRegisterProps) {
             </div>
             {!canNativeInstall && !manualSteps && (
               <p className="mt-2 text-[0.65rem] text-gray-400 text-center">
-                Toque acima e siga o passo a passo de 10 segundos
+                Toque em Instalar e siga o passo a passo de 10 segundos
               </p>
             )}
 
