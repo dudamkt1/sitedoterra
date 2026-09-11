@@ -13,7 +13,7 @@ export default async function PainelLayout({ children }: { children: ReactNode }
   const siteSlug = isDemo ? null : ctx.tenant?.slug ?? null;
 
   return (
-    <div className="flex min-h-screen w-full max-w-[100vw] flex-col overflow-x-clip bg-gradient-to-b from-[#eef5ef] via-[#faf8f2] to-[#faf8f2] md:flex-row">
+    <div className="scope-painel flex min-h-screen w-full max-w-[100vw] flex-col overflow-x-clip bg-gradient-to-b from-[#eef5ef] via-[#faf8f2] to-[#faf8f2] md:flex-row">
       {isDemo && <DemoFetchBridge />}
       <DashboardSidebar
         name={name}

@@ -27,6 +27,19 @@ body {
   -webkit-text-size-adjust: 100%;
 }
 
+/* Painéis (/admin e /painel): tipografia 100% sem serifa e moderna.
+   O site público continua com a serifa editorial (Cormorant). */
+.scope-admin,
+.scope-painel {
+  --font-display: var(--font-sans-display), var(--font-body), system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.scope-admin :where(h1, h2, h3, .card-title),
+.scope-painel :where(h1, h2, h3, .card-title) {
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+}
+
 body {
   font-family: var(--font-body);
   background: var(--branco);
@@ -41,11 +54,15 @@ h1,
 h2,
 h3,
 p,
-li,
-span,
-strong {
+li {
   overflow-wrap: break-word;
-  word-break: break-word;
+}
+
+/* Dentro de tabelas, nunca quebrar letra por letra (causava o "texto na
+   vertical" no mobile): só quebra palavras longas indivisíveis. */
+table :where(th, td, span, strong, p, a, div) {
+  word-break: normal;
+  overflow-wrap: break-word;
 }
 
 img,
@@ -131,32 +148,105 @@ a {
   box-shadow: 0 1px 2px rgba(26, 26, 20, 0.04), 0 8px 24px -16px rgba(29, 92, 58, 0.18);
 }
 
-/* Tabelas nunca estouram a tela: rolam dentro do card no mobile */
-.card:has(> .table-base) {
-  padding-left: 0;
-  padding-right: 0;
+/* ============ TABELAS (painéis) ============
+   Regras de ouro:
+   - a <table> NUNCA vira display:block (destruía o layout em colunas);
+   - quem rola é o contêiner (qualquer div com tabela filha direta);
+   - no mobile a tabela respira com largura mínima confortável. */
+
+.table-base {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
 }
 
-.card:has(> .table-base) > :not(.table-base):not(.table-scroll) {
+.table-base th {
+  text-align: left;
+  font-weight: 700;
+  color: var(--cinza);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid #ece7da;
+  white-space: nowrap;
+  background: #fff;
+}
+
+.table-base td {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid #f1ede2;
+  vertical-align: middle;
+  overflow-wrap: break-word;
+}
+
+.table-base tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.table-base tr:hover td {
+  background: #faf8f2;
+}
+
+/* Qualquer envoltório direto de tabela vira área de rolagem suave */
+div:has(> table.table-base) {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #c9c2b2 transparent;
+}
+
+div:has(> table.table-base)::-webkit-scrollbar {
+  height: 8px;
+}
+
+div:has(> table.table-base)::-webkit-scrollbar-thumb {
+  background: #c9c2b2;
+  border-radius: 999px;
+}
+
+div:has(> table.table-base)::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+div:has(> table.table-base) > table.table-base {
+  min-width: 640px;
+}
+
+/* Tabela filha direta do card: o card vira o scroller (sem quebrar nada) */
+.card:has(> table.table-base) {
+  padding-left: 0;
+  padding-right: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.card:has(> table.table-base) > :not(table) {
   margin-left: 1.5rem;
   margin-right: 1.5rem;
 }
 
-.card > .table-base {
-  display: block;
-  overflow-x: auto;
-  white-space: nowrap;
-  padding: 0 1.5rem 0.25rem;
+.card:has(> table.table-base) > table.table-base {
+  min-width: 640px;
+  padding: 0;
+  margin: 0;
 }
 
-.card > .table-base table {
-  min-width: 620px;
-  width: 100%;
+/* Cabeçalho fixo em áreas de rolagem vertical (desktop e mobile) */
+div:has(> table.table-base) thead th,
+.card:has(> table.table-base) thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  box-shadow: 0 1px 0 #ece7da;
 }
 
 .table-scroll {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
   margin: 0 -1.5rem;
   padding: 0 1.5rem;
   scrollbar-width: thin;
@@ -167,13 +257,27 @@ a {
     padding: 1rem;
     border-radius: 0.9rem;
   }
-  .card:has(> .table-base) > :not(.table-base):not(.table-scroll) {
+  .card:has(> table.table-base) > :not(table) {
     margin-left: 1rem;
     margin-right: 1rem;
   }
-  .card > .table-base {
-    padding-left: 1rem;
-    padding-right: 1rem;
+  /* Mobile: colunas com largura confortável + células com quebra natural.
+     Nada de texto espremido na vertical: a tabela rola para o lado. */
+  div:has(> table.table-base) > table.table-base,
+  .card:has(> table.table-base) > table.table-base {
+    min-width: 600px;
+  }
+  .table-base {
+    font-size: 0.8rem;
+  }
+  .table-base th {
+    padding: 0.6rem 0.75rem;
+    font-size: 0.66rem;
+  }
+  .table-base td {
+    padding: 0.75rem;
+    white-space: normal;
+    vertical-align: top;
   }
   .btn {
     min-height: 44px;
@@ -249,30 +353,4 @@ a {
   margin-bottom: 0.35rem;
 }
 
-.table-base {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.85rem;
-}
-
-.table-base th {
-  text-align: left;
-  font-weight: 600;
-  color: var(--cinza);
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid #ece7da;
-  white-space: nowrap;
-}
-
-.table-base td {
-  padding: 0.85rem 1rem;
-  border-bottom: 1px solid #f1ede2;
-  vertical-align: middle;
-}
-
-.table-base tr:hover td {
-  background: #faf8f2;
-}
+/* (Estilos de .table-base vivem na seção TABELAS acima — sem duplicatas.) */

@@ -667,7 +667,7 @@ export function PwaManager() {
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={currentIcon} alt="Ícone" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-white text-3xl font-bold" style={{ fontFamily: "Georgia, serif" }}>
+                <div className="w-full h-full flex items-center justify-center text-white text-3xl font-bold" style={{ fontFamily: "var(--font-display)" }}>
                   {(form.short_name || form.app_name || "A").charAt(0).toUpperCase()}
                 </div>
               )}

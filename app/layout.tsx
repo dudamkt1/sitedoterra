@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { Cormorant_Garamond, DM_Sans } from "next/font/google";
+import { Cormorant_Garamond, DM_Sans, Manrope } from "next/font/google";
 import "@/app/globals.css";
 
 const display = Cormorant_Garamond({
@@ -18,6 +18,15 @@ const body = DM_Sans({
   display: "swap",
 });
 
+// Sans moderna dos painéis (/admin e /painel): títulos sem serifa.
+// O site público continua com Cormorant (serifa editorial).
+const sansDisplay = Manrope({
+  subsets: ["latin"],
+  weight: ["500", "600", "700", "800"],
+  variable: "--font-sans-display",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   title: {
     default: "TopConsultores | Sites profissionais para consultoras doTERRA",
@@ -30,7 +39,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="pt-BR">
-      <body className={`${display.variable} ${body.variable}`}>
+      <body className={`${display.variable} ${body.variable} ${sansDisplay.variable}`}>
         <div className="app-shell">{children}</div>
       </body>
     </html>
