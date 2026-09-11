@@ -195,8 +195,9 @@ export function PwaRegister(props: PwaRegisterProps) {
     } catch {}
     const p = deferredPrompt.current;
     if (!p) {
-      // Sem prompt nativo (iOS sempre; Android sem evento): guia visual.
-      revealSteps();
+      // Sem prompt nativo (iPhone sempre; Android sem evento ou WebView):
+      // abre a tela de instalação visual — o caminho mais curto possível.
+      openSheet();
       return;
     }
     try {
@@ -206,13 +207,36 @@ export function PwaRegister(props: PwaRegisterProps) {
         dismiss();
         return;
       }
-      // Recusou/dispensou o diálogo nativo: mostra o caminho manual.
-      revealSteps();
+      // Recusou/dispensou o diálogo nativo: abre a tela visual.
+      openSheet();
     } catch {
-      revealSteps();
+      openSheet();
     } finally {
       deferredPrompt.current = null;
       setCanNativeInstall(false);
+    }
+  }
+
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  function openSheet() {
+    try {
+      (window.navigator as Navigator & { vibrate?: (p: number) => boolean }).vibrate?.(15);
+    } catch {}
+    setSheetOpen(true);
+  }
+
+  async function copyAppLink() {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // clipboard indisponível (http/WebView antiga): seleciona via prompt
+      try {
+        window.prompt("Copie o link do aplicativo:", window.location.href);
+      } catch {}
     }
   }
 
@@ -355,6 +379,88 @@ export function PwaRegister(props: PwaRegisterProps) {
             <p className="mt-2 text-[0.65rem] text-gray-400 text-center truncate">
               {appName}
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Tela de instalação: o caminho mais curto que cada sistema permite.
+          Android/Chrome com prompt nativo instala em 1 toque (sem esta tela).
+          iPhone e WebViews caem aqui: 3 toques grandes e visuais. */}
+      {sheetOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Instalar aplicativo"
+          className="fixed inset-0 z-[95] flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4"
+          onClick={() => setSheetOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-t-3xl bg-white shadow-2xl overflow-hidden sm:rounded-3xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="h-1.5" style={{ background: props.themeColor }} />
+            <div className="px-6 py-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+              <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-gray-200" />
+              <p className="text-center text-lg font-extrabold text-gray-900">
+                Instalar {appName}
+              </p>
+              <p className="mt-1 text-center text-xs text-gray-500">
+                {platform === "ios"
+                  ? "No iPhone são 3 toques no Safari 👇"
+                  : "Leve o app para sua tela inicial 👇"}
+              </p>
+
+              {inAppBrowser && (
+                <div className="mt-4 rounded-2xl border border-amber-300 bg-amber-50 p-3.5 text-[13px] text-amber-900 leading-relaxed">
+                  <strong>⚠️ Abra no navegador principal primeiro:</strong> toque em{" "}
+                  <strong>⋯</strong> e escolha <strong>“Abrir no Chrome”</strong>{" "}
+                  (Android) ou <strong>“Abrir no Safari”</strong> (iPhone).
+                </div>
+              )}
+
+              <div className="mt-4 space-y-2.5">
+                {(platform === "ios"
+                  ? [
+                      { n: "1", t: "Toque em Compartilhar ⬆️ na barra do Safari" },
+                      { n: "2", t: "Role e toque em “Adicionar à Tela de Início”" },
+                      { n: "3", t: "Confirme em “Adicionar” — pronto! 🎉" },
+                    ]
+                  : [
+                      { n: "1", t: "Toque no menu ⋮ do Chrome" },
+                      { n: "2", t: "Toque em “Instalar app”" },
+                      { n: "3", t: "Confirme em “Instalar” — pronto! 🎉" },
+                    ]
+                ).map((s) => (
+                  <div key={s.n} className="flex items-center gap-3 rounded-2xl bg-gray-50 border border-gray-100 px-4 py-3.5">
+                    <span
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-base font-extrabold text-white"
+                      style={{ background: props.themeColor }}
+                    >
+                      {s.n}
+                    </span>
+                    <span className="text-sm font-medium text-gray-800">{s.t}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-5 flex gap-2">
+                <button
+                  type="button"
+                  onClick={copyAppLink}
+                  className="flex-1 rounded-xl px-4 py-3.5 text-xs font-bold uppercase tracking-wide text-white active:scale-[0.98] transition-all"
+                  style={{ background: props.themeColor }}
+                >
+                  {copied ? "✓ Link copiado!" : "🔗 Copiar link do app"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSheetOpen(false)}
+                  className="rounded-xl px-5 py-3.5 text-xs font-semibold text-gray-600 bg-gray-100 active:scale-[0.98] transition-all"
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
