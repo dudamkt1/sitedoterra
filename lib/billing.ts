@@ -2,6 +2,7 @@ import Stripe from "stripe";
 import { getStripeResolved, getStripe } from "@/lib/stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getActiveOffer, getPlanById } from "@/lib/commercial";
+import { effectiveSubscriptionStatus } from "@/lib/access";
 import type { Subscription } from "@/types";
 
 export interface BillingUser {
@@ -115,29 +116,53 @@ export function addMonths(date: Date, months: number): Date {
 
 /**
  * Ativa tenant + perfil: marca conta ativa e site ativo.
- * Só ativa quando há assinatura ativa (evita ativação sem pagamento recorrente confirmado).
- * Fonte compartilhada entre os webhooks de Stripe e Mercado Pago.
+ * Ativa com assinatura "active" OU trial válido (trialing com trial_end futuro)
+ * — pagamento confirmado (incluindo trial do gateway) sempre liga o site.
+ * Fonte compartilhada entre ativação do admin e webhooks de Stripe/MP.
+ * Bloqueio do super admin nunca é revertido aqui (só unblock manual reabre).
  */
 export async function activateTenant(tenantId: string, userId?: string) {
   const admin = createAdminClient();
   const { data: sub } = await admin
     .from("subscriptions")
-    .select("status")
+    .select("status, trial_end")
     .eq("tenant_id", tenantId)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  if (sub?.status === "active") {
-    await admin.from("tenants").update({ site_status: "active", suspended_at: null }).eq("id", tenantId);
-    if (userId) {
-      await admin.from("profiles").update({ status: "active", activated_at: new Date().toISOString() }).eq("user_id", userId);
-    } else {
-      const { data: t } = await admin.from("tenants").select("user_id").eq("id", tenantId).single();
-      if (t?.user_id) {
-        await admin.from("profiles").update({ status: "active", activated_at: new Date().toISOString() }).eq("user_id", t.user_id);
-      }
-    }
+  if (effectiveSubscriptionStatus(sub as { status: Subscription["status"]; trial_end: string | null } | null) !== "active") {
+    return;
+  }
+
+  // Conta bloqueada pelo super admin: pagamento não reabre sozinho.
+  const { data: tenantRow } = await admin
+    .from("tenants")
+    .select("user_id")
+    .eq("id", tenantId)
+    .single();
+  const targetUserId = userId || (tenantRow as { user_id?: string } | null)?.user_id;
+  if (targetUserId) {
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("status")
+      .eq("user_id", targetUserId)
+      .maybeSingle();
+    if ((profile as { status?: string } | null)?.status === "blocked") return;
+  }
+
+  await admin.from("tenants").update({
+    site_status: "active",
+    suspended_at: null,
+    activated_at: new Date().toISOString(),
+  }).eq("id", tenantId);
+  if (targetUserId) {
+    await admin.from("profiles").update({
+      status: "active",
+      activated_at: new Date().toISOString(),
+      suspended_at: null,
+      cancelled_at: null,
+    }).eq("user_id", targetUserId);
   }
 }
 
@@ -251,6 +276,8 @@ export async function ensureStripePricesForPlan(
     current_period_start: sub.current_period_start ? new Date(sub.current_period_start * 1000).toISOString() : null,
     current_period_end: sub.current_period_end ? new Date(sub.current_period_end * 1000).toISOString() : null,
     next_billing_at: sub.current_period_end ? new Date(sub.current_period_end * 1000).toISOString() : null,
+    // Trial do próprio Stripe: persiste o fim do teste para a regra de acesso.
+    trial_end: sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null,
     cancel_at_period_end: sub.cancel_at_period_end,
   };
 

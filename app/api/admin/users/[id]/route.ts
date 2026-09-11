@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser, getProfile } from "@/lib/auth";
 import { getOrCreateCustomer, createRecurringSubscription } from "@/lib/billing";
+import { effectiveSubscriptionStatus } from "@/lib/access";
+import type { SubscriptionStatus } from "@/types";
 
 export const runtime = "nodejs";
 
@@ -99,14 +101,19 @@ export async function PATCH(
   }
 
   // ------------------------------------------- status da assinatura -----
+  // REGRA DE OURO: mudar a assinatura ATIVA O SITE INTEIRO (perfil + tenant).
+  // Ativar só a assinatura e deixar perfil/tenant pendentes causava a
+  // divergência "ativo no /admin, inativo no /painel". Super admin ativando
+  // equivale a pagamento confirmado: tudo fica consistente de uma vez.
   if (action === "set_subscription_status") {
     const allowedStatuses = ["awaiting_activation", "active", "paused", "canceled", "past_due"];
     const status = String(body.status || "");
     if (!allowedStatuses.includes(status)) {
       return NextResponse.json({ error: "Status inválido." }, { status: 400 });
     }
-    const { data: tenant } = await admin.from("tenants").select("id").eq("user_id", userId).maybeSingle();
+    const { data: tenant } = await admin.from("tenants").select("id, monthly_billing_enabled, site_status").eq("user_id", userId).maybeSingle();
     if (!tenant) return NextResponse.json({ error: "Usuário sem tenant" }, { status: 404 });
+    const { data: profile } = await admin.from("profiles").select("status").eq("user_id", userId).maybeSingle();
     const { data: sub } = await admin
       .from("subscriptions")
       .select("id")
@@ -115,12 +122,57 @@ export async function PATCH(
       .limit(1)
       .maybeSingle();
     if (!sub) return NextResponse.json({ error: "Usuário sem assinatura." }, { status: 404 });
+
+    const now = new Date().toISOString();
     await admin.from("subscriptions").update({
       status,
-      canceled_at: status === "canceled" ? new Date().toISOString() : null,
+      canceled_at: status === "canceled" ? now : null,
     }).eq("id", sub.id);
-    await audit(admin, actor.id, "subscription.status_changed", sub.id, { target_user_id: userId, status });
-    return NextResponse.json({ success: true });
+
+    const billingEnabled = (tenant as { monthly_billing_enabled?: boolean }).monthly_billing_enabled !== false;
+    const blocked = (profile as { status?: string } | null)?.status === "blocked";
+    const cascaded: Record<string, string> = {};
+
+    if (!blocked) {
+      if (status === "active") {
+        // ATIVAÇÃO COMPLETA: conta + site no ar (ou isento segue ativo).
+        await admin.from("profiles").update({
+          status: "active", activated_at: now, suspended_at: null, cancelled_at: null,
+        }).eq("user_id", userId);
+        await admin.from("tenants").update({
+          site_status: "active", activated_at: now, suspended_at: null, cancelled_at: null,
+        }).eq("id", tenant.id);
+        cascaded.profile = "active";
+        cascaded.tenant = "active";
+      } else if (status === "canceled") {
+        await admin.from("profiles").update({ status: "cancelled", cancelled_at: now }).eq("user_id", userId);
+        if (billingEnabled) {
+          await admin.from("tenants").update({ site_status: "suspended", suspended_at: now }).eq("id", tenant.id);
+          cascaded.tenant = "suspended";
+        }
+        cascaded.profile = "cancelled";
+      } else if (status === "paused" || status === "past_due") {
+        // Site fora do ar, mas NADA é apagado (dados + histórico preservados).
+        if (billingEnabled) {
+          await admin.from("tenants").update({ site_status: "suspended", suspended_at: now }).eq("id", tenant.id);
+          cascaded.tenant = "suspended";
+        }
+      } else if (status === "awaiting_activation") {
+        if (billingEnabled) {
+          await admin.from("tenants").update({ site_status: "pending", suspended_at: null }).eq("id", tenant.id);
+          cascaded.tenant = "pending";
+        }
+      }
+    } else {
+      cascaded.skipped = "conta bloqueada: perfil/tenant mantidos como estão";
+    }
+
+    await audit(admin, actor.id, "subscription.status_changed", sub.id, {
+      target_user_id: userId,
+      status,
+      cascaded,
+    });
+    return NextResponse.json({ success: true, cascaded });
   }
 
   // ------------------------------------------------ ativação do site ----
@@ -323,11 +375,58 @@ export async function PATCH(
 
   const { data: tenant } = await admin.from("tenants").select("id").eq("user_id", userId).maybeSingle();
 
+  // Snapshot prévio para o histórico (bloqueio nunca apaga nada — só muda status).
+  const { data: beforeTenant } = tenant
+    ? await admin.from("tenants").select("site_status").eq("id", tenant.id).maybeSingle()
+    : { data: null };
+  const { data: beforeSub } = tenant
+    ? await admin
+        .from("subscriptions")
+        .select("status")
+        .eq("tenant_id", tenant.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    : { data: null };
+
   if (cfg.profile) {
     await admin.from("profiles").update(cfg.profile).eq("user_id", userId);
   }
   if (cfg.tenant && tenant) {
     await admin.from("tenants").update(cfg.tenant).eq("id", tenant.id);
+  }
+
+  // Desbloquear/reativar NÃO liga o site no vazio: recalcula pelo estado real
+  // (isenção ou assinatura efetivamente ativa → no ar; senão segue suspenso
+  // até o pagamento/ativação, sem perder nenhum dado).
+  if ((action === "unblock" || action === "unsuspend") && tenant) {
+    const { data: tRow } = await admin
+      .from("tenants")
+      .select("monthly_billing_enabled")
+      .eq("id", tenant.id)
+      .maybeSingle();
+    const { data: latestSub } = await admin
+      .from("subscriptions")
+      .select("status, trial_end")
+      .eq("tenant_id", tenant.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const billingEnabled = (tRow as { monthly_billing_enabled?: boolean } | null)?.monthly_billing_enabled !== false;
+    const subOk =
+      !billingEnabled ||
+      effectiveSubscriptionStatus(
+        latestSub as { status: SubscriptionStatus; trial_end: string | null } | null
+      ) === "active";
+    const now = new Date().toISOString();
+    await admin
+      .from("tenants")
+      .update(
+        subOk
+          ? { site_status: "active", suspended_at: null }
+          : { site_status: "suspended", suspended_at: now }
+      )
+      .eq("id", tenant.id);
   }
 
   if (cfg.auth) {
@@ -343,7 +442,12 @@ export async function PATCH(
     action: cfg.audit,
     entity_type: "profile",
     entity_id: userId,
-    metadata: { target_user_id: userId },
+    metadata: {
+      target_user_id: userId,
+      // Histórico do bloqueio: o que era antes (nada se perde) e o que ficou.
+      previous_site_status: (beforeTenant as { site_status?: string } | null)?.site_status ?? null,
+      previous_subscription_status: (beforeSub as { status?: string } | null)?.status ?? null,
+    },
   });
 
   return NextResponse.json({ success: true });

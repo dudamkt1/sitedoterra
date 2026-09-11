@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isSitePublic } from "@/lib/access";
+import { effectiveSubscriptionStatus, isSitePublic } from "@/lib/access";
 import type { PublicTenant, Subscription } from "@/types";
 
 /**
@@ -89,12 +89,17 @@ export async function resolveTenantAccess(opts: { slug?: string; hostname?: stri
     .limit(1)
     .single();
 
+  // Trial válido conta como ativo (mesma regra do painel e do /admin).
+  const effectiveStatus = effectiveSubscriptionStatus(
+    sub as { status: Subscription["status"]; trial_end: string | null } | null
+  );
+
   return {
     tenant,
     access: isSitePublic(
       "active",
       tenant.site_status as "active" | "pending" | "suspended",
-      (sub?.status as Subscription["status"]) || "awaiting_activation",
+      effectiveStatus,
       false,
       tenant.monthly_billing_enabled !== false
     )

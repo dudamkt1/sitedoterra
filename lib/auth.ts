@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ensureTenantForUser } from "@/lib/onboarding";
+import { isTrialExpired } from "@/lib/access";
 import type { Profile, Subscription, Tenant, Domain, Plan } from "@/types";
 
 export async function getCurrentUser() {
@@ -81,6 +82,34 @@ export async function getDashboardContext(): Promise<DashboardContext | null> {
   ]);
 
   const subscription = (subResult.data as (Subscription & { plan?: Plan | null }) | null) || null;
+
+  // O status "trialing" é normalizado para "active" nos pontos onde o acesso
+  // é calculado (effectiveSubscriptionStatus) — aqui o objeto segue com o
+  // status real para exibição honesta ("Teste" vs "Ativo") no painel.
+
+  // Finalização "preguiçosa" de trial expirado: sem cron, o próximo acesso ao
+  // painel converte o trial vencido em "past_due" e suspende o site.
+  // Nada é apagado — dados e histórico preservados para reativação.
+  if (subscription && tenant && isTrialExpired(subscription)) {
+    await admin
+      .from("subscriptions")
+      .update({ status: "past_due" })
+      .eq("id", subscription.id);
+
+    const { data: tenantRow } = await admin
+      .from("tenants")
+      .select("monthly_billing_enabled")
+      .eq("id", tenant.id)
+      .maybeSingle();
+    if (tenantRow?.monthly_billing_enabled !== false) {
+      await admin
+        .from("tenants")
+        .update({ site_status: "suspended", suspended_at: new Date().toISOString() })
+        .eq("id", tenant.id);
+      tenant.site_status = "suspended";
+    }
+    subscription.status = "past_due";
+  }
 
   // Finalização "preguiçosa" de cancelamento agendado no Mercado Pago:
   // sem cron, quando o período pago termina, o próximo acesso ao painel

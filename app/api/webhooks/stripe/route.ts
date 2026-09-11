@@ -168,6 +168,11 @@ async function handleEvent(event: Stripe.Event) {
 
       await activateTenant(tenantId, tenant.user_id);
 
+      await auditPaymentEvent("user.site_activated_payment", tenant.user_id, tenantId, {
+        gateway: "stripe",
+        amount_cents: session.amount_total || 0,
+      });
+
       // ---- Atribuição de afiliado ----
       // Se a sessão foi iniciada via cookie `tc_visitor_token` (link de afiliado),
       // o `metadata.visitor_token` chega aqui. A conversão é registrada para
@@ -216,6 +221,13 @@ async function handleEvent(event: Stripe.Event) {
         // Período terminou / cancelado → suspende o site (dados preservados)
         const tenantId = local.tenant_id;
         await admin.from("tenants").update({ site_status: "suspended", suspended_at: new Date().toISOString() }).eq("id", tenantId);
+        const { data: tOwner } = await admin.from("tenants").select("user_id").eq("id", tenantId).maybeSingle();
+        if (tOwner?.user_id) {
+          await auditPaymentEvent("user.site_suspended_billing", tOwner.user_id, tenantId, {
+            gateway: "stripe",
+            stripe_status: sub.status,
+          });
+        }
       }
       break;
     }
@@ -292,6 +304,12 @@ async function handleEvent(event: Stripe.Event) {
         if (sub) {
           await admin.from("subscriptions").update({ status: "past_due" }).eq("id", sub.id);
           await admin.from("tenants").update({ site_status: "suspended", suspended_at: new Date().toISOString() }).eq("id", tenantId);
+          const { data: tOwner } = await admin.from("tenants").select("user_id").eq("id", tenantId).maybeSingle();
+          if (tOwner?.user_id) {
+            await auditPaymentEvent("user.site_suspended_past_due", tOwner.user_id, tenantId, {
+              gateway: "stripe",
+            });
+          }
         }
       }
       break;
@@ -323,4 +341,27 @@ function mapForDb(status: string): string {
   if (status === "unpaid") return "unpaid";
   if (status === "canceled") return "canceled";
   return status;
+}
+
+/**
+ * Histórico de ativações/suspensões por pagamento (best-effort: nunca quebra
+ * o webhook). actor = dono da conta; via identifica o gateway.
+ */
+async function auditPaymentEvent(
+  action: string,
+  userId: string,
+  tenantId: string,
+  metadata: Record<string, unknown> = {}
+) {
+  try {
+    const admin = createAdminClient();
+    await admin.from("audit_logs").insert({
+      actor_id: userId,
+      actor_role: "user",
+      action,
+      entity_type: "profile",
+      entity_id: userId,
+      metadata: { tenant_id: tenantId, via: "webhook_stripe", ...metadata },
+    });
+  } catch {}
 }

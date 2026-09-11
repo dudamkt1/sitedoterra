@@ -244,6 +244,11 @@ async function handleActivationPayment(payment: MpPayment) {
     await activateTenant(tenantId, tenant.user_id);
   }
 
+  await auditPaymentEvent("user.site_activated_payment", tenant.user_id, tenantId, {
+    gateway: "mercadopago",
+    amount_cents: amountCents,
+  });
+
   // ---- Atribuição de afiliado ----
   // Se a preferência foi criada com `metadata.visitor_token` (link de
   // afiliado), o pagamento carrega esse mesmo token no `metadata`. Aqui
@@ -338,6 +343,14 @@ async function handleRecurringPayment(payment: MpPayment) {
     );
 
     await activateTenant(tenantId);
+
+    const { data: tOwner } = await admin.from("tenants").select("user_id").eq("id", tenantId).maybeSingle();
+    if (tOwner?.user_id) {
+      await auditPaymentEvent("user.site_reactivated_payment", tOwner.user_id, tenantId, {
+        gateway: "mercadopago",
+        amount_cents: amountCents,
+      });
+    }
   } else if (payment.status === "rejected" || payment.status === "cancelled") {
     const { data: tenantRow } = await admin
       .from("tenants")
@@ -350,6 +363,12 @@ async function handleRecurringPayment(payment: MpPayment) {
         .from("tenants")
         .update({ site_status: "suspended", suspended_at: new Date().toISOString() })
         .eq("id", tenantId);
+      const { data: tOwner } = await admin.from("tenants").select("user_id").eq("id", tenantId).maybeSingle();
+      if (tOwner?.user_id) {
+        await auditPaymentEvent("user.site_suspended_past_due", tOwner.user_id, tenantId, {
+          gateway: "mercadopago",
+        });
+      }
     }
   }
   // status "pending"/"in_process" (ex.: PIX aguardando) → aguarda confirmação
@@ -402,6 +421,13 @@ async function handleSubscriptionUpdate(subscriptionId: string) {
         .from("tenants")
         .update({ site_status: "suspended", suspended_at: new Date().toISOString() })
         .eq("id", tenantId);
+      const { data: tOwner } = await admin.from("tenants").select("user_id").eq("id", tenantId).maybeSingle();
+      if (tOwner?.user_id) {
+        await auditPaymentEvent("user.site_suspended_billing", tOwner.user_id, tenantId, {
+          gateway: "mercadopago",
+          mp_status: mpSub.status,
+        });
+      }
     }
   } else if (mpSub.status === "authorized" || mpSub.status === "charged" || mpSub.status === "pending") {
     await activateTenant(tenantId);
@@ -431,4 +457,27 @@ function mapMpSubStatus(status: string): string {
     default:
       return "active";
   }
+}
+
+/**
+ * Histórico de ativações/suspensões por pagamento (best-effort: nunca quebra
+ * o webhook). actor = dono da conta; via identifica o gateway.
+ */
+async function auditPaymentEvent(
+  action: string,
+  userId: string,
+  tenantId: string,
+  metadata: Record<string, unknown> = {}
+) {
+  try {
+    const admin = createAdminClient();
+    await admin.from("audit_logs").insert({
+      actor_id: userId,
+      actor_role: "user",
+      action,
+      entity_type: "profile",
+      entity_id: userId,
+      metadata: { tenant_id: tenantId, via: "webhook_mp", ...metadata },
+    });
+  } catch {}
 }

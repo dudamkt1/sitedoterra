@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getPainelContext } from "@/lib/demo/painel-context";
-import { getSiteAccess } from "@/lib/access";
+import { getSiteAccess, effectiveSubscriptionStatus } from "@/lib/access";
 import { formatBRL, formatDate } from "@/lib/utils";
 import { getActiveOffer } from "@/lib/commercial";
 import { StatCard, StatusBadge } from "@/components/dashboard/ui";
@@ -17,7 +17,7 @@ export default async function PainelHome() {
   const siteAccess = getSiteAccess({
     accountStatus: profile.status,
     siteStatus: tenant?.site_status || "pending",
-    subscriptionStatus: subscription?.status || "awaiting_activation",
+    subscriptionStatus: effectiveSubscriptionStatus(subscription),
     blocked: profile.status === "blocked",
     billingEnabled: tenant?.monthly_billing_enabled !== false,
   });

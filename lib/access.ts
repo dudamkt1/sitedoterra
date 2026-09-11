@@ -12,6 +12,39 @@ export interface AccessInput {
 export type SiteAccess = "available" | "suspended";
 
 /**
+ * Status EFETIVO da assinatura para fins de acesso.
+ *
+ * - "trialing" com trial_end no futuro = período de teste válido → conta
+ *   como "active" (o Super Admin ativou em trial OU o gateway confirmou).
+ * - "trialing" com trial_end vencido/ausente = teste encerrado → "past_due"
+ *   (suspende o site até regularizar, sem apagar nada).
+ * - Demais status passam intactos.
+ *
+ * Centraliza a regra para que admin, webhooks, painel e site público
+ * concordem sobre o mesmo estado. Nada de "ativo num lugar, inativo noutro".
+ */
+export function effectiveSubscriptionStatus(sub: {
+  status: SubscriptionStatus;
+  trial_end?: string | null;
+} | null | undefined): SubscriptionStatus {
+  const status = sub?.status || "awaiting_activation";
+  if (status !== "trialing") return status;
+  const end = sub?.trial_end ? new Date(sub.trial_end).getTime() : NaN;
+  if (!Number.isNaN(end) && end > Date.now()) return "active";
+  return "past_due";
+}
+
+/** true quando um trial expirou e precisa de finalização preguiçosa no banco. */
+export function isTrialExpired(sub: {
+  status: SubscriptionStatus;
+  trial_end?: string | null;
+} | null | undefined): boolean {
+  if (sub?.status !== "trialing") return false;
+  const end = sub?.trial_end ? new Date(sub.trial_end).getTime() : NaN;
+  return Number.isNaN(end) || end <= Date.now();
+}
+
+/**
  * REGRA CENTRAL DE ACESSO PÚBLICO.
  *
  * PUBLIC_SITE = AVAILABLE quando:
