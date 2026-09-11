@@ -123,25 +123,16 @@ export async function renderPwaPng(
     const input = await fetchSource(absolute);
     if (!input) continue;
     try {
-      let pipeline = sharp(input, { failOn: "none" }).flatten({ background: theme });
-      if (kind === "maskable") {
-        // Safe zone 80%: conteúdo centralizado com padding do tema.
-        const safe = Math.round(size * 0.8);
-        pipeline = pipeline.resize(safe, safe, {
-          fit: "contain",
-          background: theme,
-        });
-        pipeline = pipeline.extend({
-          top: Math.floor((size - safe) / 2),
-          bottom: Math.ceil((size - safe) / 2),
-          left: Math.floor((size - safe) / 2),
-          right: Math.ceil((size - safe) / 2),
-          background: theme,
-        });
-      } else {
-        // Contain (não corta logos retangulares) + fundo opaco do tema.
-        pipeline = pipeline.resize(size, size, { fit: "contain", background: theme });
-      }
+      // Full-bleed INTENCIONAL (inclusive maskable): a arte enviada pelo
+      // usuário já é o ícone final quadrado. Encolher para "safe zone" criava
+      // moldura de cor diferente do fundo do logo — e o Android usa justamente
+      // o maskable na tela inicial ("logo diferente" no app instalado).
+      // Bordas full-bleed têm a cor do próprio fundo do logo → o recorte do
+      // launcher (círculo/squircle) fica invisível e o ícone é IDÊNTICO ao
+      // enviado em todos os tamanhos e launchers.
+      const pipeline = sharp(input, { failOn: "none" })
+        .flatten({ background: theme })
+        .resize(size, size, { fit: "contain", background: theme });
       const buffer = await pipeline.png({ compressionLevel: 9 }).toBuffer();
       return { buffer, generated: false };
     } catch {

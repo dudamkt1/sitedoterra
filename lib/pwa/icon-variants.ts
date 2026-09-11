@@ -126,36 +126,17 @@ async function drawComposedSquare(
   return await canvasToBlob(canvas, type);
 }
 
-/** Maskable: padding 10% (safe zone 80%). Fundo OPAÇO obrigatório (Android corta em squircle). */
+/** Maskable full-bleed: IDÊNTICO ao ícone "any" (sem encolhimento).
+ * Encolher para "safe zone" criava moldura de cor diferente do fundo do logo
+ * — e o Android usa justamente o maskable na tela inicial, exibindo um "logo
+ * diferente" do enviado. Bordas full-bleed têm a cor do próprio fundo do logo,
+ * então o recorte do launcher fica invisível. */
 async function drawMaskable(
   source: HTMLImageElement | ImageBitmap,
   size: number,
   bgColor: string
 ): Promise<Blob> {
-  const { canvas, ctx } = makeCanvas(size);
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = "high";
-
-  // Fundo opaco.
-  ctx.fillStyle = bgColor || "#1d5c3a";
-  ctx.fillRect(0, 0, size, size);
-
-  // Conteúdo em 80% do canvas (10% padding de cada lado).
-  const safe = Math.round(size * 0.8);
-  const dx = Math.floor((size - safe) / 2);
-  const dy = dx;
-
-  const srcW = "naturalWidth" in source ? source.naturalWidth : source.width;
-  const srcH = "naturalHeight" in source ? source.naturalHeight : source.height;
-  const ratio = Math.min(safe / srcW, safe / srcH);
-  const drawW = Math.round(srcW * ratio);
-  const drawH = Math.round(srcH * ratio);
-  const ix = dx + Math.floor((safe - drawW) / 2);
-  const iy = dy + Math.floor((safe - drawH) / 2);
-
-  ctx.drawImage(source, ix, iy, drawW, drawH);
-
-  return await canvasToBlob(canvas, "image/png");
+  return drawComposedSquare(source, size, bgColor, "opaque");
 }
 
 function canvasToBlob(canvas: HTMLCanvasElement, type: string): Promise<Blob> {
@@ -175,7 +156,7 @@ function canvasToBlob(canvas: HTMLCanvasElement, type: string): Promise<Blob> {
  *   mas opaco fica melhor quando a home screen é clara).
  * - icon_192 (Android legacy): opaco, fundo = theme_color.
  * - icon_512 (Android splash/home): opaco, fundo = theme_color.
- * - icon_maskable_512: opaco, fundo = theme_color, conteúdo em safe zone 80%.
+ * - icon_maskable_512: idêntico ao 512 (full-bleed — sem moldura).
  *
  * Imagens retangulares são COMPOSTAS com padding (não distorcidas).
  * Imagens transparentes ficam visíveis porque o fundo é sempre opaco.
