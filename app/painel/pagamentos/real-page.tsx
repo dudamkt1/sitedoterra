@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { getDashboardContext, type DashboardContext } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SectionTitle, StatusBadge } from "@/components/dashboard/ui";
@@ -28,12 +29,33 @@ const DEMO_ROWS = [
   },
 ];
 
-export default async function PagamentosPage(p: { demoCtx?: DashboardContext }) {
+export default function PagamentosPage(p: { demoCtx?: DashboardContext }) {
   const ctx = p.demoCtx ?? (await getDashboardContext());
   if (!ctx?.profile) return null;
 
   const tenantId = ctx.tenant?.id;
+  const [pendingActivationPayment, setPendingActivationPayment] = useState<boolean | null>(null);
+  const [checking, setChecking] = useState(false);
   let rows: any[] = DEMO_ROWS;
+
+  useEffect(() => {
+    async function checkPendingPayment() {
+      if (!tenantId) return;
+      setChecking(true);
+      try {
+        const res = await fetch("/api/subscription/status");
+        const data = await res.json();
+        if (data.pendingActivationPayment) {
+          setPendingActivationPayment(true);
+        }
+      } catch {
+        // Best-effort
+      } finally {
+        setChecking(false);
+      }
+    }
+    checkPendingPayment();
+  }, [tenantId]);
 
   if (tenantId && !p.demoCtx) {
     const admin = createAdminClient();
@@ -77,6 +99,25 @@ export default async function PagamentosPage(p: { demoCtx?: DashboardContext }) 
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+        {pendingActivationPayment !== null && (
+          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <p className="font-semibold text-sm text-amber-900">⏳ Pagamento pendente</p>
+            <p className="text-xs text-amber-800 mt-1">
+              Você iniciou a ativação mas o pagamento ainda não foi concluído.
+              Finalize na aba de pagamento ou use as opções abaixo quando quiser.
+            </p>
+            <div className="mt-3 flex flex-col sm:flex-row gap-2">
+              <button type="button" className="btn btn-outline !py-2.5 text-xs" onClick={checkPendingPayment} disabled={checking}>
+                🔄 Verificar pagamento
+              </button>
+              {pendingActivationPayment && (
+                <button type="button" className="btn btn-gold !py-2.5 text-xs" onClick={checkPendingPayment} disabled={checking}>
+                  Pagar Agora
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>
