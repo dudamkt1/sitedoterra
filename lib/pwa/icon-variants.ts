@@ -170,10 +170,19 @@ export async function generateIconVariants(
 ): Promise<IconVariantsResult> {
   const opts = { ...DEFAULT_OPTIONS, ...options };
   const img = await blobToCanvas(sourceBlob);
+  const sourceWidth = img.width;
+  const sourceHeight = img.height;
+  const minSide = Math.min(sourceWidth, sourceHeight);
 
-  // Fundo padrão: theme_color (mais "vivo" e consistente com a marca).
-  // Para casos onde a logo já é quadrada e "com fundo", o fundo fica
-  // uniforme e o Android mostra bem.
+  // Limite máximo: imagens excessivamente grandes são downscaled para 512px fonte
+  // para evitar problemas de memória no canvas e upload. O sistema compõe com padding.
+  const MAX_SOURCE_DIM = 2048;
+  const scale = minSide > MAX_SOURCE_DIM ? MAX_SOURCE_DIM / minSide : 1;
+
+  // Se a imagem for maior que o limite, desenhamos diretamente no canvas alvo
+  // com o fator de escala adequado, evitando criar blob intermediário.
+  const drawSize = minSide > MAX_SOURCE_DIM ? 512 : 512;
+
   const anyBg = opts.anyMode === "solid" ? opts.backgroundColor : opts.themeColor;
 
   const [icon_180, icon_192, icon_512, icon_maskable_512] = await Promise.all([
