@@ -722,7 +722,7 @@ export function PwaManager() {
         )}
         {iconesIgualados && (
           <p className="mt-2 text-sm text-red-600">
-            ⚠️ Todos os ícones do PWA estão apontando para o mesmo arquivo. O ícone instalado pode não aparecer corretamente. Clique em "Verificar URLs" para conferir ou faça upload de um novo logotipo.
+            ⚠️ Todos os ícones do PWA estão apontando para o mesmo arquivo. O ícone instalado pode não aparecer corretamente. Clique aqui para conferir ou faça upload de um novo logotipo.
           </p>
         )}
 
