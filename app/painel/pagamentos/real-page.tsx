@@ -29,7 +29,7 @@ const DEMO_ROWS = [
   },
 ];
 
-export default function PagamentosPage(p: { demoCtx?: DashboardContext }) {
+export default async function PagamentosPage(p: { demoCtx?: DashboardContext }) {
   const ctx = p.demoCtx ?? (await getDashboardContext());
   if (!ctx?.profile) return null;
 
