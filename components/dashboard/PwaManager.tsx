@@ -330,6 +330,7 @@ export function PwaManager() {
 
   const statusStyle = status ? LEVEL_STYLES[status.level] : "";
   const currentIcon = form.icon_512_url || form.icon_192_url;
+  const iconesIgualados = status?.checks?.iconesIgualados || false;
 
   return (
     <div className="space-y-6">
@@ -717,6 +718,11 @@ export function PwaManager() {
         {msg && (
           <p className={`mt-4 text-sm rounded-lg px-3 py-2 ${msg.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"}`}>
             {msg.text}
+          </p>
+        )}
+        {iconesIgualados && (
+          <p className="mt-2 text-sm text-red-600">
+            ⚠️ Todos os ícones do PWA estão apontando para o mesmo arquivo. O ícone instalado pode não aparecer corretamente. Clique em "Verificar URLs" para conferir ou faça upload de um novo logotipo.
           </p>
         )}
 

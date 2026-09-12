@@ -226,6 +226,7 @@ export interface PwaChecklist {
   manifest: boolean;
   serviceWorker: boolean;
   ativa: boolean;
+  iconesIgualados: boolean;
 }
 
 export interface PwaStatus {
@@ -235,6 +236,15 @@ export interface PwaStatus {
 }
 
 export function computePwaStatus(s: PwaSettings): PwaStatus {
+  const iconUrls = [
+    s.icon_180_url,
+    s.icon_192_url,
+    s.icon_512_url,
+    s.icon_maskable_512_url,
+  ];
+  const iconesIgualados = iconUrls.filter(
+    (u, i) => u && iconUrls.every((v) => v === u)
+  ).length > 0;
   const checks: PwaChecklist = {
     nome: Boolean(s.app_name && s.short_name),
     logo: Boolean(s.logo_url),
@@ -243,6 +253,7 @@ export function computePwaStatus(s: PwaSettings): PwaStatus {
     manifest: Boolean(s.app_name),
     serviceWorker: true, // servido automaticamente quando a PWA está ativa
     ativa: s.enabled,
+    iconesIgualados,
   };
   const essentials =
     checks.nome && checks.cores && checks.manifest && checks.ativa;
