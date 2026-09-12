@@ -386,8 +386,8 @@ export function SubscriptionManager({
                     <button type="button" className="btn btn-outline !py-2.5 text-xs" onClick={() => window.location.href = `/painel/assinatura?resume=1`} disabled={checking}>
                       🔄 Retomar activation
                     </button>
-                    <button type="button" className="btn btn-outline !py-2.5 text-xs" onClick={() => setStep("checkout")} disabled={checking}>
-                      🔄 Novo link de pagamento
+                    <button type="button" className="btn btn-outline !py-2.5 text-xs" onClick={checkPayment} disabled={checking}>
+                      🔄 Verificar pagamento
                     </button>
                   </div>
                 </div>
