@@ -17,9 +17,10 @@ export async function GET() {
   const tenant = await ensureTenantForUser(user.id);
   if (!tenant) return NextResponse.json({ authenticated: true, activated: false, site_status: "pending" });
 
-  const [{ data: sub }, { data: payment }] = await Promise.all([
+  const [{ data: sub }, { data: payment }, { data: pendingPayment }] = await Promise.all([
     admin.from("subscriptions").select("status, current_period_end, next_billing_at, trial_end").eq("tenant_id", tenant.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
     admin.from("payments").select("id, status, type, created_at").eq("tenant_id", tenant.id).eq("type", "activation").eq("status", "succeeded").order("created_at", { ascending: false }).limit(1).maybeSingle(),
+    admin.from("payments").select("id, status, type, created_at").eq("tenant_id", tenant.id).eq("type", "activation").eq("status", "pending").order("created_at", { ascending: false }).limit(1).maybeSingle(),
   ]);
 
   const activated = tenant.site_status === "active" && Boolean(payment);
@@ -32,6 +33,7 @@ export async function GET() {
     subscription_status: subscriptionStatus,
     tenant_id: tenant.id,
     hasActivationPayment: Boolean(payment),
+    pendingActivationPayment: Boolean(pendingPayment),
     next_billing_at: sub?.next_billing_at || sub?.current_period_end || null,
   });
 }

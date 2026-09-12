@@ -56,24 +56,47 @@ export function SubscriptionManager({
   const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const paymentOk = searchParams.get("sucesso") === "1";
+  const resume = searchParams.get("resume") === "1";
 
   const activationPaid = activation?.status === "succeeded";
 
   const [checking, setChecking] = useState(false);
   /** Checkout iniciado em outra aba e ainda sem confirmação (localStorage). */
   const [checkoutPending, setCheckoutPending] = useState(false);
+  /** Pagamento pendente detectado via API (registro no banco). */
+  const [pendingActivationPayment, setPendingActivationPayment] = useState<boolean | null>(null);
   /** Abertura do painel de demonstração ("Ainda tem dúvidas?"). */
   const [demoLoading, setDemoLoading] = useState(false);
 
   useEffect(() => {
     try {
-      if (!activationPaid && window.localStorage.getItem("site_activation_checkout") === "1") {
+      if (resume) {
+        try {
+          window.localStorage.removeItem("site_activation_checkout");
+        } catch {}
+        window.location.reload();
+      } else if (!activationPaid && window.localStorage.getItem("site_activation_checkout") === "1") {
         setCheckoutPending(true);
       }
     } catch {
       // localStorage indisponível — segue sem o aviso de pendência.
     }
-  }, [activationPaid]);
+  }, [activationPaid, resume]);
+
+  useEffect(() => {
+    async function checkPendingPayment() {
+      try {
+        const res = await fetch("/api/subscription/status");
+        const data = await res.json();
+        if (data.pendingActivationPayment) {
+          setPendingActivationPayment(true);
+        }
+      } catch {
+        // Best-effort
+      }
+    }
+    checkPendingPayment();
+  }, []);
 
   const pixCents = pixDiscountPercent > 0
     ? Math.round((activationPriceCents * (100 - pixDiscountPercent)) / 100)
@@ -133,7 +156,7 @@ export function SubscriptionManager({
     try {
       const res = await fetch("/api/subscription/status");
       const data = await res.json();
-      if (data.activated || data.hasActivationPayment) {
+      if (data.activated || data.hasActivationPayment || data.pendingActivationPayment) {
         try {
           window.localStorage.removeItem("site_activation_checkout");
         } catch {}
@@ -360,8 +383,11 @@ export function SubscriptionManager({
                     Finalize na aba de pagamento ou use as opções abaixo quando quiser.
                   </p>
                   <div className="mt-3 flex flex-col sm:flex-row gap-2">
-                    <button type="button" className="btn btn-outline !py-2.5 text-xs" onClick={checkPayment} disabled={checking}>
-                      {checking ? "Verificando..." : "🔄 Já paguei — verificar"}
+                    <button type="button" className="btn btn-outline !py-2.5 text-xs" onClick={() => window.location.href = `/painel/assinatura?resume=1`} disabled={checking}>
+                      🔄 Retomar activation
+                    </button>
+                    <button type="button" className="btn btn-outline !py-2.5 text-xs" onClick={() => setStep("checkout")} disabled={checking}>
+                      🔄 Novo link de pagamento
                     </button>
                   </div>
                 </div>

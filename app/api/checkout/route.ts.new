@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getStripeResolved } from "@/lib/stripe";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -16,28 +16,28 @@ const VISITOR_TOKEN_COOKIE = "tc_visitor_token";
 export const runtime = "nodejs";
 
 /**
- * Inicia o fluxo de contratação (ATIVAÇÃO):
- *  - Cria uma Checkout Session (pagamento ÚNICO) com o Price de ativação
- *    cadastrado na configuração comercial do Super Admin (tabela plans).
- *  - A confirmação definitiva do pagamento acontece pelo WEBHOOK, que cria o
- *    Customer + assinatura mensal recorrente com primeira cobrança após o
- *    período configurado. O frontend nunca é a fonte de verdade.
+ * Inicia o fluxo de contrataÃ§Ã£o (ATIVAÃ‡ÃƒO):
+ *  - Cria uma Checkout Session (pagamento ÃšNICO) com o Price de ativaÃ§Ã£o
+ *    cadastrado na configuraÃ§Ã£o comercial do Super Admin (tabela plans).
+ *  - A confirmaÃ§Ã£o definitiva do pagamento acontece pelo WEBHOOK, que cria o
+ *    Customer + assinatura mensal recorrente com primeira cobranÃ§a apÃ³s o
+ *    perÃ­odo configurado. O frontend nunca Ã© a fonte de verdade.
  */
 export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) {
-    return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+    return NextResponse.json({ error: "NÃ£o autenticado" }, { status: 401 });
   }
 
   const body = await request.json().catch(() => ({}));
   const planId = body.planId as string | undefined;
   const embedded = Boolean(body.embedded);
-  // Método escolhido pelo cliente na tela de pagamento ("pix" | "card").
-  // Usado SOMENTE para alinhar o valor da preferência no fluxo fallback
-  // (nova aba). No Brick, o valor é decidido em /mp/process pelo método
-  // efetivo — o frontend nunca é fonte de verdade.
+  // MÃ©todo escolhido pelo cliente na tela de pagamento ("pix" | "card").
+  // Usado SOMENTE para alinhar o valor da preferÃªncia no fluxo fallback
+  // (nova aba). No Brick, o valor Ã© decidido em /mp/process pelo mÃ©todo
+  // efetivo â€” o frontend nunca Ã© fonte de verdade.
   const payMethod = body.payMethod === "pix" ? "pix" : "card";
-  // Destino pós-pagamento (whitelist interna — evita open redirect).
+  // Destino pÃ³s-pagamento (whitelist interna â€” evita open redirect).
   const rawSuccessPath = typeof body.successPath === "string" ? body.successPath : "";
   const successPath = /^\/painel\/meu-site(\?.*)?$/.test(rawSuccessPath)
     ? rawSuccessPath
@@ -45,10 +45,10 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient();
   const profile = await getProfile(user.id);
-  if (!profile) return NextResponse.json({ error: "Perfil não encontrado" }, { status: 400 });
+  if (!profile) return NextResponse.json({ error: "Perfil nÃ£o encontrado" }, { status: 400 });
 
   const tenant = await ensureTenantForUser(user.id);
-  if (!tenant) return NextResponse.json({ error: "Tenant não encontrado" }, { status: 400 });
+  if (!tenant) return NextResponse.json({ error: "Tenant nÃ£o encontrado" }, { status: 400 });
 
   // Plano = oferta comercial (fonte de verdade). Sem planId, usa a oferta ativa.
   let plan: Plan | null = null;
@@ -63,10 +63,10 @@ export async function POST(request: Request) {
     plan = (p as Plan | null) || null;
   }
   if (!plan) plan = await getActiveOffer();
-  if (!plan) return NextResponse.json({ error: "Nenhuma oferta ativa disponível" }, { status: 400 });
+  if (!plan) return NextResponse.json({ error: "Nenhuma oferta ativa disponÃ­vel" }, { status: 400 });
 
   // ---- Gateway definido pelo Super Admin (/admin/pagamentos) decide o fluxo ----
-  // visitor_token: persiste a atribuição do afiliado até o webhook de pagamento.
+  // visitor_token: persiste a atribuiÃ§Ã£o do afiliado atÃ© o webhook de pagamento.
   // Lido do cookie first-party definido por /api/affiliate/click.
   const cookieStore = await cookies();
   const visitorToken = cookieStore.get(VISITOR_TOKEN_COOKIE)?.value || null;
@@ -80,7 +80,7 @@ export async function POST(request: Request) {
       );
     }
     const pixDiscount = Math.min(50, Math.max(0, Number(gateways.mercadopago.pixDiscountPercent) || 0));
-    // Se o cliente escolheu PIX, a preferência já sai com o valor descontado.
+    // Se o cliente escolheu PIX, a preferÃªncia jÃ¡ sai com o valor descontado.
     const preferenceAmountCents =
       payMethod === "pix" && pixDiscount > 0
         ? Math.round((plan.activation_price_cents * (100 - pixDiscount)) / 100)
@@ -94,16 +94,6 @@ export async function POST(request: Request) {
       planName: plan.name,
       visitorToken,
       successPath,
-    });
-    // Cria registro de pagamento pending no banco para permitir reaproveitamento
-    // se o usuário fechar a aba sem concluir.
-    await admin.from("payments").insert({
-      tenant_id: tenant.id,
-      type: "activation",
-      amount_cents: preferenceAmountCents,
-      currency: "brl",
-      status: "pending",
-      metadata: { gateway: "mercadopago", preference_id: preference.id, type: "activation" },
     });
     // Transparente: devolve initPoint para iframe; fluxo normal devolve url para redirect.
     return NextResponse.json({ url: preference.initPoint, gateway: "mercadopago", preferenceId: preference.id, embedded });
@@ -135,9 +125,9 @@ export async function POST(request: Request) {
   if (visitorToken) metadata.visitor_token = visitorToken;
 
   if (embedded) {
-    // Checkout Transparente — Embedded Checkout (sem sair do site)
+    // Checkout Transparente â€” Embedded Checkout (sem sair do site)
     const session = await stripe.checkout.sessions.create({
-      // @ts-ignore — ui_mode embedded é suportado na API 2024-06-20
+      // @ts-ignore â€” ui_mode embedded Ã© suportado na API 2024-06-20
       ui_mode: "embedded",
       mode: "payment",
       line_items: [{ price: await resolveActivationPriceId(plan.id), quantity: 1 }],
@@ -148,15 +138,6 @@ export async function POST(request: Request) {
       },
       return_url: `${appUrl}${successPath}`,
     } as any);
-    // Cria registro de pagamento pending no banco para permitir reaproveitamento
-    await admin.from("payments").insert({
-      tenant_id: tenant.id,
-      type: "activation",
-      amount_cents: plan.activation_price_cents,
-      currency: "brl",
-      status: "pending",
-      metadata: { gateway: "stripe", stripe_checkout_session_id: (session as any).id, type: "activation" },
-    });
     return NextResponse.json({ gateway: "stripe", clientSecret: (session as any).client_secret, url: session.url, embedded: true });
   }
 
@@ -166,23 +147,13 @@ export async function POST(request: Request) {
     customer: customer.id,
     metadata,
     payment_intent_data: {
-      // Salva o cartão como método de pagamento padrão do Customer para
-      // cobranças off-session — usado pela mensalidade que será criada após
-      // a ativação (primeira cobrança apenas no período configurado).
+      // Salva o cartÃ£o como mÃ©todo de pagamento padrÃ£o do Customer para
+      // cobranÃ§as off-session â€” usado pela mensalidade que serÃ¡ criada apÃ³s
+      // a ativaÃ§Ã£o (primeira cobranÃ§a apenas no perÃ­odo configurado).
       setup_future_usage: "off_session",
     },
     success_url: `${appUrl}${successPath}`,
     cancel_url: `${appUrl}/painel/assinatura`,
-  });
-
-  // Cria registro de pagamento pending no banco para permitir reaproveitamento
-  await admin.from("payments").insert({
-    tenant_id: tenant.id,
-    type: "activation",
-    amount_cents: plan.activation_price_cents,
-    currency: "brl",
-    status: "pending",
-    metadata: { gateway: "stripe", stripe_checkout_session_id: session.id, type: "activation" },
   });
 
   return NextResponse.json({ url: session.url, gateway: "stripe" });
