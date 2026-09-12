@@ -266,6 +266,8 @@ export function PwaManager() {
       const urlMap = Object.fromEntries(uploadedUrls.map(({ key, url }) => [key, url]));
       patch({
         icon_192_url: urlMap.icon_192,
+        icon_256_url: urlMap.icon_256,
+        icon_384_url: urlMap.icon_384,
         icon_512_url: urlMap.icon_512,
         icon_180_url: urlMap.icon_180,
         icon_maskable_512_url: urlMap.icon_maskable_512,
