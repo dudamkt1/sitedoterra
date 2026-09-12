@@ -389,6 +389,11 @@ export function SubscriptionManager({
                     <button type="button" className="btn btn-outline !py-2.5 text-xs" onClick={checkPayment} disabled={checking}>
                       🔄 Verificar pagamento
                     </button>
+                    {pendingActivationPayment && (
+                      <button type="button" className="btn btn-gold !py-2.5 text-xs" onClick={checkPayment} disabled={checking}>
+                        Pagar Agora
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
