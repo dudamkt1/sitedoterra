@@ -1,3 +1,5 @@
+"use client";
+
 import { useEffect, useState } from "react";
 import { getDashboardContext, type DashboardContext } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
