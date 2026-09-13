@@ -9,9 +9,12 @@ export interface HeaderProps {
   logoLightUrl?: string;
   navItems: { label: string; href: string }[];
   extraNav?: { label: string; href: string; className?: string }[];
+  /** Destino do clique no logotipo. Default "#hero" (HOME e sites das consultoras);
+   *  páginas fora da HOME (ex.: /afiliados) devem passar "/" para voltar à HOME. */
+  logoHref?: string;
 }
 
-export function Header({ logoText = "Logo", logoUrl, logoLightUrl, navItems, extraNav = [] }: HeaderProps) {
+export function Header({ logoText = "Logo", logoUrl, logoLightUrl, navItems, extraNav = [], logoHref = "#hero" }: HeaderProps) {
   const navRef = useRef<HTMLElement>(null);
   const [open, setOpen] = useState(false);
 
@@ -55,7 +58,7 @@ export function Header({ logoText = "Logo", logoUrl, logoLightUrl, navItems, ext
       className={`${logoUrl && logoLightUrl ? "dual-logo" : ""} ${open ? "menu-open" : ""}`.trim() || undefined}
     >
       <a
-        href="#hero"
+        href={logoHref}
         className="nav-logo"
         onClick={() => setOpen(false)}
         aria-label={logoText}
