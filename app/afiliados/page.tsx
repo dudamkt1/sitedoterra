@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Programa de Afiliados | TopConsultores",
-  description: "Indique consultores para o TopConsultores e receba comissão via Pix a cada ativação. Sem limite, sem taxa.",
+  description: "Indique consultoras e use o saldo para ativar seu site ou zerar a mensalidade — ou receba via Pix. Sem limite, sem taxa.",
 };
 
 function brl(cents: number) {
@@ -79,13 +79,20 @@ export default async function AfiliadosPage() {
   const affConfig = await getPublicAffiliateConfig();
   const pct = affConfig.commission_percent;
   const activationCents = affConfig.activation_price_cents;
+  const monthlyCents = affConfig.monthly_price_cents;
   const perSaleCents = Math.round((activationCents * pct) / 100);
   const minPayout = brl(Math.round(affConfig.min_payout_amount * 100));
+  // Quantas indicações confirmadas pagam a ativação e a mensalidade.
+  // Calculado da config — continua certo se o percentual mudar no futuro.
+  const needActivation = perSaleCents > 0 ? Math.ceil(activationCents / perSaleCents) : 0;
+  const needMonthly = perSaleCents > 0 ? Math.ceil(monthlyCents / perSaleCents) : 0;
 
   const steps = [
-    { icon: "🔗", title: "Pegue seu link exclusivo", text: "No painel, seu link de afiliado é gerado automaticamente. Copie com um clique." },
-    { icon: "💬", title: "Compartilhe com consultores", text: "Envie no WhatsApp, Instagram e grupos. Quem chegar pelo seu link fica vinculado a você." },
-    { icon: "⚡", title: "Receba via Pix", text: `Quando sua indicação ativar o site, sua comissão de ${pct}% entra no painel automaticamente.` },
+    { icon: "🆓", title: "Crie sua conta grátis", text: "Sem pagar nada: seu acesso ao painel é liberado na hora." },
+    { icon: "🔗", title: "Pegue seu link exclusivo", text: "No painel de afiliados, seu link é gerado automaticamente. Copie com um clique." },
+    { icon: "💬", title: "Compartilhe com outras consultoras", text: "Envie no WhatsApp, Instagram e grupos. Quem chegar pelo seu link fica vinculado a você." },
+    { icon: "💰", title: `Cada indicação confirmada gera ${brl(perSaleCents)} de saldo`, text: `${pct}% de cada ativação (${brl(activationCents)}) entra no seu painel automaticamente.` },
+    { icon: "🚀", title: "Ative de graça e siga zerando a mensalidade", text: `Ao juntar ${brl(activationCents)} em saldo, ative seu site sem tirar do bolso. Depois, com ${needMonthly} indicações/mês sua mensalidade de ${brl(monthlyCents)} fica coberta.` },
   ];
 
   const trust = [
@@ -95,8 +102,10 @@ export default async function AfiliadosPage() {
   ];
 
   const faq = [
-    { q: "Preciso ter site ativo no TopConsultores pra participar?", a: "Não. Basta ter sua conta criada. Seu link de afiliada é gerado no painel e você já pode começar a indicar." },
-    { q: "Quando eu recebo a comissão?", a: `A comissão de ${pct}% é registrada no seu painel assim que a indicada ativa o site. Depois é só solicitar o saque e receber via Pix.` },
+    { q: "Preciso ter site ativo no TopConsultores pra participar?", a: "Não — e esse é justamente o caminho para quem está sem condições agora: crie sua conta grátis, indique e use o saldo para ativar seu site. Seu link de afiliado é gerado no painel assim que a conta existe." },
+    { q: "Posso usar meu saldo para ativar o site em vez de sacar?", a: "Sim. No painel de afiliados você escolhe entre sacar via Pix e usar o saldo para ativar seu site ou pagar sua mensalidade." },
+    { q: "Dá pra usar parte do saldo e pagar o restante?", a: `Sim. O saldo abate o valor automaticamente: com ${brl(5000)} de saldo numa ativação de ${brl(activationCents)}, você paga só a diferença no Pix ou cartão. A sobra continua disponível para a mensalidade ou para sacar.` },
+    { q: "Quando eu recebo a comissão?", a: `A comissão de ${pct}% é registrada no seu painel assim que a indicada ativa o site. Depois é só solicitar o saque e receber via Pix — ou usar como crédito.` },
     { q: "Tem valor mínimo pra sacar?", a: `Sim, o saque mínimo atual é de ${minPayout}. Atingiu esse valor, pode solicitar a qualquer momento pelo painel.` },
     { q: "Posso indicar quantas pessoas eu quiser?", a: "Sim, não há limite de indicações. Cada ativação confirmada gera uma nova comissão para você." },
     { q: "E se a pessoa que eu indiquei cancelar depois?", a: "Comissões de ativações canceladas ou estornadas podem ser estornadas do seu saldo. Vale o que foi efetivamente confirmado." },
@@ -127,31 +136,31 @@ export default async function AfiliadosPage() {
                 🤝 Programa de Afiliados
               </p>
               <h1 className="mt-5 text-[28px] sm:text-[40px] lg:text-[44px] font-extrabold tracking-[-0.02em] text-[#0f1a2a] leading-[1.15]">
-                Ganhe dinheiro indicando o site que você já usa
+                Não tem para ativar agora? Comece indicando.
               </h1>
               <p className="mt-4 text-[14.5px] sm:text-[16.5px] leading-relaxed text-[#5a6b7a] max-w-[620px] mx-auto">
-                Sem vender nada: é só compartilhar seu link. A cada indicação que ativar o site, você recebe {pct}% de comissão.
+                Crie sua conta grátis, compartilhe seu link e use o saldo das suas indicações para ativar seu próprio site — sem tirar do bolso.
               </p>
               <a
                 href={ctaHref}
                 className="mt-7 inline-flex items-center justify-center gap-2 rounded-[14px] bg-[#1d5c3a] hover:bg-[#154730] active:bg-[#103d2d] px-8 py-4 text-[15px] sm:text-[16px] font-bold text-white shadow-[0_10px_28px_rgba(29,92,58,0.28)] transition"
               >
-                Quero ser afiliado <span aria-hidden>→</span>
+                Quero minha conta grátis <span aria-hidden>→</span>
               </a>
               <p className="mt-3 text-[12.5px] text-[#8a9aa8] leading-relaxed">
-                Grátis · Sem taxa de participação · {brl(perSaleCents)} por ativação
+                Já tem site ativo? Continue indicando e deixe suas próximas mensalidades grátis.
               </p>
             </div>
 
-            {/* ============ COMO FUNCIONA ============ */}
+            {/* ============ DO ZERO AO SITE ATIVO ============ */}
             <div className="mt-14 sm:mt-20">
               <p className="text-center text-[12px] sm:text-[13px] font-extrabold uppercase tracking-[0.18em] text-[#1d5c3a]/70">
-                Como funciona
+                Do zero ao site ativo
               </p>
               <h2 className="mt-2.5 text-center text-[22px] sm:text-[30px] font-extrabold tracking-tight text-[#0f1a2a] leading-snug px-2">
-                3 passos e pronto
+                Sem site ativo? Comece por aqui
               </h2>
-              <div className="mt-7 sm:mt-9 grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5">
+              <div className="mt-7 sm:mt-9 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
                 {steps.map((s, i) => (
                   <div key={s.title} className="relative rounded-[20px] bg-white/95 border border-[#e7ece8] shadow-[0_12px_32px_rgba(16,61,45,0.07)] p-6 sm:p-7">
                     <span className="absolute top-5 right-6 text-[12px] font-extrabold text-[#cbd5d1]">0{i + 1}</span>
@@ -162,6 +171,34 @@ export default async function AfiliadosPage() {
                     <p className="mt-2 text-[13.5px] leading-relaxed text-[#5a6b7a]">{s.text}</p>
                   </div>
                 ))}
+              </div>
+            </div>
+
+            {/* ============ DOIS CAMINHOS ============ */}
+            <div className="mt-6 sm:mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+              <div className="rounded-[20px] bg-white/95 border border-[#e7ece8] shadow-[0_12px_32px_rgba(16,61,45,0.07)] p-6 sm:p-8">
+                <p className="text-[15px] font-bold text-[#0f1a2a] leading-snug">Já quero ativar agora</p>
+                <p className="mt-2 text-[13.5px] leading-relaxed text-[#5a6b7a]">
+                  Ative por {brl(activationCents)} (ou 3x sem juros) e comece a usar hoje.
+                </p>
+                <a
+                  href="/checkout"
+                  className="mt-5 inline-flex items-center justify-center gap-2 rounded-[14px] bg-[#1d5c3a] hover:bg-[#154730] active:bg-[#103d2d] px-6 py-3.5 text-[14px] font-bold text-white shadow-[0_10px_28px_rgba(29,92,58,0.28)] transition"
+                >
+                  Ativar agora <span aria-hidden>→</span>
+                </a>
+              </div>
+              <div className="rounded-[20px] bg-gradient-to-br from-[#1d5c3a] via-[#154730] to-[#0d3320] shadow-[0_20px_56px_rgba(16,61,45,0.25)] p-6 sm:p-8">
+                <p className="text-[15px] font-bold text-white leading-snug">Prefiro começar de graça</p>
+                <p className="mt-2 text-[13.5px] leading-relaxed text-white/80">
+                  Crie sua conta, indique e ative quando o saldo cobrir os {brl(activationCents)}.
+                </p>
+                <a
+                  href={ctaHref}
+                  className="mt-5 inline-flex items-center justify-center gap-2 rounded-[14px] bg-white hover:bg-[#f2f7f3] px-6 py-3.5 text-[14px] font-bold text-[#1d5c3a] transition"
+                >
+                  Criar conta grátis <span aria-hidden>→</span>
+                </a>
               </div>
             </div>
 
@@ -181,7 +218,11 @@ export default async function AfiliadosPage() {
             {/* ============ CALCULADORA ============ */}
             <div className="mt-6 sm:mt-8">
               <Suspense fallback={<div className="py-10 text-center text-sm text-slate-500">Carregando calculadora...</div>}>
-                <AffiliatesCalculator commissionPercent={pct} activationPriceCents={activationCents} />
+                <AffiliatesCalculator
+                  commissionPercent={pct}
+                  activationPriceCents={activationCents}
+                  monthlyPriceCents={monthlyCents}
+                />
               </Suspense>
             </div>
 
@@ -226,16 +267,16 @@ export default async function AfiliadosPage() {
             {/* ============ CTA FINAL ============ */}
             <div className="mt-14 sm:mt-20 rounded-[24px] bg-white/95 border border-[#e7ece8] shadow-[0_16px_48px_rgba(16,61,45,0.08)] px-6 py-9 sm:p-12 text-center">
               <p className="text-[22px] sm:text-[28px] font-extrabold tracking-tight text-[#0f1a2a] leading-snug">
-                Sua rede já vale renda extra.<br className="hidden sm:block" /> Ative seu link agora.
+                Sua rede pode pagar o seu site.
               </p>
               <p className="mt-3 text-[14px] sm:text-[15px] leading-relaxed text-[#5a6b7a] max-w-[520px] mx-auto">
-                Leva menos de 1 minuto: entre no painel e seu link de afiliado está pronto para compartilhar.
+                Comece de graça, indique e acompanhe seu saldo crescer no painel.
               </p>
               <a
                 href={ctaHref}
                 className="mt-7 inline-flex items-center justify-center gap-2 rounded-[14px] bg-[#1d5c3a] hover:bg-[#154730] active:bg-[#103d2d] px-8 py-4 text-[15px] sm:text-[16px] font-bold text-white shadow-[0_10px_28px_rgba(29,92,58,0.28)] transition"
               >
-                Aceitar e ativar meu link de afiliado <span aria-hidden>→</span>
+                Criar minha conta grátis <span aria-hidden>→</span>
               </a>
               {!user && (
                 <p className="mt-3 text-[12.5px] text-[#8a9aa8] leading-relaxed">

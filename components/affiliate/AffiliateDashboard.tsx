@@ -97,6 +97,72 @@ interface AffiliateSummary {
   total_paid: number;
 }
 
+/**
+ * Cartão "usar saldo como pagamento" — condicional ao status do site:
+ * site inativo → progresso até a ativação grátis + botão de ativar;
+ * site ativo → botão de pagar a próxima mensalidade.
+ */
+function CreditActionCard({
+  summary,
+  siteActive,
+  pubConfig,
+}: {
+  summary: { available_balance: number };
+  siteActive: boolean;
+  pubConfig: { commission_percent: number; activation_price_cents: number; monthly_price_cents: number } | null;
+}) {
+  const balanceCents = Math.max(0, Math.round(Number(summary.available_balance || 0) * 100));
+  const targetCents = pubConfig && pubConfig.activation_price_cents > 0 ? pubConfig.activation_price_cents : 29700;
+  const pct = pubConfig && pubConfig.commission_percent > 0 ? pubConfig.commission_percent : 10;
+  const perSaleCents = Math.round((targetCents * pct) / 100);
+  const progress = Math.min(100, Math.round((balanceCents / targetCents) * 100));
+  const missingCents = Math.max(0, targetCents - balanceCents);
+  const missingCount = perSaleCents > 0 ? Math.ceil(missingCents / perSaleCents) : null;
+
+  const href = siteActive ? "/checkout?type=subscription" : "/checkout";
+
+  return (
+    <div className="card border-[#cde7d1] bg-gradient-to-br from-[#f0fdf4] to-white">
+      <h2 className="card-title mb-1">
+        {siteActive ? "💰 Usar saldo para pagar minha próxima mensalidade" : "💰 Usar saldo para ativar meu site"}
+      </h2>
+      <p className="text-sm text-gray-600 mb-4">
+        {siteActive ? (
+          <>
+            Seu <strong>saldo disponível de {formatBRL(balanceCents)}</strong> pode zerar ou abater
+            sua mensalidade. No checkout, escolha <strong>“Sim”</strong> quando perguntado sobre o crédito.
+          </>
+        ) : (
+          <>
+            Seu <strong>saldo disponível de {formatBRL(balanceCents)}</strong> também vale como pagamento:
+            no checkout, escolha <strong>“Sim”</strong> para abater ou quitar a ativação.
+          </>
+        )}
+      </p>
+      {!siteActive && (
+        <div className="mb-4">
+          <div className="h-2.5 w-full rounded-full bg-[#e2ece8] overflow-hidden">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-[#16a34a] to-[#1d5c3a] transition-all"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          <p className="mt-2 text-[12.5px] text-gray-600">
+            {formatBRL(balanceCents)} de {formatBRL(targetCents)} ({progress}%)
+            {missingCount !== null && missingCount > 0 && (
+              <> — faltam <strong>{missingCount} {missingCount === 1 ? "indicação" : "indicações"}</strong></>
+            )}
+            {missingCount === 0 && <> — <strong>saldo suficiente para ativar grátis!</strong></>}
+          </p>
+        </div>
+      )}
+      <Link href={href} className="btn btn-gold !py-2.5 text-sm">
+        {siteActive ? "Pagar mensalidade com saldo →" : "Ativar meu site com saldo →"}
+      </Link>
+    </div>
+  );
+}
+
 interface AffiliateDashboardProps {
   userId: string;
   userEmail: string;
@@ -115,6 +181,11 @@ export function AffiliateDashboard({ userId, userEmail, userName, tenantSlug, is
   const [conversions, setConversions] = useState<AffiliateConversion[]>([]);
   const [payouts, setPayouts] = useState<AffiliatePayout[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<AffiliatePaymentMethod | null>(null);
+  const [pubConfig, setPubConfig] = useState<{
+    commission_percent: number;
+    activation_price_cents: number;
+    monthly_price_cents: number;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -147,7 +218,7 @@ export function AffiliateDashboard({ userId, userEmail, userName, tenantSlug, is
       setLoading(true);
       setError(null);
 
-      const [settingsRes, statusRes, summaryRes, clicksRes, conversionsRes, payoutsRes, pmRes] = await Promise.all([
+      const [settingsRes, statusRes, summaryRes, clicksRes, conversionsRes, payoutsRes, pmRes, pubConfigRes] = await Promise.all([
         fetch("/api/affiliate/settings").then(r => r.json()),
         fetch("/api/affiliate/status").then(r => r.json()),
         fetch("/api/affiliate/summary").then(r => r.json()),
@@ -155,8 +226,16 @@ export function AffiliateDashboard({ userId, userEmail, userName, tenantSlug, is
         fetch("/api/affiliate/conversions").then(r => r.json()),
         fetch("/api/affiliate/payouts").then(r => r.json()),
         fetch("/api/affiliate/payment-method").then(r => r.json()),
+        fetch("/api/affiliate/public-config").then(r => r.json()).catch(() => null),
       ]);
 
+      if (pubConfigRes && Number.isFinite(Number(pubConfigRes.activation_price_cents))) {
+        setPubConfig({
+          commission_percent: Number(pubConfigRes.commission_percent) || 10,
+          activation_price_cents: Math.round(Number(pubConfigRes.activation_price_cents)),
+          monthly_price_cents: Math.round(Number(pubConfigRes.monthly_price_cents) || 4700),
+        });
+      }
       if (settingsRes.success) setSettings(settingsRes.data);
       if (statusRes.success) setStatus(statusRes.data);
       if (summaryRes.success) setSummary(summaryRes.data);
@@ -509,25 +588,13 @@ export function AffiliateDashboard({ userId, userEmail, userName, tenantSlug, is
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard label="Cliques no link" value={summary.total_clicks} icon="🔗" />
           <StatCard label="Conversões" value={summary.total_conversions} icon="✅" />
-          <StatCard label="Saldo disponível" value={formatBRL(summary.available_balance * 100)} icon="💰" sub="Pronto para saque" />
+          <StatCard label="Saldo disponível" value={formatBRL(summary.available_balance * 100)} icon="💰" sub="Saque via Pix ou crédito" />
           <StatCard label="Saldo pendente" value={formatBRL(summary.pending_balance * 100)} icon="⏳" sub="Aguardando aprovação" />
         </div>
       )}
 
-      {/* Usar saldo como crédito no checkout */}
-      {programActive && summary && summary.available_balance > 0 && (
-        <div className="card border-[#cde7d1] bg-gradient-to-br from-[#f0fdf4] to-white">
-          <h2 className="card-title mb-1">💰 Usar saldo como crédito</h2>
-          <p className="text-sm text-gray-600 mb-4">
-            Seu <strong>saldo disponível de {formatBRL(summary.available_balance * 100)}</strong> também
-            pode abater a ativação do Site Profissional ou a mensalidade. No checkout, escolha
-            <strong> “Sim” </strong>quando perguntado sobre o crédito.
-          </p>
-          <Link href="/checkout" className="btn btn-gold !py-2.5 text-sm">
-            Usar como crédito no checkout →
-          </Link>
-        </div>
-      )}
+      {/* Usar saldo como pagamento — condicional ao status do site */}
+      {programActive && summary && <CreditActionCard summary={summary} siteActive={siteActive} pubConfig={pubConfig} />}
 
       {/* Solicitar Saque */}
       {programActive && summary && summary.available_balance > 0 && (

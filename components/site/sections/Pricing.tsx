@@ -240,6 +240,13 @@ export function Pricing({ content }: { content: PricingContent }) {
             </button>
           )}
 
+          <a
+            href="/afiliados"
+            className="mt-3 block text-center text-[12px] leading-5 text-[#8a9aa8] hover:text-[#1d5c3a] hover:underline transition"
+          >
+            Sem condições agora? Indique e ative com o saldo →
+          </a>
+
           {offer.transparencyText && (
             <p className="oferta-transparencia">{offer.transparencyText}</p>
           )}

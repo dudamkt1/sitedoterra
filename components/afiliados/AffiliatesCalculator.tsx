@@ -9,16 +9,21 @@ function brl(cents: number) {
 interface AffiliatesCalculatorProps {
   commissionPercent: number;
   activationPriceCents: number;
+  monthlyPriceCents: number;
 }
 
 /**
  * Calculadora de ganhos — slider 1–20 indicações/mês.
  * Comissão só sobre a ATIVAÇÃO: indicações × % × valor de ativação.
+ * Os marcos (ativação grátis / mensalidade coberta) são calculados da
+ * config central — continuam certos se o percentual mudar no futuro.
  */
-export function AffiliatesCalculator({ commissionPercent, activationPriceCents }: AffiliatesCalculatorProps) {
+export function AffiliatesCalculator({ commissionPercent, activationPriceCents, monthlyPriceCents }: AffiliatesCalculatorProps) {
   const [count, setCount] = useState(5);
   const perSale = Math.round((activationPriceCents * commissionPercent) / 100);
   const monthly = perSale * count;
+  const needActivation = perSale > 0 ? Math.ceil(activationPriceCents / perSale) : 0;
+  const needMonthly = perSale > 0 ? Math.ceil(monthlyPriceCents / perSale) : 0;
 
   return (
     <div className="rounded-[24px] bg-white border border-[#e7ece8] shadow-[0_16px_48px_rgba(16,61,45,0.08)] p-6 sm:p-10">
@@ -59,6 +64,20 @@ export function AffiliatesCalculator({ commissionPercent, activationPriceCents }
           {commissionPercent}% sobre a ativação ({brl(activationPriceCents)}) por indicação · {brl(perSale)} cada
         </p>
       </div>
+      {needActivation > 0 && needMonthly > 0 && (
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="rounded-[14px] bg-[#f0fdf4] border border-[#cfe6d4] px-4 py-3.5 text-center">
+            <p className="text-[12.5px] leading-relaxed text-[#14532d]">
+              Você precisa de <strong>{needActivation} indicações confirmadas</strong> para ativar seu site sem pagar nada.
+            </p>
+          </div>
+          <div className="rounded-[14px] bg-[#f0fdf4] border border-[#cfe6d4] px-4 py-3.5 text-center">
+            <p className="text-[12.5px] leading-relaxed text-[#14532d]">
+              A partir de <strong>{needMonthly} indicações por mês</strong>, sua mensalidade fica coberta pelo saldo.
+            </p>
+          </div>
+        </div>
+      )}
       <p className="mt-4 text-center text-[11.5px] sm:text-[12px] leading-relaxed text-[#8a9aa8]">
         *Estimativa com base no percentual vigente. Valores reais dependem das ativações confirmadas no mês.
       </p>

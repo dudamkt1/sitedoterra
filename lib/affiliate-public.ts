@@ -6,6 +6,7 @@ export interface PublicAffiliateConfig {
   commission_percent: number;
   min_payout_amount: number;
   activation_price_cents: number;
+  monthly_price_cents: number;
 }
 
 /**
@@ -42,13 +43,17 @@ export async function getPublicAffiliateConfig(): Promise<PublicAffiliateConfig>
   }
 
   let activationPriceCents = 29700;
+  let monthlyPriceCents = 4700;
   try {
     const offer = await getActiveOffer();
     if (offer && Number.isFinite(Number(offer.activation_price_cents))) {
       activationPriceCents = Math.round(Number(offer.activation_price_cents));
     }
+    if (offer && Number.isFinite(Number(offer.monthly_price_cents))) {
+      monthlyPriceCents = Math.round(Number(offer.monthly_price_cents));
+    }
   } catch {
-    // mantém o default
+    // mantém os defaults
   }
 
   return {
@@ -56,5 +61,6 @@ export async function getPublicAffiliateConfig(): Promise<PublicAffiliateConfig>
     commission_percent: commissionPercent,
     min_payout_amount: minPayoutAmount,
     activation_price_cents: activationPriceCents,
+    monthly_price_cents: monthlyPriceCents,
   };
 }
