@@ -1,17 +1,11 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 
-let cookieStore: any | null = null;
-
-async function ensureCookieStore() {
-  if (!cookieStore) {
-    const module = await import("next/headers");
-    cookieStore = module.cookies();
-  }
-  return cookieStore;
-}
-
 export async function createClient() {
-  const cookieStore = await ensureCookieStore();
+  // Import dinâmico: "next/headers" só existe no servidor (Server Components,
+  // Route Handlers). Import estático no topo quebra o build.
+  // Sem cache global: o cookieStore deve ser novo a cada request.
+  const headersModule = await import("next/headers");
+  const cookieStore = headersModule.cookies();
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

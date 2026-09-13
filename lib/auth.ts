@@ -8,7 +8,7 @@ export async function getCurrentUser() {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
     return null;
   }
-  const supabase = createClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -18,7 +18,7 @@ export async function getCurrentUser() {
 export async function getProfile(userId?: string): Promise<Profile | null> {
   const user = userId || (await getCurrentUser())?.id;
   if (!user) return null;
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data } = await supabase
     .from("profiles")
     .select("*")

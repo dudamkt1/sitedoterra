@@ -151,7 +151,7 @@ export async function PATCH(request: Request) {
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: profile } = await supabase.from("profiles").select("*").eq("user_id", user.id).single();
   if (!profile) return NextResponse.json({ error: "Perfil não encontrado" }, { status: 404 });
   return NextResponse.json({ profile });

@@ -108,7 +108,7 @@ export async function POST(request: Request) {
   }
 
   // Fallback: Supabase padrão (quando SMTP não configurado)
-  const supabase = createClient();
+  const supabase = await createClient();
   const { error } = await supabase.auth.resetPasswordForEmail(emailRaw, {
     redirectTo,
   });
