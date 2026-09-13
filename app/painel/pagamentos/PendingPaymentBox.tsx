@@ -10,10 +10,10 @@ import { useCallback, useEffect, useState } from "react";
 export function PendingPaymentBox({ tenantId }: { tenantId?: string | null }) {
   const [pendingActivationPayment, setPendingActivationPayment] = useState<boolean | null>(null);
   const [checking, setChecking] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
 
   const checkPendingPayment = useCallback(async () => {
     if (!tenantId) return;
-    setChecking(true);
     try {
       const res = await fetch("/api/subscription/status");
       const data = await res.json();
@@ -22,14 +22,36 @@ export function PendingPaymentBox({ tenantId }: { tenantId?: string | null }) {
       }
     } catch {
       // Best-effort
-    } finally {
-      setChecking(false);
     }
   }, [tenantId]);
 
   useEffect(() => {
     checkPendingPayment();
   }, [checkPendingPayment]);
+
+  /** "Verificar pagamento": se já foi confirmado, recarrega a página; senão, avisa. */
+  async function checkPayment() {
+    setChecking(true);
+    setMsg(null);
+    try {
+      const res = await fetch("/api/subscription/status");
+      const data = await res.json();
+      if (data.activated || data.hasActivationPayment) {
+        window.location.reload();
+      } else {
+        setMsg("Pagamento ainda não confirmado. Conclua na aba de pagamento ou clique em Pagar Agora para gerar o link.");
+      }
+    } catch {
+      setMsg("Não foi possível verificar agora. Tente novamente em instantes.");
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  /** "Pagar Agora": leva para a tela de assinatura retomando a ativação. */
+  function payNow() {
+    window.location.href = "/painel/assinatura?resume=1";
+  }
 
   if (pendingActivationPayment === null) return null;
 
@@ -41,15 +63,16 @@ export function PendingPaymentBox({ tenantId }: { tenantId?: string | null }) {
         Finalize na aba de pagamento ou use as opções abaixo quando quiser.
       </p>
       <div className="mt-3 flex flex-col sm:flex-row gap-2">
-        <button type="button" className="btn btn-outline !py-2.5 text-xs" onClick={checkPendingPayment} disabled={checking}>
-          🔄 Verificar pagamento
+        <button type="button" className="btn btn-outline !py-2.5 text-xs" onClick={checkPayment} disabled={checking}>
+          {checking ? "Verificando..." : "🔄 Verificar pagamento"}
         </button>
         {pendingActivationPayment && (
-          <button type="button" className="btn btn-gold !py-2.5 text-xs" onClick={checkPendingPayment} disabled={checking}>
+          <button type="button" className="btn btn-gold !py-2.5 text-xs" onClick={payNow} disabled={checking}>
             Pagar Agora
           </button>
         )}
       </div>
+      {msg && <p className="text-xs text-amber-800 mt-2">{msg}</p>}
     </div>
   );
 }
