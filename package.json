@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
+    "test:credit": "node scripts/test-affiliate-credit.mjs",
     "seed:test": "node scripts/seed-test-users.mjs"
   },
   "dependencies": {

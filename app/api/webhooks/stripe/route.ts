@@ -10,6 +10,8 @@ import {
   activateTenant,
 } from "@/lib/billing";
 import { registerAffiliateConversionForVisitor } from "@/lib/affiliate";
+import { applyAffiliateCredit, releaseAffiliateCredit } from "@/lib/affiliate-credit";
+import { extendSubscriptionPeriod } from "@/lib/checkout-quote";
 
 export const runtime = "nodejs";
 
@@ -99,18 +101,25 @@ async function handleEvent(event: Stripe.Event) {
   const stripe = await getStripeResolved();
 
   switch (event.type) {
-    // ---------------- ATIVAÇÃO PAGA ----------------
+    // ---------------- PAGAMENTO ÚNICO (ATIVAÇÃO OU MENSALIDADE AVULSA) ----------------
     case "checkout.session.completed": {
       const session = event.data.object as Stripe.Checkout.Session;
       const tenantId = session.metadata?.tenant_id;
       const planId = session.metadata?.plan_id;
       if (!tenantId) break;
 
+      // Mensalidade avulsa (com ou sem crédito): estende o período, sem criar recorrência.
+      if (session.metadata?.type === "subscription") {
+        await handleManualMonthlyStripe(session);
+        break;
+      }
+
       const { data: tenant } = await admin.from("tenants").select("*").eq("id", tenantId).single();
       const { data: profile } = await admin.from("profiles").select("*").eq("user_id", tenant.user_id).single();
+      const creditUsageId = session.metadata?.credit_usage_id || null;
 
       // Registra pagamento de ativação (R$ 297,00)
-      await admin.from("payments").upsert(
+      const { data: paymentRow } = await admin.from("payments").upsert(
         {
           tenant_id: tenantId,
           stripe_payment_intent_id: (session.payment_intent as string) || null,
@@ -120,10 +129,30 @@ async function handleEvent(event: Stripe.Event) {
           currency: (session.currency || "brl").toLowerCase(),
           status: "succeeded",
           paid_at: new Date().toISOString(),
-          metadata: { plan_id: planId },
+          metadata: {
+            plan_id: planId,
+            ...(creditUsageId ? { credit_usage_id: creditUsageId } : {}),
+            ...(session.metadata?.credit_applied_cents
+              ? { credit_applied_cents: Number(session.metadata.credit_applied_cents) }
+              : {}),
+            ...(session.metadata?.original_amount_cents
+              ? { original_amount_cents: Number(session.metadata.original_amount_cents) }
+              : {}),
+          },
         },
         { onConflict: "stripe_checkout_session_id", ignoreDuplicates: true }
-      );
+      ).select("id").maybeSingle();
+
+      // Crédito de afiliado: confirma a utilização SOMENTE com pagamento aprovado.
+      if (creditUsageId) {
+        const applied = await applyAffiliateCredit(creditUsageId, paymentRow?.id || null);
+        if (!applied) {
+          console.error("[stripe webhook] falha ao confirmar crédito de afiliado", {
+            usage_id: creditUsageId,
+            session_id: session.id,
+          });
+        }
+      }
 
       // Cria assinatura mensal recorrente (R$ 47,00 — 1ª cobrança após os meses
       // definidos pelo Super Admin em /admin/planos, padrão 3 meses)
@@ -189,6 +218,16 @@ async function handleEvent(event: Stripe.Event) {
           console.error("[stripe webhook] falha ao registrar conversão de afiliado", convErr);
         }
       }
+      break;
+    }
+
+    // ---------------- SESSÃO EXPIRADA ----------------
+    // Checkout abandonado/expirado com crédito reservado: libera a reserva
+    // para o saldo voltar ao afiliado.
+    case "checkout.session.expired": {
+      const session = event.data.object as Stripe.Checkout.Session;
+      const usageId = session.metadata?.credit_usage_id || null;
+      if (usageId) await releaseAffiliateCredit(usageId);
       break;
     }
 
@@ -341,6 +380,106 @@ function mapForDb(status: string): string {
   if (status === "unpaid") return "unpaid";
   if (status === "canceled") return "canceled";
   return status;
+}
+
+// Mensalidade avulsa paga pelo /checkout (metadata type = subscription), com
+// ou sem crédito de afiliado: estende o período em +1 mês, sem criar
+// recorrência e sem tocar na atribuição de afiliados (não é venda nova).
+async function handleManualMonthlyStripe(session: Stripe.Checkout.Session) {
+  const admin = createAdminClient();
+  const tenantId = session.metadata?.tenant_id;
+  if (!tenantId) return;
+
+  const metaSubId = session.metadata?.subscription_id || null;
+  let sub: { id: string } | null = null;
+  if (metaSubId) {
+    const { data } = await admin
+      .from("subscriptions")
+      .select("id")
+      .eq("id", metaSubId)
+      .eq("tenant_id", tenantId)
+      .maybeSingle();
+    sub = (data as { id: string } | null) || null;
+  }
+  if (!sub) {
+    const { data } = await admin
+      .from("subscriptions")
+      .select("id")
+      .eq("tenant_id", tenantId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    sub = (data as { id: string } | null) || null;
+  }
+  if (!sub) {
+    console.error("[stripe webhook] mensalidade avulsa sem assinatura", { tenantId });
+    return;
+  }
+
+  const creditUsageId = session.metadata?.credit_usage_id || null;
+  const { data: paymentRow } = await admin.from("payments").upsert(
+    {
+      tenant_id: tenantId,
+      subscription_id: sub.id,
+      stripe_payment_intent_id: (session.payment_intent as string) || null,
+      stripe_checkout_session_id: session.id,
+      type: "subscription",
+      amount_cents: session.amount_total || 0,
+      currency: (session.currency || "brl").toLowerCase(),
+      status: "succeeded",
+      paid_at: new Date().toISOString(),
+      metadata: {
+        plan_id: session.metadata?.plan_id || null,
+        manual_monthly: true,
+        ...(creditUsageId ? { credit_usage_id: creditUsageId } : {}),
+        ...(session.metadata?.credit_applied_cents
+          ? { credit_applied_cents: Number(session.metadata.credit_applied_cents) }
+          : {}),
+        ...(session.metadata?.original_amount_cents
+          ? { original_amount_cents: Number(session.metadata.original_amount_cents) }
+          : {}),
+      },
+    },
+    { onConflict: "stripe_checkout_session_id", ignoreDuplicates: true }
+  ).select("id").maybeSingle();
+
+  const periodStart = new Date().toISOString();
+  await admin.from("billing_history").insert({
+    tenant_id: tenantId,
+    subscription_id: sub.id,
+    plan_id: session.metadata?.plan_id || null,
+    type: "subscription",
+    amount_cents: session.amount_total || 0,
+    currency: "brl",
+    status: "succeeded",
+    period_start: periodStart,
+  });
+
+  try {
+    await extendSubscriptionPeriod(admin, tenantId, sub.id);
+  } catch (e) {
+    console.error("[stripe webhook] falha ao estender assinatura", e);
+  }
+
+  if (creditUsageId) {
+    const applied = await applyAffiliateCredit(creditUsageId, paymentRow?.id || null);
+    if (!applied) {
+      console.error("[stripe webhook] falha ao confirmar crédito de afiliado", {
+        usage_id: creditUsageId,
+        session_id: session.id,
+      });
+    }
+  }
+
+  const { data: tenant } = await admin.from("tenants").select("user_id").eq("id", tenantId).maybeSingle();
+  await activateTenant(tenantId, tenant?.user_id);
+  if (tenant?.user_id) {
+    await auditPaymentEvent("user.site_reactivated_payment", tenant.user_id, tenantId, {
+      gateway: "stripe",
+      amount_cents: session.amount_total || 0,
+      manual_monthly: true,
+    });
+  }
 }
 
 /**

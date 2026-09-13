@@ -3,10 +3,13 @@ import { cookies } from "next/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser, getProfile } from "@/lib/auth";
 import { ensureTenantForUser } from "@/lib/onboarding";
-import { getActiveOffer, getPlanById } from "@/lib/commercial";
-import type { Plan } from "@/types";
 import { resolveGateways } from "@/lib/gateway-config";
 import { processBrickPayment } from "@/lib/mercadopago";
+import {
+  buildCheckoutQuote,
+  QuoteError,
+  type CheckoutQuote,
+} from "@/lib/checkout-quote";
 
 const VISITOR_TOKEN_COOKIE = "tc_visitor_token";
 
@@ -17,8 +20,10 @@ export const runtime = "nodejs";
  * (cartão ou Pix) via Payments API, SEM redirect externo.
  *
  * O frontend envia o `formData` gerado pelo Brick (token do cartão,
- * payment_method_id, installments, payer). O VALOR é sempre recalculado aqui
- * a partir da oferta comercial (tabela plans) — nunca confia no cliente.
+ * payment_method_id, installments, payer) + intenções (`payMethod`,
+ * `useAffiliateCredit`, `type`). O VALOR é sempre recalculado aqui
+ * (buildCheckoutQuote: oferta comercial + desconto PIX + crédito de afiliado
+ * com reserva atômica) — nunca confia no cliente.
  *
  * A ativação continua acontecendo SOMENTE pelo webhook
  * (/api/webhooks/mercadopago), que usa o mesmo external_reference/metadata
@@ -45,6 +50,9 @@ export async function POST(request: Request) {
   if (!formData) {
     return NextResponse.json({ error: "Dados do pagamento não recebidos." }, { status: 400 });
   }
+  const kind = body.type === "subscription" ? "subscription" : "activation";
+  const payMethod = body.payMethod === "pix" ? "pix" : "card";
+  const useAffiliateCredit = body.useAffiliateCredit === true;
 
   const admin = createAdminClient();
   const profile = await getProfile(user.id);
@@ -53,19 +61,31 @@ export async function POST(request: Request) {
   const tenant = await ensureTenantForUser(user.id);
   if (!tenant) return NextResponse.json({ error: "Tenant não encontrado" }, { status: 400 });
 
-  let plan: Plan | null = null;
-  if (planId) {
-    const { data: p } = await admin
-      .from("plans")
-      .select("*")
-      .eq("id", planId)
-      .eq("is_active", true)
-      .neq("status", "inactive")
-      .maybeSingle();
-    plan = (p as Plan | null) || null;
+  const pixDiscount = Math.min(50, Math.max(0, Number(gateways.mercadopago.pixDiscountPercent) || 0));
+
+  let quote: CheckoutQuote;
+  try {
+    quote = await buildCheckoutQuote({
+      userId: user.id,
+      tenantId: tenant.id,
+      planId,
+      kind,
+      payMethod,
+      useAffiliateCredit,
+      pixDiscountPercent: pixDiscount,
+    });
+  } catch (e) {
+    if (e instanceof QuoteError) {
+      return NextResponse.json({ error: e.message }, { status: e.status });
+    }
+    throw e;
   }
-  if (!plan) plan = await getActiveOffer();
-  if (!plan) return NextResponse.json({ error: "Nenhuma oferta ativa disponível" }, { status: 400 });
+  if (quote.totalCents <= 0) {
+    return NextResponse.json(
+      { error: "Valor zerado pelo crédito — conclua pelo checkout." },
+      { status: 400 }
+    );
+  }
 
   const cookieStore = await cookies();
   const visitorToken = cookieStore.get(VISITOR_TOKEN_COOKIE)?.value || null;
@@ -76,15 +96,26 @@ export async function POST(request: Request) {
   try {
     const payment = await processBrickPayment({
       tenantId: tenant.id,
-      planId: plan.id,
+      planId: quote.plan.id,
       email: profile.email,
       firstName: firstName || null,
       lastName: rest.length > 0 ? rest.join(" ") : null,
-      activationAmountCents: plan.activation_price_cents,
-      planName: plan.name,
+      // Base do método (cotação) — desconto PIX e crédito aplicados no servidor.
+      activationAmountCents: quote.originalCents,
+      planName: quote.plan.name,
       visitorToken,
       // Config oficial: desconto aplicado SOMENTE se o método efetivo for pix.
-      pixDiscountPercent: gateways.mercadopago.pixDiscountPercent,
+      pixDiscountPercent: pixDiscount,
+      expectedPayMethod: payMethod,
+      creditCents: quote.creditCents,
+      chargeKind: kind,
+      subscriptionId: quote.subscriptionId,
+      creditUsageId: quote.usageId,
+      originalAmountCents: quote.creditCents > 0 ? quote.originalCents : null,
+      itemTitle:
+        kind === "subscription"
+          ? `${quote.plan.name} — Mensalidade`
+          : `${quote.plan.name} — Ativação do site`,
       formData,
     });
     return NextResponse.json({
@@ -94,6 +125,12 @@ export async function POST(request: Request) {
       payment_method_id: payment.payment_method_id || null,
       payment_type_id: payment.payment_type_id || null,
       point_of_interaction: payment.point_of_interaction || null,
+      credit: {
+        original_cents: quote.originalCents,
+        credit_cents: quote.creditCents,
+        total_cents: quote.totalCents,
+        usage_id: quote.usageId,
+      },
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Erro ao processar pagamento.";

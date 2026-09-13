@@ -95,6 +95,9 @@ export interface MpSubscription {
 
 // ============================ CHECKOUT (ATIVAÇÃO) ============================
 
+export type ChargeKind = "activation" | "subscription";
+export type CheckoutPayMethod = "pix" | "card";
+
 export interface ActivationPreferenceInput {
   tenantId: string;
   planId: string;
@@ -113,6 +116,23 @@ export interface ActivationPreferenceInput {
    * após pagamento aprovado. Default: /painel/assinatura?sucesso=1.
    */
   successPath?: string | null;
+  /**
+   * Método escolhido pelo usuário no /checkout. Quando informado, a preferência
+   * restringe os meios exibidos (sem segunda escolha dentro do Mercado Pago).
+   */
+  payMethod?: CheckoutPayMethod | null;
+  /** Tipo de cobrança: ativação (pagamento único) ou mensalidade manual. */
+  chargeKind?: ChargeKind;
+  /** Id da assinatura local (obrigatório quando chargeKind = subscription). */
+  subscriptionId?: string | null;
+  /** Crédito de afiliado aplicado (centavos) — só informativo/auditoria. */
+  creditAppliedCents?: number | null;
+  /** Valor original antes do crédito (centavos) — auditoria. */
+  originalAmountCents?: number | null;
+  /** Id da reserva de crédito (affiliate_credit_usages) — consumido no webhook. */
+  creditUsageId?: string | null;
+  /** Título do item exibido ao pagador. */
+  itemTitle?: string | null;
 }
 
 /**
@@ -126,17 +146,54 @@ export async function createActivationPreference(
   const appUrl = getPublicBaseUrl();
   const notificationUrl = `${appUrl}/api/webhooks/mercadopago`;
 
+  const kind: ChargeKind = input.chargeKind === "subscription" ? "subscription" : "activation";
+
   const metadata: Record<string, unknown> = {
     tenant_id: input.tenantId,
     plan_id: input.planId,
-    type: "activation",
+    type: kind,
   };
   if (input.visitorToken) metadata.visitor_token = input.visitorToken;
+  if (input.subscriptionId) metadata.subscription_id = input.subscriptionId;
+  if (input.creditUsageId) metadata.credit_usage_id = input.creditUsageId;
+  if (input.creditAppliedCents) metadata.credit_applied_cents = input.creditAppliedCents;
+  if (input.originalAmountCents) metadata.original_amount_cents = input.originalAmountCents;
 
-  const body = {
+  // O usuário já escolheu PIX ou CARTÃO no /checkout: restringe os meios da
+  // preferência para não exigir uma segunda escolha dentro do Mercado Pago.
+  const paymentMethods =
+    input.payMethod === "pix"
+      ? {
+          excluded_payment_types: [
+            { id: "credit_card" },
+            { id: "debit_card" },
+            { id: "prepaid_card" },
+            { id: "ticket" },
+            { id: "atm" },
+            { id: "account_money" },
+          ],
+        }
+      : input.payMethod === "card"
+        ? {
+            excluded_payment_types: [
+              { id: "bank_transfer" },
+              { id: "debit_card" },
+              { id: "prepaid_card" },
+              { id: "ticket" },
+              { id: "atm" },
+              { id: "account_money" },
+            ],
+          }
+        : undefined;
+
+  const body: Record<string, unknown> = {
     items: [
       {
-        title: `${input.planName} — Ativação do site`,
+        title:
+          input.itemTitle ||
+          (kind === "subscription"
+            ? `${input.planName} — Mensalidade`
+            : `${input.planName} — Ativação do site`),
         quantity: 1,
         unit_price: input.activationAmountCents / 100,
         currency_id: "BRL",
@@ -146,7 +203,7 @@ export async function createActivationPreference(
       email: input.email,
       name: input.name || undefined,
     },
-    external_reference: `act_${input.tenantId}`,
+    external_reference: kind === "subscription" ? `mon_${input.tenantId}` : `act_${input.tenantId}`,
     metadata,
     back_urls: {
       success: `${appUrl}${input.successPath || "/painel/assinatura?sucesso=1"}`,
@@ -157,6 +214,7 @@ export async function createActivationPreference(
     notification_url: notificationUrl,
     statement_descriptor: "SITE DOTERRA",
   };
+  if (paymentMethods) body.payment_methods = paymentMethods;
 
   const pref = await mpFetch<{
     id: string;
@@ -195,12 +253,28 @@ export interface BrickPaymentInput {
   email: string;
   firstName?: string | null;
   lastName?: string | null;
+  /** Valor base em centavos (antes do desconto PIX e do crédito). */
   activationAmountCents: number;
   planName: string;
   visitorToken?: string | null;
   /** Desconto oficial do PIX (%) vindo de resolveGateways(). Aplicado SOMENTE
    *  quando o método efetivo for pix — o frontend nunca define o valor. */
   pixDiscountPercent?: number | null;
+  /** Método escolhido no /checkout ("pix" | "card"). O método efetivo do
+   *  Brick precisa ser compatível — divergência é rejeitada. */
+  expectedPayMethod?: CheckoutPayMethod | null;
+  /** Crédito de afiliado em centavos (validado e reservado pelo backend). */
+  creditCents?: number | null;
+  /** Tipo de cobrança: ativação (pagamento único) ou mensalidade manual. */
+  chargeKind?: ChargeKind;
+  /** Id da assinatura local (obrigatório quando chargeKind = subscription). */
+  subscriptionId?: string | null;
+  /** Id da reserva de crédito (affiliate_credit_usages) — consumido no webhook. */
+  creditUsageId?: string | null;
+  /** Valor original antes do crédito (centavos) — auditoria. */
+  originalAmountCents?: number | null;
+  /** Título exibido ao pagador. */
+  itemTitle?: string | null;
   formData: BrickFormData;
 }
 
@@ -215,6 +289,7 @@ export interface BrickPaymentInput {
  * webhook (fonte de verdade), nunca pelo retorno do frontend.
  */
 export async function processBrickPayment(input: BrickPaymentInput): Promise<MpPayment> {
+  const kind: ChargeKind = input.chargeKind === "subscription" ? "subscription" : "activation";
   const fullAmount = Math.round(input.activationAmountCents) / 100;
   if (!Number.isFinite(fullAmount) || fullAmount <= 0) throw new Error("Valor de ativação inválido");
 
@@ -226,12 +301,27 @@ export async function processBrickPayment(input: BrickPaymentInput): Promise<MpP
   if (!methodId) throw new Error("Método de pagamento não informado");
   const isPix = methodId === "pix";
 
+  // O método efetivo precisa ser compatível com a escolha do /checkout.
+  if (input.expectedPayMethod === "pix" && !isPix) {
+    throw new Error("Método divergente da escolha no checkout. Selecione PIX novamente.");
+  }
+  if (input.expectedPayMethod === "card" && isPix) {
+    throw new Error("Método divergente da escolha no checkout. Selecione cartão novamente.");
+  }
+
   // Desconto do PIX aplicado no SERVIDOR a partir da config oficial —
   // o cliente escolhe o método, mas nunca o valor cobrado.
   const pixDiscount = Math.min(50, Math.max(0, Number(input.pixDiscountPercent) || 0));
-  const amount = isPix && pixDiscount > 0
+  const discounted = isPix && pixDiscount > 0
     ? Math.round(fullAmount * (100 - pixDiscount)) / 100
     : fullAmount;
+
+  // Crédito de afiliado (reservado pelo backend) descontado do valor.
+  const credit = Math.max(0, Math.round(Number(input.creditCents) || 0) / 100);
+  const amount = Math.round((discounted - credit) * 100) / 100;
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error("Valor zerado pelo crédito — conclua pelo checkout.");
+  }
 
   const token = typeof fd.token === "string" && fd.token.trim() ? fd.token.trim() : null;
   if (!isPix && !token) throw new Error("Token do cartão não gerado. Tente novamente.");
@@ -261,14 +351,22 @@ export async function processBrickPayment(input: BrickPaymentInput): Promise<MpP
   const metadata: Record<string, unknown> = {
     tenant_id: input.tenantId,
     plan_id: input.planId,
-    type: "activation",
+    type: kind,
   };
   if (input.visitorToken) metadata.visitor_token = input.visitorToken;
+  if (input.subscriptionId) metadata.subscription_id = input.subscriptionId;
+  if (input.creditUsageId) metadata.credit_usage_id = input.creditUsageId;
+  if (credit > 0) metadata.credit_applied_cents = Math.round(credit * 100);
+  if (input.originalAmountCents) metadata.original_amount_cents = input.originalAmountCents;
 
   const appUrl = getPublicBaseUrl();
   const body: Record<string, unknown> = {
     transaction_amount: amount,
-    description: `${input.planName} — Ativação do site`,
+    description:
+      input.itemTitle ||
+      (kind === "subscription"
+        ? `${input.planName} — Mensalidade`
+        : `${input.planName} — Ativação do site`),
     payment_method_id: methodId,
     payer: {
       email,
@@ -276,7 +374,7 @@ export async function processBrickPayment(input: BrickPaymentInput): Promise<MpP
       last_name: input.lastName || payer.last_name || undefined,
       ...(identification ? { identification } : {}),
     },
-    external_reference: `act_${input.tenantId}`,
+    external_reference: kind === "subscription" ? `mon_${input.tenantId}` : `act_${input.tenantId}`,
     metadata,
     notification_url: `${appUrl}/api/webhooks/mercadopago`,
     statement_descriptor: "SITE DOTERRA",

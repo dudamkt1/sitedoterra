@@ -36,10 +36,12 @@ const DEMO_TENANT: PublicTenant = {
 export default async function CheckoutPage({
   searchParams,
 }: {
-  searchParams?: { planId?: string; plan?: string };
+  searchParams?: { planId?: string; plan?: string; type?: string };
 }) {
   const user = await getCurrentUser();
   const planId = searchParams?.planId || searchParams?.plan || undefined;
+  // type=subscription → pagamento avulso de mensalidade (com ou sem crédito).
+  const chargeType = searchParams?.type === "subscription" ? "subscription" : "activation";
 
   // --- Cabeçalho e rodapé SINCRONIZADOS com a HOME (mesma fonte de verdade) — cache 60s ---
   const homeSlug = process.env.HOME_TENANT_SLUG || "usuarioteste";
@@ -101,9 +103,9 @@ export default async function CheckoutPage({
         </div>
         <div className="relative max-w-[1160px] mx-auto px-4 sm:px-8 lg:px-10 pt-10 sm:pt-14 lg:pt-16 pb-16 sm:pb-24 flex justify-center">
           <div className="w-full max-w-[1020px]">
-            <Suspense fallback={<div className="max-w-[640px] mx-auto py-12 text-center text-sm text-slate-500">Carregando checkout...</div>}>
-              <CheckoutPageClient planIdParam={planId} />
-            </Suspense>
+              <Suspense fallback={<div className="max-w-[640px] mx-auto py-12 text-center text-sm text-slate-500">Carregando checkout...</div>}>
+                <CheckoutPageClient planIdParam={planId} chargeType={chargeType} />
+              </Suspense>
           </div>
         </div>
       </main>

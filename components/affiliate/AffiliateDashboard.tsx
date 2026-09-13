@@ -514,6 +514,21 @@ export function AffiliateDashboard({ userId, userEmail, userName, tenantSlug, is
         </div>
       )}
 
+      {/* Usar saldo como crédito no checkout */}
+      {programActive && summary && summary.available_balance > 0 && (
+        <div className="card border-[#cde7d1] bg-gradient-to-br from-[#f0fdf4] to-white">
+          <h2 className="card-title mb-1">💰 Usar saldo como crédito</h2>
+          <p className="text-sm text-gray-600 mb-4">
+            Seu <strong>saldo disponível de {formatBRL(summary.available_balance * 100)}</strong> também
+            pode abater a ativação do Site Profissional ou a mensalidade. No checkout, escolha
+            <strong> “Sim” </strong>quando perguntado sobre o crédito.
+          </p>
+          <Link href="/checkout" className="btn btn-gold !py-2.5 text-sm">
+            Usar como crédito no checkout →
+          </Link>
+        </div>
+      )}
+
       {/* Solicitar Saque */}
       {programActive && summary && summary.available_balance > 0 && (
         <div className="card">

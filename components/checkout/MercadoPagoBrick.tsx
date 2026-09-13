@@ -20,6 +20,12 @@ interface MercadoPagoBrickProps {
   /** Parcelas máximas vindas de /admin/pagamentos (mínimo 1). */
   maxInstallments: number;
   planId?: string;
+  /** Método escolhido no /checkout: o Brick exibe SOMENTE ele (sem 2ª escolha). */
+  payMethod: "pix" | "card";
+  /** Mensalidade avulsa quando "subscription". */
+  chargeType?: "activation" | "subscription";
+  /** Intenção de uso de crédito (valores calculados no backend). */
+  useCredit?: boolean;
   onApproved: () => void;
   onPixPending: (pix: PixData) => void;
   onPending: () => void;
@@ -39,6 +45,9 @@ export function MercadoPagoBrick({
   payerEmail,
   maxInstallments,
   planId,
+  payMethod,
+  chargeType,
+  useCredit,
   onApproved,
   onPixPending,
   onPending,
@@ -75,7 +84,13 @@ export function MercadoPagoBrick({
       const res = await fetch("/api/checkout/mp/process", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ formData, planId }),
+        body: JSON.stringify({
+          formData,
+          planId,
+          payMethod,
+          ...(chargeType === "subscription" ? { type: "subscription" } : {}),
+          ...(useCredit === true ? { useAffiliateCredit: true } : {}),
+        }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.error || "Erro ao processar pagamento.");
@@ -132,16 +147,13 @@ export function MercadoPagoBrick({
             payer: { email: payerEmail },
           }}
           customization={{
-            paymentMethods: {
-              creditCard: "all",
-              debitCard: "all",
-              ticket: "all",
-              // PIX no Payment Brick = grupo bankTransfer (doc oficial:
-              // "para NÃO incluir um tipo, remova-o do objeto paymentMethods").
-              // Sem esta chave a aba PIX ficava oculta em "Meios de pagamento".
-              bankTransfer: "all",
-              maxInstallments: safeMaxInstallments,
-            },
+            // O usuário já escolheu PIX ou CARTÃO no /checkout: exibe SOMENTE
+            // o método escolhido (doc oficial: "para NÃO incluir um tipo,
+            // remova-o do objeto paymentMethods"). PIX = grupo bankTransfer.
+            paymentMethods:
+              payMethod === "pix"
+                ? { bankTransfer: "all", maxInstallments: safeMaxInstallments }
+                : { creditCard: "all", maxInstallments: safeMaxInstallments },
             visual: { style: { theme: "default" } },
           }}
           onSubmit={handleSubmit as never}

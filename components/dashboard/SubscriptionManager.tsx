@@ -470,6 +470,20 @@ export function SubscriptionManager({
             {!billingEnabled && (
               <p className="text-xs text-emerald-600 mt-2">Ativo sem mensalidade recorrente.</p>
             )}
+            {billingEnabled && (subscription?.status === "past_due" || subscription?.status === "unpaid") && (
+              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                <p className="text-xs text-amber-800">
+                  Sua mensalidade está em aberto. Quite agora — você pode usar seu crédito de afiliado.
+                </p>
+                <button
+                  type="button"
+                  className="btn btn-gold !py-2 !px-4 text-xs mt-2"
+                  onClick={() => window.location.href = `/checkout?type=subscription`}
+                >
+                  Pagar mensalidade
+                </button>
+              </div>
+            )}
           </div>
           <div className="card">
             <p className="text-xs uppercase tracking-wider text-gray-400 font-semibold">Próxima cobrança</p>

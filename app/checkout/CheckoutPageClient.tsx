@@ -111,10 +111,19 @@ export function friendlyError(raw: string): string {
   return cleaned || "Não foi possível processar o pagamento. Tente novamente.";
 }
 
-export default function CheckoutPageClient({ planIdParam }: { planIdParam?: string }) {
+export default function CheckoutPageClient({
+  planIdParam,
+  chargeType,
+}: {
+  planIdParam?: string;
+  chargeType?: "activation" | "subscription";
+}) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const planId = planIdParam || searchParams.get("planId") || searchParams.get("plan") || undefined;
+  // Mensalidade avulsa (?type=subscription): cobra o valor mensal, com ou sem crédito.
+  const isMonthly =
+    chargeType === "subscription" || searchParams.get("type") === "subscription";
 
   const [gatewayInfo, setGatewayInfo] = useState<GatewayInfo | null>(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
@@ -143,6 +152,18 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
   const [pix, setPix] = useState<PixData | null>(null);
   const [copiedPix, setCopiedPix] = useState(false);
   const [processingMsg, setProcessingMsg] = useState<string | null>(null);
+  /** Crédito de afiliado (centavos) — SOMENTE exibição; valores válidos vêm do backend. */
+  const [creditCents, setCreditCents] = useState(0);
+  const [creditEnabled, setCreditEnabled] = useState(false);
+  /** null = ainda não escolheu; true = Sim; false = Não. */
+  const [useCredit, setUseCredit] = useState<boolean | null>(null);
+  /** Totais FIXADOS pelo backend ao iniciar o pagamento (fonte de verdade). */
+  const [lockedCredit, setLockedCredit] = useState<{
+    original_cents: number;
+    credit_cents: number;
+    total_cents: number;
+    usage_id: string | null;
+  } | null>(null);
 
   const pollRef = useRef<NodeJS.Timeout | null>(null);
   const checkoutGuardRef = useRef(false);
@@ -200,6 +221,23 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
       if (pollRef.current) clearInterval(pollRef.current);
     };
   }, []);
+
+  // Saldo de crédito de afiliado (para a pergunta "Deseja utilizar?").
+  useEffect(() => {
+    if (!isAuthed) return;
+    let alive = true;
+    fetch("/api/checkout/credit")
+      .then((r) => r.json())
+      .then((j) => {
+        if (!alive) return;
+        setCreditCents(Math.max(0, Math.floor(Number(j.available_cents) || 0)));
+        setCreditEnabled(Boolean(j.enabled) && Number(j.available_cents) > 0);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [isAuthed]);
 
   async function handleSignup(e: React.FormEvent) {
     e.preventDefault();
@@ -268,7 +306,14 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planId, embedded: true, payMethod: effectiveMethod }),
+        body: JSON.stringify({
+          planId,
+          embedded: true,
+          payMethod: effectiveMethod,
+          // Mensalidade avulsa + intenção de uso de crédito (valores no backend).
+          ...(isMonthly ? { type: "subscription" } : {}),
+          ...(useCredit === true ? { useAffiliateCredit: true } : {}),
+        }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -278,6 +323,14 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
         }
         throw new Error(friendlyError(json.error || "Não foi possível iniciar o pagamento. Tente novamente."));
       }
+      // Crédito 100%: sem gateway — pagamento já confirmado no backend.
+      if (json.zeroCharge) {
+        setLockedCredit(json.credit || null);
+        clearIntent();
+        setStep("success");
+        return;
+      }
+      if (json.credit) setLockedCredit(json.credit);
       if (json.gateway === "mercadopago" && (json.preferenceId || json.url)) {
         setMpUrl(json.url || null);
         setPreferenceId(json.preferenceId || null);
@@ -403,15 +456,23 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
   const mpPixDiscount = Number(gatewayInfo?.mercadopago?.pixDiscountPercent || 0);
   const mpInstallments = Number(gatewayInfo?.mercadopago?.installments || 0);
   const mpInstallmentsWithoutInterest = gatewayInfo?.mercadopago?.installmentsWithoutInterest !== false;
-  const pixCents = pixCentsFrom(activationCents, mpPixDiscount);
-  const installmentLabel = installmentText(activationCents, mpInstallments, mpInstallmentsWithoutInterest);
+  // Valor cheio da cobrança atual: ativação (pagamento único) ou mensalidade avulsa.
+  const chargeFullCents = isMonthly ? monthlyCents : activationCents;
+  const pixCents = pixCentsFrom(chargeFullCents, mpPixDiscount);
+  const installmentLabel = installmentText(chargeFullCents, mpInstallments, mpInstallmentsWithoutInterest);
   // Método efetivo: escolha do cliente; padrão = PIX quando há desconto, senão cartão.
   const selectedMethod: "pix" | "card" = payMethod ?? (mpPixDiscount > 0 ? "pix" : "card");
-  const selectedTotalCents = selectedMethod === "pix" ? pixCents : activationCents;
-  const cardPerInstallment = mpInstallments > 0 ? brl(Math.round(activationCents / mpInstallments)) : null;
+  const selectedTotalCents = selectedMethod === "pix" ? pixCents : chargeFullCents;
+  const cardPerInstallment = mpInstallments > 0 ? brl(Math.round(chargeFullCents / mpInstallments)) : null;
+  // Crédito de afiliado (EXIBIÇÃO — o backend fixa os valores reais em lockedCredit).
+  const displayCreditCents =
+    useCredit === true && creditEnabled ? Math.min(creditCents, selectedTotalCents) : 0;
+  const displayTotalCents = selectedTotalCents - displayCreditCents;
+  // Total fixado pelo backend ao iniciar o pagamento prevalece sobre o cálculo local.
+  const effectiveTotalCents = lockedCredit ? lockedCredit.total_cents : displayTotalCents;
   const gatewayLabel = gateway === "mercadopago" ? "Mercado Pago" : "Stripe";
   const mpPublicKey = gatewayInfo?.mercadopago?.publicKey || null;
-  const brickAmount = Math.round(selectedTotalCents) / 100;
+  const brickAmount = Math.round(effectiveTotalCents) / 100;
   const brickMaxInstallments = mpInstallments > 0 ? mpInstallments : 1;
   const canUseBrick = gateway === "mercadopago" && !!mpPublicKey && !brickFailed;
   const gatewaySecureText =
@@ -463,7 +524,7 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
               </div>
               <div className="text-right shrink-0">
                 <p className="text-[10px] font-bold tracking-[0.13em] uppercase text-[#8a9aa8] leading-4">Total hoje</p>
-                <p className="text-[16px] font-extrabold text-[#103d2d] mt-0.5 leading-6 tracking-tight">{brl(activationCents)}</p>
+                <p className="text-[16px] font-extrabold text-[#103d2d] mt-0.5 leading-6 tracking-tight">{brl(chargeFullCents)}</p>
               </div>
             </div>
           </div>
@@ -585,10 +646,12 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
         {/* Título centralizado — mais respiro e legibilidade */}
         <div className="text-center w-full max-w-[1020px] mx-auto px-3 sm:px-6 pt-1 sm:pt-2 pb-1 mb-8 sm:mb-12">
           <h1 className="text-[26px] sm:text-[34px] lg:text-[36px] font-bold tracking-[-0.02em] text-[#0f1a2a] leading-[1.2] sm:leading-[1.15]">
-            Finalize a ativação do seu site
+            {isMonthly ? "Pague sua mensalidade" : "Finalize a ativação do seu site"}
           </h1>
           <p className="text-[14px] sm:text-[15.5px] leading-relaxed text-[#5a6b7a] mt-4 max-w-[600px] mx-auto">
-            Escolha a forma de pagamento e ative seu Site Profissional.
+            {isMonthly
+              ? "Escolha a forma de pagamento e quite sua mensalidade."
+              : "Escolha a forma de pagamento e ative seu Site Profissional."}
           </p>
         </div>
 
@@ -620,31 +683,42 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
 
                 <div className="mt-6 space-y-5">
                   <div className="flex items-center justify-between gap-4">
-                    <p className="text-[13px] text-[#475569] leading-6">Ativação (pagamento único)</p>
-                    <p className="text-[13.5px] font-semibold text-[#0f1a2a] shrink-0 tracking-tight leading-6">{brl(activationCents)}</p>
+                    <p className="text-[13px] text-[#475569] leading-6">
+                      {isMonthly ? "Mensalidade (período)" : "Ativação (pagamento único)"}
+                    </p>
+                    <p className="text-[13.5px] font-semibold text-[#0f1a2a] shrink-0 tracking-tight leading-6">{brl(chargeFullCents)}</p>
                   </div>
-                  <div className="flex items-start justify-between gap-4">
-                    <p className="text-[13px] text-[#475569] leading-6 pt-0.5">Mensalidade</p>
-                    <div className="text-right shrink-0">
-                      <p className="text-[13.5px] font-semibold text-[#0f1a2a] leading-6 tracking-tight">{brl(monthlyCents)}/mês</p>
-                      <p className="text-[11px] text-[#6b7a89] mt-1.5 leading-4">após {trialMonths} meses</p>
+                  {!isMonthly && (
+                    <div className="flex items-start justify-between gap-4">
+                      <p className="text-[13px] text-[#475569] leading-6 pt-0.5">Mensalidade</p>
+                      <div className="text-right shrink-0">
+                        <p className="text-[13.5px] font-semibold text-[#0f1a2a] leading-6 tracking-tight">{brl(monthlyCents)}/mês</p>
+                        <p className="text-[11px] text-[#6b7a89] mt-1.5 leading-4">após {trialMonths} meses</p>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
 
                 <div className="mt-7 h-px bg-[#eef2ee]" />
 
-                <div className="mt-6 rounded-[12px] bg-[#fffbeb] border border-[#fde68a] px-4 py-3.5 flex items-center gap-3">
-                  <span className="text-[18px] leading-none shrink-0" aria-hidden>🎁</span>
-                  <p className="text-[12.5px] leading-5 text-[#92400e]">
-                    <b>{trialMonths} {trialMonths === 1 ? "mês" : "meses"} sem mensalidade</b> — você só paga a ativação hoje.
-                  </p>
-                </div>
+                {!isMonthly && (
+                  <div className="mt-6 rounded-[12px] bg-[#fffbeb] border border-[#fde68a] px-4 py-3.5 flex items-center gap-3">
+                    <span className="text-[18px] leading-none shrink-0" aria-hidden>🎁</span>
+                    <p className="text-[12.5px] leading-5 text-[#92400e]">
+                      <b>{trialMonths} {trialMonths === 1 ? "mês" : "meses"} sem mensalidade</b> — você só paga a ativação hoje.
+                    </p>
+                  </div>
+                )}
 
                 <div className="mt-4 rounded-[12px] bg-[#f2f7f3] border border-[#e6efe7] px-4 py-4 flex items-center justify-between gap-3">
                   <div>
                     <p className="text-[10px] font-bold tracking-[0.13em] uppercase text-[#6b7a89] leading-4">Total hoje</p>
-                    <p className="text-[22px] font-extrabold text-[#13402e] leading-6 mt-1.5 tracking-tight">{brl(activationCents)}</p>
+                    <p className="text-[22px] font-extrabold text-[#13402e] leading-6 mt-1.5 tracking-tight">{brl(displayTotalCents)}</p>
+                    {displayCreditCents > 0 && (
+                      <p className="text-[11.5px] font-semibold text-[#16a34a] mt-1 leading-4">
+                        com {brl(displayCreditCents)} de crédito aplicado
+                      </p>
+                    )}
                   </div>
                   <span className="shrink-0 inline-flex items-center rounded-full bg-[#dff0e2] border border-[#cde7d1] px-3 py-1.5 text-[10px] font-extrabold tracking-[0.07em] uppercase text-[#166534] leading-4">Pagamento único</span>
                 </div>
@@ -774,6 +848,59 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
                 </div>
               )}
 
+              {/* Crédito de afiliado — o backend calcula e fixa os valores */}
+              {isAuthed && creditEnabled && creditCents > 0 && (
+                <div className="mt-6 rounded-[14px] border-[1.5px] border-[#cde7d1] bg-[#f0fdf4] px-4 py-4">
+                  <p className="text-[13.5px] font-bold text-[#0f1a2a] leading-6">
+                    💰 Você possui {brl(creditCents)} de crédito disponível. Deseja utilizar?
+                  </p>
+                  <div className="mt-3 grid grid-cols-2 gap-3" role="radiogroup" aria-label="Usar crédito de afiliado">
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={useCredit === true}
+                      onClick={() => setUseCredit(true)}
+                      className={`rounded-[12px] border-[1.5px] px-4 py-3 text-[13px] font-bold transition-all ${
+                        useCredit === true
+                          ? "border-[#16a34a] bg-white text-[#166534] shadow-[0_6px_18px_rgba(22,163,74,0.12)]"
+                          : "border-[#d9e5db] bg-white/70 text-[#475569] hover:border-[#a7d0b4]"
+                      }`}
+                    >
+                      Sim, usar
+                    </button>
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={useCredit === false}
+                      onClick={() => setUseCredit(false)}
+                      className={`rounded-[12px] border-[1.5px] px-4 py-3 text-[13px] font-bold transition-all ${
+                        useCredit === false
+                          ? "border-[#103d2d] bg-white text-[#0f1a2a] shadow-[0_6px_18px_rgba(16,61,45,0.12)]"
+                          : "border-[#d9e5db] bg-white/70 text-[#475569] hover:border-[#a7d0b4]"
+                      }`}
+                    >
+                      Não, obrigado
+                    </button>
+                  </div>
+                  {useCredit === true && (
+                    <div className="mt-3 rounded-[10px] bg-white/80 border border-[#dcefe0] px-3.5 py-3 space-y-1.5 text-[12.5px] leading-5">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-[#475569]">{isMonthly ? "Mensalidade" : "Ativação"}</span>
+                        <span className="font-semibold text-[#0f1a2a]">{brl(selectedTotalCents)}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3 font-semibold text-[#16a34a]">
+                        <span>Crédito de afiliado</span>
+                        <span>− {brl(displayCreditCents)}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3 border-t border-[#e2efe4] pt-1.5 text-[14px] font-extrabold text-[#0f1a2a]">
+                        <span>Total a pagar</span>
+                        <span>{brl(displayTotalCents)}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {checkoutError && <p className="mt-5 rounded-xl bg-[#fef2f2] border border-[#fde4e4] px-4 py-3 text-sm leading-6 text-[#991b1b]">{checkoutError}</p>}
 
               <button
@@ -784,20 +911,26 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
               >
                 <span className="flex items-center justify-center gap-2 text-[15px] font-semibold text-white leading-6">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /><circle cx="12" cy="16" r="1.1" fill="white" stroke="none" /></svg>
-                  {checkoutLoading ? "Processando pagamento..." : "🔒 Pagar e ativar meu site"}
+                  {checkoutLoading
+                    ? "Processando pagamento..."
+                    : isMonthly
+                      ? "🔒 Pagar mensalidade"
+                      : "🔒 Pagar e ativar meu site"}
                 </span>
                 <span className="block text-[12px] font-medium text-white/80 mt-1.5 leading-5">
                   {checkoutLoading
                     ? "Aguarde um instante"
-                    : gateway === "mercadopago"
-                      ? selectedMethod === "pix"
-                        ? mpPixDiscount > 0
-                          ? `PIX ${brl(pixCents)} com ${mpPixDiscount}% OFF hoje`
-                          : `PIX ${brl(pixCents)} hoje • aprovação imediata`
-                        : installmentLabel
-                          ? `Cartão ${installmentLabel} • total ${brl(activationCents)} hoje`
-                          : `Cartão ${brl(activationCents)} hoje`
-                      : `Pagamento único de ${brl(activationCents)} hoje`}
+                    : displayCreditCents > 0
+                      ? `Total ${brl(displayTotalCents)} com ${brl(displayCreditCents)} de crédito aplicado`
+                      : gateway === "mercadopago"
+                        ? selectedMethod === "pix"
+                          ? mpPixDiscount > 0
+                            ? `PIX ${brl(pixCents)} com ${mpPixDiscount}% OFF hoje`
+                            : `PIX ${brl(pixCents)} hoje • aprovação imediata`
+                          : installmentLabel
+                            ? `Cartão ${installmentLabel} • total ${brl(chargeFullCents)} hoje`
+                            : `Cartão ${brl(chargeFullCents)} hoje`
+                        : `Pagamento único de ${brl(chargeFullCents)} hoje`}
                 </span>
               </button>
 
@@ -876,8 +1009,13 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
           <div>
             <p className="text-[10.5px] font-semibold tracking-[0.11em] uppercase text-[#8a9aa8]">Total hoje</p>
             <p className="text-[18px] font-bold text-[#103d2d] leading-none mt-1.5">
-              {gateway === "mercadopago" ? brl(selectedTotalCents) : brl(activationCents)}
+              {brl(effectiveTotalCents)}
             </p>
+            {(lockedCredit ? lockedCredit.credit_cents : displayCreditCents) > 0 && (
+              <p className="text-[11.5px] font-semibold text-[#1a6b4a] mt-1.5 leading-4">
+                Crédito de afiliado aplicado: − {brl(lockedCredit ? lockedCredit.credit_cents : displayCreditCents)}
+              </p>
+            )}
             {gateway === "mercadopago" && (
               <p className="text-[11.5px] font-semibold text-[#1a6b4a] mt-1.5 leading-4">
                 {selectedMethod === "pix"
@@ -887,7 +1025,7 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
             )}
           </div>
           <div className="text-right shrink-0">
-            <p className="text-xs text-[#6b7a89] text-right leading-5">{planName}<br />{brl(monthlyCents)}/mês após {trialMonths}m</p>
+            <p className="text-xs text-[#6b7a89] text-right leading-5">{planName}<br />{isMonthly ? "Mensalidade avulsa" : <>{brl(monthlyCents)}/mês após {trialMonths}m</>}</p>
             {gateway === "mercadopago" && (
               <button type="button" onClick={() => setStep("checkout")} className="mt-1.5 text-[11.5px] font-semibold text-[#1a6b4a] hover:text-[#103d2d] hover:underline leading-4">
                 trocar método
@@ -934,6 +1072,9 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
                   payerEmail={userEmail || email}
                   maxInstallments={brickMaxInstallments}
                   planId={offer?.id}
+                  payMethod={selectedMethod}
+                  chargeType={isMonthly ? "subscription" : "activation"}
+                  useCredit={useCredit === true}
                   onApproved={handleBrickApproved}
                   onPixPending={handleBrickPix}
                   onPending={handleBrickPending}
@@ -954,8 +1095,8 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
                   <p className="text-sm font-semibold text-[#0f1a2a] leading-6">Pagamento em ambiente seguro do Mercado Pago</p>
                   <p className="text-[13px] text-[#64748b] mt-1.5 leading-5">
                     {selectedMethod === "pix"
-                      ? `${brl(selectedTotalCents)} no PIX${mpPixDiscount > 0 ? ` (${mpPixDiscount}% OFF aplicado)` : ""}`
-                      : `${brl(selectedTotalCents)} no cartão${installmentLabel ? ` (${installmentLabel})` : ""}`} • Após a confirmação, voltamos para ativar seu site automaticamente.
+                      ? `${brl(effectiveTotalCents)} no PIX${mpPixDiscount > 0 ? ` (${mpPixDiscount}% OFF aplicado)` : ""}`
+                      : `${brl(effectiveTotalCents)} no cartão${installmentLabel ? ` (${installmentLabel})` : ""}`} • Após a confirmação, voltamos para ativar seu site automaticamente.
                   </p>
                   {mpUrl ? (
                     <a
@@ -1012,7 +1153,7 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-[10.5px] font-semibold tracking-[0.11em] uppercase text-[#8a9aa8]">Total no PIX</p>
-              <p className="text-[22px] font-extrabold text-[#13402e] leading-none mt-1.5">{mpPixDiscount > 0 ? brl(pixCents) : brl(activationCents)}</p>
+              <p className="text-[22px] font-extrabold text-[#13402e] leading-none mt-1.5">{brl(effectiveTotalCents)}</p>
             </div>
             <span className="shrink-0 inline-flex items-center rounded-full bg-[#16a34a]/10 border border-[#16a34a]/15 px-3 py-1.5 text-xs font-semibold text-[#16a34a]">PIX • Aprovação rápida</span>
           </div>
@@ -1116,11 +1257,31 @@ export default function CheckoutPageClient({ planIdParam }: { planIdParam?: stri
       <div className="max-w-[560px] mx-auto w-full px-5 sm:px-8 text-center py-12 sm:py-16">
         <div className="w-16 h-16 rounded-full bg-[#f0fdf4] border border-[#bbf7d0] flex items-center justify-center mx-auto text-2xl">🎉</div>
         <h3 className="text-[20px] font-semibold text-[#0f1a2a] mt-5">Pagamento confirmado!</h3>
-        <p className="text-sm text-[#4a5a6a] mt-2">Seu site foi ativado com sucesso.</p>
-        <div className="mt-6 rounded-[16px] border border-[#bbf7d0] bg-[#f0fdf4] p-4 text-left">
-          <p className="text-sm font-semibold text-[#14532d]">Site ativado com sucesso!</p>
-          <p className="text-sm text-[#166534]/80 mt-1 leading-5">Você já pode acessar seu painel. A mensalidade de {brl(monthlyCents)}/mês só começará após {trialMonths} {trialMonths === 1 ? "mês" : "meses"}.</p>
-        </div>
+        <p className="text-sm text-[#4a5a6a] mt-2">
+          {isMonthly ? "Sua mensalidade foi quitada com sucesso." : "Seu site foi ativado com sucesso."}
+        </p>
+        {lockedCredit && lockedCredit.credit_cents > 0 && (
+          <div className="mt-4 rounded-[16px] border border-[#bbf7d0] bg-[#f0fdf4] p-4 text-left text-sm leading-6">
+            <div className="flex items-center justify-between gap-3 text-[#166534]/80">
+              <span>Valor original</span>
+              <span className="font-semibold">{brl(lockedCredit.original_cents)}</span>
+            </div>
+            <div className="flex items-center justify-between gap-3 font-semibold text-[#16a34a]">
+              <span>Crédito de afiliado</span>
+              <span>− {brl(lockedCredit.credit_cents)}</span>
+            </div>
+            <div className="flex items-center justify-between gap-3 font-extrabold text-[#14532d]">
+              <span>Total pago</span>
+              <span>{brl(lockedCredit.total_cents)}</span>
+            </div>
+          </div>
+        )}
+        {!isMonthly && (
+          <div className="mt-6 rounded-[16px] border border-[#bbf7d0] bg-[#f0fdf4] p-4 text-left">
+            <p className="text-sm font-semibold text-[#14532d]">Site ativado com sucesso!</p>
+            <p className="text-sm text-[#166534]/80 mt-1 leading-5">Você já pode acessar seu painel. A mensalidade de {brl(monthlyCents)}/mês só começará após {trialMonths} {trialMonths === 1 ? "mês" : "meses"}.</p>
+          </div>
+        )}
         <div className="mt-6 flex flex-col gap-2 w-full">
           <button type="button" onClick={() => (window.location.href = "/painel")} className="w-full rounded-full bg-[#103d2d] px-6 py-3.5 text-[15px] font-semibold text-white shadow-[0_8px_24px_rgba(16,61,45,0.18)] hover:bg-[#0e3326] transition">
             Ir para meu painel

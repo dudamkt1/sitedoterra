@@ -3,6 +3,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { activateTenant } from "@/lib/billing";
 import { getActiveOffer, getPlanById } from "@/lib/commercial";
 import { registerAffiliateConversionForVisitor } from "@/lib/affiliate";
+import { applyAffiliateCredit, releaseAffiliateCredit } from "@/lib/affiliate-credit";
+import { extendSubscriptionPeriod } from "@/lib/checkout-quote";
 import {
   createRecurringSubscriptionMp,
   getMpPayment,
@@ -24,7 +26,8 @@ export const runtime = "nodejs";
  *
  * Mapa de identificação via `external_reference`:
  *   - "act_<tenantId>" → pagamento ÚNICO de ativação;
- *   - "sub_<tenantId>" → cobrança recorrente da mensalidade.
+ *   - "sub_<tenantId>" → cobrança recorrente da mensalidade;
+ *   - "mon_<tenantId>" → mensalidade avulsa paga manualmente (com ou sem crédito).
  */
 export async function POST(request: Request) {
   if (!(await isMercadoPagoEnabled())) {
@@ -110,10 +113,20 @@ async function handleNotification(type: string, dataId: string) {
   if (type === "payment") {
     const payment = await getMpPayment(dataId);
     const ref = payment.external_reference || "";
+    // Pagamento recusado/cancelado com crédito reservado: libera a reserva
+    // para o saldo voltar ao afiliado (vale para act_ e mon_).
+    if (payment.status === "rejected" || payment.status === "cancelled") {
+      const usageId = (payment.metadata?.credit_usage_id as string | undefined) || null;
+      if (usageId) await releaseAffiliateCredit(usageId);
+      if (ref.startsWith("sub_")) return handleRecurringPayment(payment);
+      return;
+    }
     if (ref.startsWith("act_")) return handleActivationPayment(payment);
+    if (ref.startsWith("mon_")) return handleManualMonthlyPayment(payment);
     if (ref.startsWith("sub_")) return handleRecurringPayment(payment);
     // Fallback: metadata da preference
     if (payment.metadata?.type === "activation") return handleActivationPayment(payment);
+    if (payment.metadata?.type === "subscription") return handleManualMonthlyPayment(payment);
     return;
   }
   if (type === "subscription") {
@@ -145,9 +158,10 @@ async function handleActivationPayment(payment: MpPayment) {
   const plan = planId ? await getPlanById(planId) : await getActiveOffer();
 
   const amountCents = Math.round((payment.transaction_amount || 0) * 100);
+  const creditUsageId = (payment.metadata?.credit_usage_id as string | undefined) || null;
 
   // Registra o pagamento de ativação (idempotente: upsert pelo id do MP)
-  await admin.from("payments").upsert(
+  const { data: paymentRow } = await admin.from("payments").upsert(
     {
       tenant_id: tenantId,
       mercadopago_payment_id: String(payment.id),
@@ -157,10 +171,32 @@ async function handleActivationPayment(payment: MpPayment) {
       currency: (payment.currency_id || "brl").toLowerCase(),
       status: "succeeded",
       paid_at: payment.date_approved ? new Date(payment.date_approved).toISOString() : new Date().toISOString(),
-      metadata: { plan_id: planId, gateway: "mercadopago", external_reference: ref },
+      metadata: {
+        plan_id: planId,
+        gateway: "mercadopago",
+        external_reference: ref,
+        ...(creditUsageId ? { credit_usage_id: creditUsageId } : {}),
+        ...(typeof payment.metadata?.credit_applied_cents !== "undefined"
+          ? { credit_applied_cents: payment.metadata.credit_applied_cents }
+          : {}),
+        ...(typeof payment.metadata?.original_amount_cents !== "undefined"
+          ? { original_amount_cents: payment.metadata.original_amount_cents }
+          : {}),
+      },
     },
     { onConflict: "mercadopago_payment_id" }
-  );
+  ).select("id").maybeSingle();
+
+  // Crédito de afiliado: confirma a utilização SOMENTE com pagamento aprovado.
+  if (creditUsageId) {
+    const applied = await applyAffiliateCredit(creditUsageId, paymentRow?.id || null);
+    if (!applied) {
+      console.error("[mercadopago webhook] falha ao confirmar crédito de afiliado", {
+        usage_id: creditUsageId,
+        mp_payment_id: payment.id,
+      });
+    }
+  }
 
   await admin.from("billing_history").upsert(
     {
@@ -265,6 +301,120 @@ async function handleActivationPayment(payment: MpPayment) {
     } catch (convErr) {
       console.error("[mercadopago webhook] falha ao registrar conversão de afiliado", convErr);
     }
+  }
+}
+
+// ============================ MENSALIDADE AVULSA (PAGAMENTO MANUAL) ============================
+
+// Mensalidade paga manualmente pelo /checkout (type = subscription), com ou
+// sem crédito de afiliado. Diferente da recorrência automática do gateway
+// (handleRecurringPayment), aqui o período é estendido em +1 mês.
+async function handleManualMonthlyPayment(payment: MpPayment) {
+  if (payment.status !== "approved") return;
+
+  const admin = createAdminClient();
+  const ref = payment.external_reference || "";
+  const tenantId = ref.startsWith("mon_")
+    ? ref.slice(4)
+    : (payment.metadata?.tenant_id as string | undefined);
+  if (!tenantId) return;
+
+  const metaSubId = (payment.metadata?.subscription_id as string | undefined) || null;
+  let sub: { id: string } | null = null;
+  if (metaSubId) {
+    const { data } = await admin
+      .from("subscriptions")
+      .select("id")
+      .eq("id", metaSubId)
+      .eq("tenant_id", tenantId)
+      .maybeSingle();
+    sub = (data as { id: string } | null) || null;
+  }
+  if (!sub) {
+    const { data } = await admin
+      .from("subscriptions")
+      .select("id")
+      .eq("tenant_id", tenantId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    sub = (data as { id: string } | null) || null;
+  }
+  if (!sub) {
+    console.error("[mercadopago webhook] mensalidade avulsa sem assinatura", { tenantId });
+    return;
+  }
+
+  const amountCents = Math.round((payment.transaction_amount || 0) * 100);
+  const creditUsageId = (payment.metadata?.credit_usage_id as string | undefined) || null;
+
+  const { data: paymentRow } = await admin.from("payments").upsert(
+    {
+      tenant_id: tenantId,
+      subscription_id: sub.id,
+      mercadopago_payment_id: String(payment.id),
+      mercadopago_preference_id: payment.preference_id || null,
+      type: "subscription",
+      amount_cents: amountCents,
+      currency: (payment.currency_id || "brl").toLowerCase(),
+      status: "succeeded",
+      paid_at: payment.date_approved ? new Date(payment.date_approved).toISOString() : new Date().toISOString(),
+      metadata: {
+        gateway: "mercadopago",
+        external_reference: ref,
+        manual_monthly: true,
+        ...(creditUsageId ? { credit_usage_id: creditUsageId } : {}),
+        ...(typeof payment.metadata?.credit_applied_cents !== "undefined"
+          ? { credit_applied_cents: payment.metadata.credit_applied_cents }
+          : {}),
+        ...(typeof payment.metadata?.original_amount_cents !== "undefined"
+          ? { original_amount_cents: payment.metadata.original_amount_cents }
+          : {}),
+      },
+    },
+    { onConflict: "mercadopago_payment_id" }
+  ).select("id").maybeSingle();
+
+  const periodStart = new Date().toISOString();
+  await admin.from("billing_history").upsert(
+    {
+      tenant_id: tenantId,
+      subscription_id: sub.id,
+      mercadopago_payment_id: String(payment.id),
+      type: "subscription",
+      amount_cents: amountCents,
+      currency: "brl",
+      status: "succeeded",
+      period_start: periodStart,
+    },
+    { onConflict: "mercadopago_payment_id" }
+  );
+
+  try {
+    await extendSubscriptionPeriod(admin, tenantId, sub.id);
+  } catch (e) {
+    console.error("[mercadopago webhook] falha ao estender assinatura", e);
+  }
+
+  if (creditUsageId) {
+    const applied = await applyAffiliateCredit(creditUsageId, paymentRow?.id || null);
+    if (!applied) {
+      console.error("[mercadopago webhook] falha ao confirmar crédito de afiliado", {
+        usage_id: creditUsageId,
+        mp_payment_id: payment.id,
+      });
+    }
+  }
+
+  await activateTenant(tenantId);
+
+  const { data: tOwner } = await admin.from("tenants").select("user_id").eq("id", tenantId).maybeSingle();
+  if (tOwner?.user_id) {
+    await auditPaymentEvent("user.site_reactivated_payment", tOwner.user_id, tenantId, {
+      gateway: "mercadopago",
+      amount_cents: amountCents,
+      manual_monthly: true,
+    });
   }
 }
 
