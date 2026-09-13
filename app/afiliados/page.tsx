@@ -310,6 +310,16 @@ export default async function AfiliadosPage({
                 </p>
               )}
             </div>
+
+            {/* Voltar à HOME (da consultora quando veio de um site /?from=, senão a principal) */}
+            <div className="mt-8 sm:mt-10 text-center">
+              <a
+                href={logoHref}
+                className="inline-flex items-center justify-center gap-2 rounded-full border border-[#dde6de] bg-white/80 px-6 py-3 text-[13.5px] font-semibold text-[#2d3a4a] hover:bg-[#f6faf7] hover:text-[#103d2d] transition"
+              >
+                <span aria-hidden>←</span> Voltar para a home
+              </a>
+            </div>
           </div>
         </div>
       </main>
