@@ -48,9 +48,10 @@ export function PendingPaymentBox({ tenantId }: { tenantId?: string | null }) {
     }
   }
 
-  /** "Pagar Agora": leva para a tela de assinatura retomando a ativação. */
+  /** "Pagar Agora": leva para o checkout, onde o usuário escolhe
+   *  novamente como pagar (PIX/cartão) e finaliza o pagamento. */
   function payNow() {
-    window.location.href = "/painel/assinatura?resume=1";
+    window.location.href = "/checkout";
   }
 
   if (pendingActivationPayment === null) return null;

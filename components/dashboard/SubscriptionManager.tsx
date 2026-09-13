@@ -71,10 +71,13 @@ export function SubscriptionManager({
   useEffect(() => {
     try {
       if (resume) {
+        // Limpa a flag de checkout pendente e volta para a URL sem o
+        // parâmetro. Usar reload() aqui causava loop infinito, pois o
+        // ?resume=1 permanecia na URL após recarregar ("site pensando").
         try {
           window.localStorage.removeItem("site_activation_checkout");
         } catch {}
-        window.location.reload();
+        window.location.href = "/painel/assinatura";
       } else if (!activationPaid && window.localStorage.getItem("site_activation_checkout") === "1") {
         setCheckoutPending(true);
       }
@@ -390,7 +393,7 @@ export function SubscriptionManager({
                       🔄 Verificar pagamento
                     </button>
                     {pendingActivationPayment && (
-                      <button type="button" className="btn btn-gold !py-2.5 text-xs" onClick={checkPayment} disabled={checking}>
+                      <button type="button" className="btn btn-gold !py-2.5 text-xs" onClick={() => window.location.href = `/checkout`} disabled={checking}>
                         Pagar Agora
                       </button>
                     )}
