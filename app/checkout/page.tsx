@@ -36,12 +36,24 @@ const DEMO_TENANT: PublicTenant = {
 export default async function CheckoutPage({
   searchParams,
 }: {
-  searchParams?: { planId?: string; plan?: string; type?: string };
+  searchParams?: { planId?: string; plan?: string; type?: string; from?: string };
 }) {
   const user = await getCurrentUser();
   const planId = searchParams?.planId || searchParams?.plan || undefined;
   // type=subscription → pagamento avulso de mensalidade (com ou sem crédito).
   const chargeType = searchParams?.type === "subscription" ? "subscription" : "activation";
+  // Visitante vindo do site de uma consultora (?from=<slug>): o logo volta
+  // à HOME DELA — nunca ao domínio principal. Slug validado (só tenants reais).
+  let logoHref = "/";
+  const fromRaw = typeof searchParams?.from === "string" ? searchParams.from.trim() : "";
+  if (fromRaw) {
+    try {
+      const fromTenant = await getPublicTenantBySlug(fromRaw);
+      if (fromTenant) logoHref = `/${fromTenant.slug}`;
+    } catch {
+      // slug inválido — segue para a HOME padrão
+    }
+  }
 
   // --- Cabeçalho e rodapé SINCRONIZADOS com a HOME (mesma fonte de verdade) — cache 60s ---
   const homeSlug = process.env.HOME_TENANT_SLUG || "usuarioteste";
@@ -91,7 +103,7 @@ export default async function CheckoutPage({
         {/* Garante contraste do NAV fixo sobre fundo claro do checkout (sem alterar componente) */}
         <style dangerouslySetInnerHTML={{ __html: `#tenant-site nav:not(.scrolled){background:rgba(247,242,234,0.92);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid rgba(196,150,58,0.15);} #tenant-site nav:not(.scrolled) .nav-logo{color:var(--verde);} #tenant-site nav:not(.scrolled) .nav-links a{color:var(--cinza);} #tenant-site nav:not(.scrolled) .nav-links a:hover{color:var(--verde);} #tenant-site nav:not(.scrolled) .hamburger span{background:var(--verde);} #tenant-site nav:not(.scrolled) .nav-extra-link{color:var(--ouro);border-color:rgba(196,150,58,0.4);} ` }} />
         <SiteEffects />
-        <Header logoText={logoText} logoUrl={logoUrl} logoLightUrl={logoLightUrl} navItems={navItems} extraNav={extraNav} logoHref="/" />
+        <Header logoText={logoText} logoUrl={logoUrl} logoLightUrl={logoLightUrl} navItems={navItems} extraNav={extraNav} logoHref={logoHref} />
       </div>
       {/* Isolado do NAV fixo (70px) + respiro generoso — checkout central moderno, com margens laterais e fundo suave */}
       <main className="flex-1 bg-gradient-to-b from-[#fcf9f5] via-[#f7f3ea] to-[#fcf9f5] pt-[70px] relative overflow-hidden">

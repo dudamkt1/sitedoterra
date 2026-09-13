@@ -12,6 +12,7 @@ import { getPublicTenantBySlug } from "@/lib/tenant";
 import { getPublicAffiliateConfig } from "@/lib/affiliate-public";
 import { AffiliatesCalculator } from "@/components/afiliados/AffiliatesCalculator";
 import { AffiliatesFaq } from "@/components/afiliados/AffiliatesFaq";
+import { AffiliateAttribution } from "@/components/site/AffiliateAttribution";
 import type { PublicTenant } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -38,9 +39,29 @@ const DEMO_TENANT: PublicTenant = {
   user_id: "demo-user-id",
 };
 
-export default async function AfiliadosPage() {
+export default async function AfiliadosPage({
+  searchParams,
+}: {
+  searchParams?: { ref?: string; from?: string };
+}) {
   const user = await getCurrentUser();
   const ctaHref = user ? "/painel/afiliados" : "/login?next=/painel/afiliados";
+
+  // Visitante vindo do site de uma consultora (?from=<slug>): valida o slug
+  // (só tenants reais) para voltar à HOME DELA — nunca ao domínio principal.
+  // O ?ref= é capturado abaixo pelo AffiliateAttribution (mantém a indicação).
+  let tenantSlug: string | null = null;
+  const fromRaw = typeof searchParams?.from === "string" ? searchParams.from.trim() : "";
+  if (fromRaw) {
+    try {
+      const fromTenant = await getPublicTenantBySlug(fromRaw);
+      if (fromTenant) tenantSlug = fromTenant.slug;
+    } catch {
+      // slug inválido — segue sem contexto de tenant
+    }
+  }
+  const logoHref = tenantSlug ? `/${tenantSlug}` : "/";
+  const checkoutHref = tenantSlug ? `/checkout?from=${encodeURIComponent(tenantSlug)}` : "/checkout";
 
   // --- Cabeçalho e rodapé SINCRONIZADOS com a HOME (mesma fonte de verdade) ---
   const homeSlug = process.env.HOME_TENANT_SLUG || "usuarioteste";
@@ -118,7 +139,12 @@ export default async function AfiliadosPage() {
         <style dangerouslySetInnerHTML={{ __html: themeStyleTag(theme) }} />
         <style dangerouslySetInnerHTML={{ __html: `#tenant-site nav:not(.scrolled){background:rgba(247,242,234,0.92);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid rgba(196,150,58,0.15);} #tenant-site nav:not(.scrolled) .nav-logo{color:var(--verde);} #tenant-site nav:not(.scrolled) .nav-links a{color:var(--cinza);} #tenant-site nav:not(.scrolled) .nav-links a:hover{color:var(--verde);} #tenant-site nav:not(.scrolled) .hamburger span{background:var(--verde);} #tenant-site nav:not(.scrolled) .nav-extra-link{color:var(--ouro);border-color:rgba(196,150,58,0.4);} ` }} />
         <SiteEffects />
-        <Header logoText={logoText} logoUrl={logoUrl} logoLightUrl={logoLightUrl} navItems={navItems} extraNav={[{ label: "Painel", href: user ? "/painel" : "/login" }]} logoHref="/" />
+        <Header logoText={logoText} logoUrl={logoUrl} logoLightUrl={logoLightUrl} navItems={navItems} extraNav={[{ label: "Painel", href: user ? "/painel" : "/login" }]} logoHref={logoHref} />
+        {/* Captura ?ref= de quem veio do site de uma consultora (registra o
+            click + cookie de atribuição). Sem scroll (kind none). */}
+        <Suspense fallback={null}>
+          <AffiliateAttribution destination={{ kind: "none", label: "afiliados" }} />
+        </Suspense>
       </div>
 
       <main className="flex-1 bg-gradient-to-b from-[#fcf9f5] via-[#f7f3ea] to-[#fcf9f5] pt-[70px] relative overflow-hidden">
@@ -182,7 +208,7 @@ export default async function AfiliadosPage() {
                   Ative por {brl(activationCents)} (ou 3x sem juros) e comece a usar hoje.
                 </p>
                 <a
-                  href="/checkout"
+                  href={checkoutHref}
                   className="mt-5 inline-flex items-center justify-center gap-2 rounded-[14px] bg-[#1d5c3a] hover:bg-[#154730] active:bg-[#103d2d] px-6 py-3.5 text-[14px] font-bold text-white shadow-[0_10px_28px_rgba(29,92,58,0.28)] transition"
                 >
                   Ativar agora <span aria-hidden>→</span>

@@ -212,6 +212,9 @@ export default async function TenantSitePage({
           sections={sections}
           theme={theme}
           affiliateUserId={tenant.user_id}
+          // Site de consultora (exceto o tenant oficial = HOME da plataforma):
+          // links de plataforma preservam o tenant (?ref=/?from=).
+          tenantSite={!isOfficial}
           destination={destination}
           contact={{
             whatsapp: (siteData.whatsapp as string) || undefined,

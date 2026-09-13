@@ -47,6 +47,12 @@ interface SiteHomeProps {
   /** ID do usuário afiliado (dono do site) para rastreamento de cliques */
   affiliateUserId?: string;
   /**
+   * true quando renderiza o site de UMA consultora (/[slug]), false na HOME
+   * da plataforma. Em site de tenant, os links de plataforma ("Afiliados")
+   * carregam `?ref=` (preserva a indicação) + `?from=` (volta ao tenant).
+   */
+  tenantSite?: boolean;
+  /**
    * Destino do scroll quando o visitante chega por `?ref=`. Resolvido pelo
    * servidor via `resolveAffiliateDestination`. Se ausente, default
    * = `kind: "anchor", anchor: "planos"` (compatibilidade).
@@ -60,7 +66,7 @@ interface SiteHomeProps {
  * renderiza cada uma como componente independente, na ordem correta.
  * Seções desativadas são simplesmente ignoradas.
  */
-export function SiteHome({ slug, sections, contact, logo, extraNav = [], theme, affiliateUserId, destination }: SiteHomeProps) {
+export function SiteHome({ slug, sections, contact, logo, extraNav = [], theme, affiliateUserId, destination, tenantSite = false }: SiteHomeProps) {
   const visible = sections.filter((s) => s.enabled);
 
   const headerSection = visible.find((s) => s.type === "header");
@@ -75,12 +81,20 @@ export function SiteHome({ slug, sections, contact, logo, extraNav = [], theme, 
   const logoLightUrl =
     logo?.lightUrl || (headerContent.logoLightUrl as string) || undefined;
 
+  // Em site de tenant, o link "Afiliados" preserva o caminho da consultora:
+  // `?ref=` mantém a indicação (capturada pelo AffiliateAttribution) e
+  // `?from=` permite voltar à HOME dela (nunca ao domínio principal).
+  const affiliatesHref =
+    tenantSite && affiliateUserId
+      ? `/afiliados?ref=${encodeURIComponent(affiliateUserId)}&from=${encodeURIComponent(slug)}`
+      : "/afiliados";
+
   const navItems = [
     ...visible
       .filter((s) => s.settings?.showInNav !== false && s.type !== "header" && s.type !== "footer" && s.type !== "affiliates")
       .map((s) => ({ label: (s.navLabel || s.label) as string, href: `#${s.anchor}` })),
     // A seção "affiliates" é só uma chamada — o item do menu leva à página.
-    { label: "Afiliados", href: "/afiliados" },
+    { label: "Afiliados", href: affiliatesHref },
   ];
 
   const footerSection = visible.find((s) => s.type === "footer");
