@@ -193,12 +193,13 @@ export async function POST(request: Request) {
       name: profile.name,
     });
 
-    // metadata do Stripe (limite 500 chars por valor; UUIDs cabem sem problemas).
-    const metadata: Record<string, string> = {
-      tenant_id: tenant.id,
-      type: kind,
-      plan_id: plan.id,
-    };
+  // metadata do Stripe (limite 500 chars por valor; UUIDs cabem sem problemas).
+  const metadata: Record<string, string> = {
+    tenant_id: tenant.id,
+    type: kind,
+    plan_id: plan.id,
+    expected_total_cents: String(quote.totalCents),
+  };
     if (visitorToken) metadata.visitor_token = visitorToken;
     if (quote.subscriptionId) metadata.subscription_id = quote.subscriptionId;
     if (quote.usageId) metadata.credit_usage_id = quote.usageId;

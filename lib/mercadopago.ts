@@ -5,6 +5,7 @@ import { addMonths } from "@/lib/billing";
 import { getPublicBaseUrl } from "@/lib/public-url";
 import {
   getMercadoPagoTokenResolved,
+  getMercadoPagoWebhookSecretResolved,
   isMercadoPagoSandboxResolved,
 } from "@/lib/gateway-config";
 
@@ -164,6 +165,11 @@ export async function createActivationPreference(
     tenant_id: input.tenantId,
     plan_id: input.planId,
     type: kind,
+    // Método escolhido no checkout + total esperado (centavos, já com
+    // desconto PIX e crédito). O webhook valida o valor pago contra este
+    // total — o frontend nunca é fonte de verdade.
+    ...(input.payMethod ? { pay_method: input.payMethod } : {}),
+    expected_total_cents: Math.round(input.activationAmountCents),
   };
   if (input.visitorToken) metadata.visitor_token = input.visitorToken;
   if (input.subscriptionId) metadata.subscription_id = input.subscriptionId;
@@ -366,6 +372,10 @@ export async function processBrickPayment(input: BrickPaymentInput): Promise<MpP
     tenant_id: input.tenantId,
     plan_id: input.planId,
     type: kind,
+    // Método efetivo + total esperado (centavos). O webhook valida o valor
+    // pago contra este total — o frontend nunca é fonte de verdade.
+    pay_method: isPix ? "pix" : "card",
+    expected_total_cents: Math.round(amount * 100),
   };
   if (input.visitorToken) metadata.visitor_token = input.visitorToken;
   if (input.subscriptionId) metadata.subscription_id = input.subscriptionId;
@@ -501,6 +511,30 @@ export function getMpPayment(id: string): Promise<MpPayment> {
   return mpFetch<MpPayment>(`/v1/payments/${id}`);
 }
 
+/**
+ * Busca pagamentos pelo `external_reference` (ex.: `act_<tenantId>`).
+ * Usado pela sincronização manual (`POST /api/payments/sync`): quando o
+ * webhook não foi entregue/processado, o próprio usuário dispara a
+ * conciliação e o backend confirma o status real direto no Mercado Pago
+ * (fonte de verdade — nunca o frontend).
+ */
+export async function searchMpPaymentsByExternalReference(
+  externalReference: string,
+  limit = 10
+): Promise<MpPayment[]> {
+  const qs = new URLSearchParams({
+    external_reference: externalReference,
+    sort: "date_created",
+    criteria: "desc",
+    range: "date_created",
+    begin_date: "2020-01-01T00:00:00.000-03:00",
+    end_date: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+  });
+  qs.set("limit", String(Math.min(Math.max(limit, 1), 50)));
+  const res = await mpFetch<{ results?: MpPayment[] }>(`/v1/payments/search?${qs.toString()}`);
+  return Array.isArray(res?.results) ? res.results : [];
+}
+
 export function getMpSubscription(id: string): Promise<MpSubscription> {
   return mpFetch<MpSubscription>(`/v1/subscriptions/${id}`);
 }
@@ -534,7 +568,8 @@ export async function cancelMpSubscription(id: string): Promise<MpSubscription> 
 /**
  * Valida a assinatura do webhook (x-signature: ts=...,v1=...).
  * Manifest: `id:<data.id>;request-id:<x-request-id>;ts:<ts>`
- * HMAC-SHA256 com a Access Token (ou MERCADOPAGO_WEBHOOK_SECRET, se configurada).
+ * HMAC-SHA256 com o segredo resolvido (banco → env) ou, na ausência dele,
+ * com o Access Token — mesma regra de resolução das demais chaves.
  */
 export async function verifyMpSignature(input: {
   xSignature: string | null;
@@ -555,7 +590,7 @@ export async function verifyMpSignature(input: {
   if (!ts || !v1) return false;
 
   const secret =
-    process.env.MERCADOPAGO_WEBHOOK_SECRET || (await getMercadoPagoTokenResolved());
+    (await getMercadoPagoWebhookSecretResolved()) || (await getMercadoPagoTokenResolved());
   if (!secret) return false;
   const manifest = `id:${input.dataId};request-id:${input.xRequestId || ""};ts:${ts}`;
   const hash = crypto.createHmac("sha256", secret).update(manifest).digest("hex");

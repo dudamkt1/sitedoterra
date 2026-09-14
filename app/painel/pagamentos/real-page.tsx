@@ -3,6 +3,18 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { SectionTitle, StatusBadge } from "@/components/dashboard/ui";
 import { formatBRL, formatDateTime } from "@/lib/utils";
 import { PendingPaymentBox } from "./PendingPaymentBox";
+import { PagamentosAutoRefresh } from "./AutoRefresh";
+
+/** Referência curta do gateway para a coluna da tabela (Stripe ou MP). */
+function paymentRef(r: any): string {
+  return (
+    r.mercadopago_payment_id ||
+    r.mercadopago_preference_id ||
+    r.stripe_invoice_id ||
+    r.stripe_checkout_session_id ||
+    "—"
+  );
+}
 
 export const dynamic = "force-dynamic";
 
@@ -54,8 +66,11 @@ export default async function PagamentosPage(p: { demoCtx?: DashboardContext }) 
     }
   }
 
+  const hasPending = rows.some((r) => r.status === "pending");
+
   return (
     <div>
+      <PagamentosAutoRefresh active={hasPending} />
       <SectionTitle sub="Todos os pagamentos e cobranças do seu site.">Pagamentos</SectionTitle>
       <div className="card">
         {rows.length === 0 ? (
@@ -79,7 +94,7 @@ export default async function PagamentosPage(p: { demoCtx?: DashboardContext }) 
                     <td>{r.type === "activation" ? "Ativação" : r.type === "subscription" ? "Mensalidade" : r.type}</td>
                     <td>{formatBRL(r.amount_cents)}</td>
                     <td><StatusBadge status={r.status} /></td>
-                    <td className="text-gray-400 text-xs">{r.stripe_invoice_id || r.stripe_checkout_session_id || "—"}</td>
+                    <td className="text-gray-400 text-xs">{paymentRef(r)}</td>
                   </tr>
                 ))}
               </tbody>

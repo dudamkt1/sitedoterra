@@ -167,6 +167,24 @@ export async function activateTenant(tenantId: string, userId?: string) {
 }
 
 /**
+ * Desativa o tenant por falta de pagamento válido (ex.: reembolso da
+ * ativação). Espelho reverso do activateTenant, SEM apagar nada:
+ * site volta para "suspenso", usuário/perfil/conteúdo/configurações são
+ * preservados e um novo pagamento aprovado reativa normalmente.
+ * O perfil NÃO é suspenso — o usuário continua logando e pode pagar de novo.
+ */
+export async function deactivateTenant(tenantId: string, reason?: string) {
+  const admin = createAdminClient();
+  await admin
+    .from("tenants")
+    .update({ site_status: "suspended", suspended_at: new Date().toISOString() })
+    .eq("id", tenantId);
+  if (reason) {
+    console.warn(`[billing] tenant ${tenantId} desativado: ${reason}`);
+  }
+}
+
+/**
  * Cria a assinatura recorrente (ex.: R$ 47,00/mês) com primeira cobrança
  * apenas após o número de MESES definido na configuração comercial
  * (trial_months — Super Admin decide em /admin/planos).

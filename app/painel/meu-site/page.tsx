@@ -3,6 +3,8 @@ import { getPainelContext } from "@/lib/demo/painel-context";
 import { SectionTitle } from "@/components/dashboard/ui";
 import { getPublicBaseUrl } from "@/lib/public-url";
 import { getAffiliateSettings } from "@/lib/affiliate";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { formatBRL, formatDateTime } from "@/lib/utils";
 
 export default async function MeuSitePage({ searchParams }: { searchParams?: { ativado?: string } }) {
   const { isDemo, ctx } = await getPainelContext();
@@ -16,6 +18,28 @@ export default async function MeuSitePage({ searchParams }: { searchParams?: { a
   const programActive = affiliateSettings?.program_active !== false;
   const userId = ctx.profile?.user_id || "";
   const tenantSlug = ctx.tenant?.slug || "";
+
+  // Último pagamento de ativação: se foi devolvido/reembolsado (e nenhum
+  // pagamento posterior o substituiu), o site fica desativado e exibimos o
+  // aviso com CTA de reativação. Histórico e conteúdo preservados.
+  let refundedActivation: { amount_cents: number; created_at: string } | null = null;
+  if (!isDemo && ctx.tenant?.id) {
+    try {
+      const admin = createAdminClient();
+      const { data } = await admin
+        .from("payments")
+        .select("amount_cents, created_at, status")
+        .eq("tenant_id", ctx.tenant.id)
+        .eq("type", "activation")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const row = data as { amount_cents: number; created_at: string; status: string } | null;
+      if (row?.status === "refunded") {
+        refundedActivation = { amount_cents: row.amount_cents, created_at: row.created_at };
+      }
+    } catch {}
+  }
 
   // Lazy-load dos componentes reais
   const { SiteManager } = await import("@/components/dashboard/SiteManager");
@@ -35,6 +59,28 @@ export default async function MeuSitePage({ searchParams }: { searchParams?: { a
       {/* Retorno do pagamento de ativação (nova aba) */}
       {searchParams?.ativado === "1" && (
         <ActivationReturnNotice siteActive={siteActive} />
+      )}
+
+      {/* Pagamento de ativação devolvido/reembolsado: site desativado, com
+          CTA para pagar novamente e reativar (novo registro; histórico intacto). */}
+      {refundedActivation && !siteActive && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-red-900">
+                ⚠️ Seu site está desativado porque o pagamento anterior foi devolvido
+              </p>
+              <p className="text-sm text-red-800 mt-1.5">
+                Pagamento de {formatBRL(refundedActivation.amount_cents)} em{" "}
+                {formatDateTime(refundedActivation.created_at)} foi reembolsado no
+                Mercado Pago. Seus dados e conteúdo estão preservados.
+              </p>
+            </div>
+            <Link href="/checkout" className="btn btn-primary shrink-0">
+              🔄 Reativar meu site
+            </Link>
+          </div>
+        </div>
       )}
 
       {/* Card contextual — só aparece quando o site do próprio afiliado não

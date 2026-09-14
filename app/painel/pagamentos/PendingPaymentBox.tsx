@@ -29,11 +29,21 @@ export function PendingPaymentBox({ tenantId }: { tenantId?: string | null }) {
     checkPendingPayment();
   }, [checkPendingPayment]);
 
-  /** "Verificar pagamento": se já foi confirmado, recarrega a página; senão, avisa. */
+  /**
+   * "Verificar pagamento": concilia direto no Mercado Pago (fonte de
+   * verdade) e só depois lê o status local. Se já foi confirmado (mesmo
+   * que o webhook tenha falhado), recarrega a página; senão, avisa.
+   */
   async function checkPayment() {
     setChecking(true);
     setMsg(null);
     try {
+      // Sincroniza com o MP antes de ler o status local.
+      try {
+        await fetch("/api/payments/sync", { method: "POST" });
+      } catch {
+        // Best-effort: segue para a leitura local mesmo assim.
+      }
       const res = await fetch("/api/subscription/status");
       const data = await res.json();
       if (data.activated || data.hasActivationPayment) {

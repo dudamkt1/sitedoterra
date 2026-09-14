@@ -71,7 +71,7 @@ export default async function AdminFinanceiroPage() {
                   <td>{r.type === "activation" ? "Ativação" : r.type === "subscription" ? "Mensalidade" : r.type}</td>
                   <td>{formatBRL(r.amount_cents)}</td>
                   <td><StatusBadge status={r.status} /></td>
-                  <td className="text-xs text-gray-400">{r.stripe_invoice_id || r.stripe_checkout_session_id || "—"}</td>
+                  <td className="text-xs text-gray-400">{r.mercadopago_payment_id || r.mercadopago_preference_id || r.stripe_invoice_id || r.stripe_checkout_session_id || "—"}</td>
                 </tr>
               ))}
               {rows.length === 0 && <tr><td colSpan={5} className="text-center text-gray-400 py-8">Sem transações.</td></tr>}

@@ -128,6 +128,16 @@ export async function getMercadoPagoTokenResolved(): Promise<string | null> {
   return (await resolveGateways()).mercadopago.accessToken;
 }
 
+/**
+ * Segredo do webhook MP (DB → env). O webhook DEVE usar este helper (e não
+ * só a env) — caso contrário, um segredo configurado apenas em
+ * /admin/pagamentos nunca é usado, a verificação falha com 401 e NENHUM
+ * pagamento é confirmado (fica "pendente" para sempre).
+ */
+export async function getMercadoPagoWebhookSecretResolved(): Promise<string | null> {
+  return (await resolveGateways()).mercadopago.webhookSecret;
+}
+
 export async function isMercadoPagoSandboxResolved(): Promise<boolean> {
   return (await resolveGateways()).mercadopago.sandbox;
 }

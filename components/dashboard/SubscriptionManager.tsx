@@ -157,6 +157,13 @@ export function SubscriptionManager({
   async function checkPayment() {
     setChecking(true);
     try {
+      // Sincroniza com o MP (fonte de verdade) antes de ler o status local —
+      // cobre o caso em que o webhook não foi entregue/processado.
+      try {
+        await fetch("/api/payments/sync", { method: "POST" });
+      } catch {
+        // Best-effort: segue para a leitura local mesmo assim.
+      }
       const res = await fetch("/api/subscription/status");
       const data = await res.json();
       if (data.activated || data.hasActivationPayment || data.pendingActivationPayment) {
