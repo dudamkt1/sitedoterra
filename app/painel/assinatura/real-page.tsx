@@ -72,6 +72,20 @@ export default async function AssinaturaPage(p: { demoCtx?: DashboardContext }) 
 
   const mp = await gatewayConditions();
 
+  // Garantia de 7 dias: botão "Quero Cancelar" visível SOMENTE até 7 dias
+  // após a aprovação da ativação (janela validada de novo no backend).
+  let guaranteeUntil: string | null = null;
+  try {
+    const paidAt = (activation as { paid_at?: string; created_at?: string } | null)?.paid_at ||
+      (activation as { created_at?: string } | null)?.created_at;
+    if (paidAt) {
+      const until = new Date(new Date(paidAt).getTime() + 7 * 86_400_000);
+      if (Number.isFinite(until.getTime()) && Date.now() <= until.getTime()) {
+        guaranteeUntil = until.toISOString();
+      }
+    }
+  } catch {}
+
   return (
     <div>
       <SectionTitle sub="Gerencie a ativação do site, sua mensalidade e o histórico financeiro.">
@@ -94,6 +108,7 @@ export default async function AssinaturaPage(p: { demoCtx?: DashboardContext }) 
         pixDiscountPercent={mp.pixDiscountPercent}
         installments={mp.installments}
         installmentsWithoutInterest={mp.installmentsWithoutInterest}
+        guaranteeUntil={guaranteeUntil}
       />
     </div>
   );

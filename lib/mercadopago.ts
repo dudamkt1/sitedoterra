@@ -539,6 +539,22 @@ export function getMpSubscription(id: string): Promise<MpSubscription> {
   return mpFetch<MpSubscription>(`/v1/subscriptions/${id}`);
 }
 
+/**
+ * Devolve um pagamento aprovado (garantia de 7 dias / cancelamento).
+ * O webhook (`payment.updated` → status `refunded`) aplica o resto
+ * automaticamente: pagamento → reembolsado, site desativado, histórico
+ * preservado. Idempotente por tentativa (X-Idempotency-Key).
+ */
+export async function refundMpPayment(
+  mpPaymentId: string | number
+): Promise<{ id: number; status: string }> {
+  return mpFetch<{ id: number; status: string }>(`/v1/payments/${mpPaymentId}/refunds`, {
+    method: "POST",
+    headers: { "X-Idempotency-Key": `guarantee-${mpPaymentId}` },
+    body: JSON.stringify({}),
+  });
+}
+
 /** Pausa a assinatura (usada no cancelamento: para as cobranças, mantém o registro). */
 export async function pauseMpSubscription(id: string): Promise<MpSubscription> {
   return mpFetch<MpSubscription>(`/v1/subscriptions/${id}/pause`, {

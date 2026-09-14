@@ -4,6 +4,7 @@ import { SectionTitle } from "@/components/dashboard/ui";
 import { getPublicBaseUrl } from "@/lib/public-url";
 import { getAffiliateSettings } from "@/lib/affiliate";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { ensureTenantActivated } from "@/lib/mp-payment-processor";
 import { formatBRL, formatDateTime } from "@/lib/utils";
 
 export default async function MeuSitePage({ searchParams }: { searchParams?: { ativado?: string } }) {
@@ -12,31 +13,43 @@ export default async function MeuSitePage({ searchParams }: { searchParams?: { a
 
   const siteData = (ctx.tenant?.site_data || {}) as Record<string, any>;
   const appUrl = getPublicBaseUrl();
-  const siteActive = ctx.tenant?.site_status === "active";
+  let siteActive = ctx.tenant?.site_status === "active";
   const affiliateSettings = await getAffiliateSettings();
   const allowInactiveSite = affiliateSettings?.allow_inactive_site_affiliate !== false;
   const programActive = affiliateSettings?.program_active !== false;
   const userId = ctx.profile?.user_id || "";
   const tenantSlug = ctx.tenant?.slug || "";
 
-  // Último pagamento de ativação: se foi devolvido/reembolsado (e nenhum
-  // pagamento posterior o substituiu), o site fica desativado e exibimos o
-  // aviso com CTA de reativação. Histórico e conteúdo preservados.
-  let refundedActivation: { amount_cents: number; created_at: string } | null = null;
+  // Estado financeiro pela ÚLTIMA atualização (qualquer tipo: ativação ou
+  // mensalidade) — é ela que vale, não um reembolso antigo já superado por
+  // um pagamento posterior.
+  let refundedPayment: { amount_cents: number; created_at: string } | null = null;
   if (!isDemo && ctx.tenant?.id) {
     try {
       const admin = createAdminClient();
       const { data } = await admin
         .from("payments")
-        .select("amount_cents, created_at, status")
+        .select("amount_cents, created_at, status, type")
         .eq("tenant_id", ctx.tenant.id)
-        .eq("type", "activation")
+        .in("type", ["activation", "subscription"])
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-      const row = data as { amount_cents: number; created_at: string; status: string } | null;
-      if (row?.status === "refunded") {
-        refundedActivation = { amount_cents: row.amount_cents, created_at: row.created_at };
+      const row = data as { amount_cents: number; created_at: string; status: string; type: string } | null;
+      if (row?.status === "succeeded" && !siteActive) {
+        // Última atualização é PAGO mas o site segue inativo (falha antiga):
+        // cura a ativação agora (idempotente; não toca afiliados).
+        const healed = await ensureTenantActivated(ctx.tenant.id);
+        if (healed) {
+          const { data: t } = await admin
+            .from("tenants")
+            .select("site_status")
+            .eq("id", ctx.tenant.id)
+            .maybeSingle();
+          siteActive = (t as { site_status?: string } | null)?.site_status === "active";
+        }
+      } else if (row?.status === "refunded") {
+        refundedPayment = { amount_cents: row.amount_cents, created_at: row.created_at };
       }
     } catch {}
   }
@@ -61,9 +74,11 @@ export default async function MeuSitePage({ searchParams }: { searchParams?: { a
         <ActivationReturnNotice siteActive={siteActive} />
       )}
 
-      {/* Pagamento de ativação devolvido/reembolsado: site desativado, com
-          CTA para pagar novamente e reativar (novo registro; histórico intacto). */}
-      {refundedActivation && !siteActive && (
+      {/* Pagamento devolvido/reembolsado como ÚLTIMA atualização: site
+          desativado, com CTA para pagar novamente e reativar (novo registro;
+          histórico intacto). Se um pagamento posterior consta PAGO, o site é
+          ativado acima e este aviso não aparece. */}
+      {refundedPayment && !siteActive && (
         <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div className="min-w-0">
@@ -71,8 +86,8 @@ export default async function MeuSitePage({ searchParams }: { searchParams?: { a
                 ⚠️ Seu site está desativado porque o pagamento anterior foi devolvido
               </p>
               <p className="text-sm text-red-800 mt-1.5">
-                Pagamento de {formatBRL(refundedActivation.amount_cents)} em{" "}
-                {formatDateTime(refundedActivation.created_at)} foi reembolsado no
+                Pagamento de {formatBRL(refundedPayment.amount_cents)} em{" "}
+                {formatDateTime(refundedPayment.created_at)} foi reembolsado no
                 Mercado Pago. Seus dados e conteúdo estão preservados.
               </p>
             </div>

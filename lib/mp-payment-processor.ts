@@ -456,38 +456,83 @@ async function handleActivationPayment(payment: MpPayment) {
     trialEnd.setMonth(trialEnd.getMonth() + trialMonths);
     const monthlyAmountCents = plan.monthly_price_cents;
 
-    const mpSub = await createRecurringSubscriptionMp({
-      planId: plan.id,
-      tenantId,
-      email: profile?.email || "",
-      monthlyAmountCents,
-      trialEnd: trialEnd.toISOString(),
-    });
+    try {
+      const mpSub = await createRecurringSubscriptionMp({
+        planId: plan.id,
+        tenantId,
+        email: profile?.email || "",
+        monthlyAmountCents,
+        trialEnd: trialEnd.toISOString(),
+      });
 
-    await admin.from("subscriptions").insert({
-      tenant_id: tenantId,
-      plan_id: plan.id,
-      gateway: "mercadopago",
-      mercadopago_subscription_id: mpSub.id,
-      mercadopago_plan_id: mpSub.plan_id || null,
-      status: "active",
-      current_period_start: new Date().toISOString(),
-      current_period_end: trialEnd.toISOString(),
-      next_billing_at: trialEnd.toISOString(),
-      trial_end: trialEnd.toISOString(),
-      activated_at: new Date().toISOString(),
-      // CONTRATO CONGELADO: mudanças futuras de preço em /admin/planos
-      // não afetam este contrato (fonte de valores para o painel do usuário).
-      snapshot: {
-        gateway: "mercadopago",
+      await admin.from("subscriptions").insert({
+        tenant_id: tenantId,
         plan_id: plan.id,
-        currency: "brl",
-        activation_amount_cents: plan.activation_price_cents,
-        monthly_amount_cents: monthlyAmountCents,
-        trial_months: trialMonths,
-        trial_period_days: trialMonths * 30,
-      },
-    });
+        gateway: "mercadopago",
+        mercadopago_subscription_id: mpSub.id,
+        mercadopago_plan_id: mpSub.plan_id || null,
+        status: "active",
+        current_period_start: new Date().toISOString(),
+        current_period_end: trialEnd.toISOString(),
+        next_billing_at: trialEnd.toISOString(),
+        trial_end: trialEnd.toISOString(),
+        activated_at: new Date().toISOString(),
+        // CONTRATO CONGELADO: mudanças futuras de preço em /admin/planos
+        // não afetam este contrato (fonte de valores para o painel do usuário).
+        snapshot: {
+          gateway: "mercadopago",
+          plan_id: plan.id,
+          currency: "brl",
+          activation_amount_cents: plan.activation_price_cents,
+          monthly_amount_cents: monthlyAmountCents,
+          trial_months: trialMonths,
+          trial_period_days: trialMonths * 30,
+        },
+      });
+    } catch (subErr) {
+      // A recorrência no MP NÃO pode travar a ativação: o pagamento já foi
+      // aprovado (PAGO). Cria a assinatura local ativa (trial válido) para o
+      // site ligar imediatamente; a cobrança futura segue manual até a
+      // recorrência ser regularizada. Audita para o admin acompanhar.
+      console.error("[mercadopago] falha ao criar recorrência — ativando com assinatura local", subErr);
+      await admin.from("subscriptions").insert({
+        tenant_id: tenantId,
+        plan_id: plan.id,
+        gateway: "mercadopago",
+        mercadopago_subscription_id: null,
+        mercadopago_plan_id: null,
+        status: "active",
+        current_period_start: new Date().toISOString(),
+        current_period_end: trialEnd.toISOString(),
+        next_billing_at: trialEnd.toISOString(),
+        trial_end: trialEnd.toISOString(),
+        activated_at: new Date().toISOString(),
+        snapshot: {
+          gateway: "mercadopago",
+          plan_id: plan.id,
+          currency: "brl",
+          activation_amount_cents: plan.activation_price_cents,
+          monthly_amount_cents: monthlyAmountCents,
+          trial_months: trialMonths,
+          trial_period_days: trialMonths * 30,
+          mp_recurring_failed: true,
+        },
+      });
+      try {
+        await admin.from("audit_logs").insert({
+          actor_id: tenant.user_id,
+          actor_role: "system",
+          action: "subscription.mp_recurring_failed",
+          entity_type: "profile",
+          entity_id: tenant.user_id,
+          metadata: {
+            tenant_id: tenantId,
+            via: "webhook_mp",
+            error: subErr instanceof Error ? subErr.message.slice(0, 300) : "recorrência MP falhou",
+          },
+        });
+      } catch {}
+    }
   }
 
   // Usuário isento de mensalidade: ativa sem criar assinatura recorrente.
@@ -959,6 +1004,75 @@ function mapMpSubStatus(status: string): string {
       return "canceled";
     default:
       return "active";
+  }
+}
+
+/**
+ * Cura de ativação: quando a ÚLTIMA atualização financeira é um pagamento
+ * `succeeded` mas o site segue inativo (ex.: falha antiga na recorrência),
+ * garante assinatura ativa/trialing (cria local a partir da oferta vigente
+ * se não houver) e ativa o tenant. Idempotente — pode rodar sempre.
+ * Usado pela página /painel/meu-site e pelo sync. Nunca toca afiliados.
+ */
+export async function ensureTenantActivated(tenantId: string): Promise<boolean> {
+  try {
+    const admin = createAdminClient();
+    const { data: active } = await admin
+      .from("subscriptions")
+      .select("id")
+      .eq("tenant_id", tenantId)
+      .in("status", ["active", "trialing"])
+      .limit(1)
+      .maybeSingle();
+    if (!active) {
+      const plan = await getActiveOffer();
+      if (!plan) return false;
+      const { data: lastPay } = await admin
+        .from("payments")
+        .select("metadata")
+        .eq("tenant_id", tenantId)
+        .eq("status", "succeeded")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const gateway =
+        (lastPay as { metadata?: { gateway?: string } } | null)?.metadata?.gateway ||
+        "mercadopago";
+      const trialMonths = Math.max(1, plan.trial_months || 3);
+      const trialEnd = new Date();
+      trialEnd.setMonth(trialEnd.getMonth() + trialMonths);
+      await admin.from("subscriptions").insert({
+        tenant_id: tenantId,
+        plan_id: plan.id,
+        gateway,
+        status: "active",
+        current_period_start: new Date().toISOString(),
+        current_period_end: trialEnd.toISOString(),
+        next_billing_at: trialEnd.toISOString(),
+        trial_end: trialEnd.toISOString(),
+        activated_at: new Date().toISOString(),
+        snapshot: {
+          gateway,
+          plan_id: plan.id,
+          currency: "brl",
+          activation_amount_cents: plan.activation_price_cents,
+          monthly_amount_cents: plan.monthly_price_cents,
+          trial_months: trialMonths,
+          trial_period_days: trialMonths * 30,
+          healed: true,
+        },
+      });
+    }
+    const { data: t } = await admin
+      .from("tenants")
+      .select("user_id")
+      .eq("id", tenantId)
+      .maybeSingle();
+    await activateTenant(tenantId, (t as { user_id?: string } | null)?.user_id);
+    return true;
+  } catch (e) {
+    console.error("[mp] falha na cura de ativação", e);
+    return false;
   }
 }
 

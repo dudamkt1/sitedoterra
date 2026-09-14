@@ -28,6 +28,11 @@ interface SubManagerProps {
   pixDiscountPercent?: number;
   installments?: number;
   installmentsWithoutInterest?: boolean;
+  /**
+   * Fim da garantia de 7 dias (ISO) — enquanto vigente E com ativação paga,
+   * exibe o botão "Quero Cancelar". A janela é revalidada no backend.
+   */
+  guaranteeUntil?: string | null;
 }
 
 export function SubscriptionManager({
@@ -47,6 +52,7 @@ export function SubscriptionManager({
   pixDiscountPercent = 0,
   installments = 0,
   installmentsWithoutInterest = true,
+  guaranteeUntil = null,
 }: SubManagerProps) {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
@@ -65,6 +71,9 @@ export function SubscriptionManager({
   const [checkoutPending, setCheckoutPending] = useState(false);
   /** Pagamento pendente detectado via API (registro no banco). */
   const [pendingActivationPayment, setPendingActivationPayment] = useState<boolean | null>(null);
+  /** Garantia de 7 dias: confirmação do cancelamento + estado do pedido. */
+  const [confirmGuarantee, setConfirmGuarantee] = useState(false);
+  const [guaranteeLoading, setGuaranteeLoading] = useState(false);
   /** Abertura do painel de demonstração ("Ainda tem dúvidas?"). */
   const [demoLoading, setDemoLoading] = useState(false);
 
@@ -202,6 +211,30 @@ export function SubscriptionManager({
     setLoading(false);
   }
 
+  /** Garantia de 7 dias: solicita cancelamento + devolução no Mercado Pago. */
+  const guaranteeActive =
+    activationPaid && siteActive && Boolean(guaranteeUntil) && Date.now() <= new Date(guaranteeUntil as string).getTime();
+
+  async function guaranteeCancel() {
+    setGuaranteeLoading(true);
+    setMsg(null);
+    try {
+      const res = await fetch("/api/guarantee-cancel", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMsg({ ok: false, text: data.error || "Não foi possível solicitar o cancelamento." });
+      } else {
+        setConfirmGuarantee(false);
+        setMsg({ ok: true, text: data.message || "Cancelamento recebido! A devolução foi solicitada." });
+        setTimeout(() => window.location.reload(), 2500);
+      }
+    } catch {
+      setMsg({ ok: false, text: "Não foi possível solicitar agora. Tente novamente." });
+    } finally {
+      setGuaranteeLoading(false);
+    }
+  }
+
   async function openBillingPortal() {
     setLoading(true);
     const res = await fetch("/api/billing-portal", { method: "POST" });
@@ -289,6 +322,42 @@ export function SubscriptionManager({
             <button className="btn btn-gold" onClick={reactivate} disabled={loading}>
               {loading ? "Processando..." : "♻️ Reativar assinatura"}
             </button>
+          )}
+
+          {/* Garantia de 7 dias: visível SOMENTE dentro da janela. Ao
+              confirmar, o backend devolve o valor no Mercado Pago, o admin é
+              avisado e o sistema atualiza tudo sozinho (pagamento →
+              devolvido, site desativado, histórico mantido). Afiliados não
+              são alterados. */}
+          {guaranteeActive && (
+            <div className="w-full rounded-xl border border-blue-200 bg-blue-50/60 p-4">
+              <p className="font-semibold text-sm text-blue-900">🛡️ Garantia de 7 dias — até {formatDate(guaranteeUntil)}</p>
+              <p className="text-xs text-blue-800 mt-1">
+                Não ficou satisfeito? Você pode cancelar e receber o valor da ativação de volta. O Super Admin é avisado na hora e a devolução é feita automaticamente.
+              </p>
+              {!confirmGuarantee ? (
+                <button
+                  type="button"
+                  className="btn btn-outline !py-2 !px-4 text-xs mt-3"
+                  onClick={() => setConfirmGuarantee(true)}
+                  disabled={guaranteeLoading}
+                >
+                  Quero Cancelar
+                </button>
+              ) : (
+                <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-2 rounded-lg bg-white border border-blue-200 px-3 py-2.5">
+                  <span className="text-xs text-blue-900 flex-1">Confirmar cancelamento com devolução do valor pago?</span>
+                  <div className="flex gap-2 shrink-0">
+                    <button type="button" className="btn btn-danger !py-1.5 !px-4 text-xs" onClick={guaranteeCancel} disabled={guaranteeLoading}>
+                      {guaranteeLoading ? "Solicitando..." : "Sim, cancelar e devolver"}
+                    </button>
+                    <button type="button" className="btn btn-outline !py-1.5 !px-4 text-xs" onClick={() => setConfirmGuarantee(false)} disabled={guaranteeLoading}>
+                      Voltar
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
 
           {!subscription && billingEnabled && (
