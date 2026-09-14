@@ -124,37 +124,53 @@ export async function POST(request: Request) {
         { status: 503 }
       );
     }
-    const preference = await createActivationPreference({
-      tenantId: tenant.id,
-      planId: plan.id,
-      email: profile.email,
-      name: profile.name,
-      activationAmountCents: quote.totalCents,
-      planName: plan.name,
-      visitorToken,
-      successPath,
-      payMethod,
-      chargeKind: kind,
-      subscriptionId: quote.subscriptionId,
-      creditUsageId: quote.usageId,
-      creditAppliedCents: quote.creditCents > 0 ? quote.creditCents : null,
-      originalAmountCents: quote.creditCents > 0 ? quote.originalCents : null,
-      itemTitle:
-        kind === "subscription" ? `${plan.name} — Mensalidade` : `${plan.name} — Ativação do site`,
-    });
-    // Cria registro de pagamento pending no banco para permitir reaproveitamento
-    // se o usuário fechar a aba sem concluir.
-    await admin.from("payments").insert({
-      tenant_id: tenant.id,
-      subscription_id: quote.subscriptionId,
-      type: kind,
-      amount_cents: quote.totalCents,
-      currency: "brl",
-      status: "pending",
-      metadata: { gateway: "mercadopago", preference_id: preference.id, ...pendingMetaBase },
-    });
-    // Transparente: devolve initPoint para iframe; fluxo normal devolve url para redirect.
-    return NextResponse.json({ url: preference.initPoint, gateway: "mercadopago", preferenceId: preference.id, embedded, credit: creditPayload });
+    try {
+      const preference = await createActivationPreference({
+        tenantId: tenant.id,
+        planId: plan.id,
+        email: profile.email,
+        name: profile.name,
+        activationAmountCents: quote.totalCents,
+        planName: plan.name,
+        visitorToken,
+        successPath,
+        payMethod,
+        chargeKind: kind,
+        subscriptionId: quote.subscriptionId,
+        creditUsageId: quote.usageId,
+        creditAppliedCents: quote.creditCents > 0 ? quote.creditCents : null,
+        originalAmountCents: quote.creditCents > 0 ? quote.originalCents : null,
+        itemTitle:
+          kind === "subscription" ? `${plan.name} — Mensalidade` : `${plan.name} — Ativação do site`,
+      });
+      // Cria registro de pagamento pending no banco para permitir reaproveitamento
+      // se o usuário fechar a aba sem concluir.
+      await admin.from("payments").insert({
+        tenant_id: tenant.id,
+        subscription_id: quote.subscriptionId,
+        type: kind,
+        amount_cents: quote.totalCents,
+        currency: "brl",
+        status: "pending",
+        metadata: { gateway: "mercadopago", preference_id: preference.id, ...pendingMetaBase },
+      });
+      // Transparente: devolve initPoint para iframe; fluxo normal devolve url para redirect.
+      return NextResponse.json({ url: preference.initPoint, gateway: "mercadopago", preferenceId: preference.id, embedded, credit: creditPayload });
+    } catch (e) {
+      // SEMPRE retorna JSON (nunca 500 com HTML): o frontend faz
+      // `res.json()` e um corpo vazio/HTML quebrava com
+      // "Unexpected end of JSON input" na tela de erro.
+      console.error("[checkout] falha ao criar preferência Mercado Pago", e);
+      const message = e instanceof Error ? e.message : "";
+      const clean = message
+        .replace(/Mercado Pago API[^\:]*:\s*/i, "")
+        .replace(/\(.*\)/, "")
+        .trim();
+      return NextResponse.json(
+        { error: clean.slice(0, 300) || "Não foi possível iniciar o pagamento no Mercado Pago. Tente novamente ou escolha outra forma de pagamento." },
+        { status: 502 }
+      );
+    }
   }
 
   if (!gateways.stripe.secretKey) {
@@ -164,66 +180,95 @@ export async function POST(request: Request) {
     );
   }
 
-  const appUrl = getPublicBaseUrl();
-  const stripe = await getStripeResolved();
+  try {
+    const appUrl = getPublicBaseUrl();
+    const stripe = await getStripeResolved();
 
-  const customer = await getOrCreateCustomer({
-    userId: user.id,
-    tenantId: tenant.id,
-    email: profile.email,
-    name: profile.name,
-  });
+    const customer = await getOrCreateCustomer({
+      userId: user.id,
+      tenantId: tenant.id,
+      email: profile.email,
+      name: profile.name,
+    });
 
-  // metadata do Stripe (limite 500 chars por valor; UUIDs cabem sem problemas).
-  const metadata: Record<string, string> = {
-    tenant_id: tenant.id,
-    type: kind,
-    plan_id: plan.id,
-  };
-  if (visitorToken) metadata.visitor_token = visitorToken;
-  if (quote.subscriptionId) metadata.subscription_id = quote.subscriptionId;
-  if (quote.usageId) metadata.credit_usage_id = quote.usageId;
-  if (quote.creditCents > 0) {
-    metadata.credit_applied_cents = String(quote.creditCents);
-    metadata.original_amount_cents = String(quote.originalCents);
-  }
+    // metadata do Stripe (limite 500 chars por valor; UUIDs cabem sem problemas).
+    const metadata: Record<string, string> = {
+      tenant_id: tenant.id,
+      type: kind,
+      plan_id: plan.id,
+    };
+    if (visitorToken) metadata.visitor_token = visitorToken;
+    if (quote.subscriptionId) metadata.subscription_id = quote.subscriptionId;
+    if (quote.usageId) metadata.credit_usage_id = quote.usageId;
+    if (quote.creditCents > 0) {
+      metadata.credit_applied_cents = String(quote.creditCents);
+      metadata.original_amount_cents = String(quote.originalCents);
+    }
 
-  // Com crédito (ou mensalidade avulsa), o valor não corresponde a um Price
-  // fixo: usa price_data ad hoc com o total calculado no backend.
-  const needsAdHocPrice = quote.creditCents > 0 || kind === "subscription";
-  const lineItems = needsAdHocPrice
-    ? [
-        {
-          price_data: {
-            currency: "brl",
-            unit_amount: quote.totalCents,
-            product_data: {
-              name:
-                kind === "subscription"
-                  ? `${plan.name} — Mensalidade`
-                  : `${plan.name} — Ativação do site`,
+    // Com crédito (ou mensalidade avulsa), o valor não corresponde a um Price
+    // fixo: usa price_data ad hoc com o total calculado no backend.
+    const needsAdHocPrice = quote.creditCents > 0 || kind === "subscription";
+    const lineItems = needsAdHocPrice
+      ? [
+          {
+            price_data: {
+              currency: "brl",
+              unit_amount: quote.totalCents,
+              product_data: {
+                name:
+                  kind === "subscription"
+                    ? `${plan.name} — Mensalidade`
+                    : `${plan.name} — Ativação do site`,
+              },
             },
+            quantity: 1,
           },
-          quantity: 1,
-        },
-      ]
-    : [{ price: await resolveActivationPriceId(plan.id), quantity: 1 }];
+        ]
+      : [{ price: await resolveActivationPriceId(plan.id), quantity: 1 }];
 
-  if (embedded) {
-    // Checkout Transparente — Embedded Checkout (sem sair do site).
-    // Funciona tanto com Price fixo quanto com price_data ad hoc (crédito).
+    if (embedded) {
+      // Checkout Transparente — Embedded Checkout (sem sair do site).
+      // Funciona tanto com Price fixo quanto com price_data ad hoc (crédito).
+      const session = await stripe.checkout.sessions.create({
+        // @ts-ignore — ui_mode embedded é suportado na API 2024-06-20
+        ui_mode: "embedded",
+        mode: "payment",
+        line_items: lineItems,
+        customer: customer.id,
+        metadata,
+        payment_intent_data: {
+          setup_future_usage: "off_session",
+        },
+        return_url: `${appUrl}${successPath}`,
+      } as any);
+      // Cria registro de pagamento pending no banco para permitir reaproveitamento
+      await admin.from("payments").insert({
+        tenant_id: tenant.id,
+        subscription_id: quote.subscriptionId,
+        type: kind,
+        amount_cents: quote.totalCents,
+        currency: "brl",
+        status: "pending",
+        metadata: { gateway: "stripe", stripe_checkout_session_id: (session as any).id, ...pendingMetaBase },
+      });
+      return NextResponse.json({ gateway: "stripe", clientSecret: (session as any).client_secret, url: session.url, embedded: true, credit: creditPayload });
+    }
+
     const session = await stripe.checkout.sessions.create({
-      // @ts-ignore — ui_mode embedded é suportado na API 2024-06-20
-      ui_mode: "embedded",
       mode: "payment",
       line_items: lineItems,
       customer: customer.id,
       metadata,
       payment_intent_data: {
+        // Salva o cartão como método de pagamento padrão do Customer para
+        // cobranças off-session — usado pela mensalidade que será criada após
+        // a ativação (primeira cobrança apenas no período configurado).
         setup_future_usage: "off_session",
       },
-      return_url: `${appUrl}${successPath}`,
-    } as any);
+      success_url: `${appUrl}${successPath}`,
+      cancel_url: `${appUrl}/painel/assinatura`,
+    });
+
     // Cria registro de pagamento pending no banco para permitir reaproveitamento
     await admin.from("payments").insert({
       tenant_id: tenant.id,
@@ -232,36 +277,18 @@ export async function POST(request: Request) {
       amount_cents: quote.totalCents,
       currency: "brl",
       status: "pending",
-      metadata: { gateway: "stripe", stripe_checkout_session_id: (session as any).id, ...pendingMetaBase },
+      metadata: { gateway: "stripe", stripe_checkout_session_id: session.id, ...pendingMetaBase },
     });
-    return NextResponse.json({ gateway: "stripe", clientSecret: (session as any).client_secret, url: session.url, embedded: true, credit: creditPayload });
+
+    return NextResponse.json({ url: session.url, gateway: "stripe", credit: creditPayload });
+  } catch (e) {
+    // SEMPRE retorna JSON (nunca 500 com HTML): o frontend faz
+    // `res.json()` e um corpo vazio/HTML quebrava com
+    // "Unexpected end of JSON input" na tela de erro.
+    console.error("[checkout] falha ao criar sessão Stripe", e);
+    return NextResponse.json(
+      { error: "Não foi possível iniciar o pagamento no Stripe. Tente novamente ou escolha outra forma de pagamento." },
+      { status: 502 }
+    );
   }
-
-  const session = await stripe.checkout.sessions.create({
-    mode: "payment",
-    line_items: lineItems,
-    customer: customer.id,
-    metadata,
-    payment_intent_data: {
-      // Salva o cartão como método de pagamento padrão do Customer para
-      // cobranças off-session — usado pela mensalidade que será criada após
-      // a ativação (primeira cobrança apenas no período configurado).
-      setup_future_usage: "off_session",
-    },
-    success_url: `${appUrl}${successPath}`,
-    cancel_url: `${appUrl}/painel/assinatura`,
-  });
-
-  // Cria registro de pagamento pending no banco para permitir reaproveitamento
-  await admin.from("payments").insert({
-    tenant_id: tenant.id,
-    subscription_id: quote.subscriptionId,
-    type: kind,
-    amount_cents: quote.totalCents,
-    currency: "brl",
-    status: "pending",
-    metadata: { gateway: "stripe", stripe_checkout_session_id: session.id, ...pendingMetaBase },
-  });
-
-  return NextResponse.json({ url: session.url, gateway: "stripe", credit: creditPayload });
 }

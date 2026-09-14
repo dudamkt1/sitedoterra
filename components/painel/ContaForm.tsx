@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { StatusBadge } from "@/components/dashboard/ui";
+import { PasswordField } from "@/components/PasswordField";
 import { formatDate } from "@/lib/utils";
 
 type Props = {
@@ -189,23 +190,21 @@ export default function ContaForm({ profile, isDemo }: Props) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="label">Nova senha (mín. 6 caracteres)</label>
-            <input
-              className="input"
-              type="password"
+            <PasswordField
+              id="conta-new-password"
               autoComplete="new-password"
               value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
+              onChange={setNewPassword}
               placeholder="••••••••"
             />
           </div>
           <div>
             <label className="label">Confirmar nova senha</label>
-            <input
-              className="input"
-              type="password"
+            <PasswordField
+              id="conta-confirm-password"
               autoComplete="new-password"
               value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
+              onChange={setConfirmPassword}
               placeholder="••••••••"
             />
           </div>

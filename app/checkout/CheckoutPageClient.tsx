@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { loadStripe } from "@stripe/stripe-js";
 import { MercadoPagoBrick, type PixData } from "@/components/checkout/MercadoPagoBrick";
+import { PasswordField } from "@/components/PasswordField";
 
 const INTENT_KEY = "checkout_intent_v1";
 
@@ -103,12 +104,39 @@ export function friendlyError(raw: string): string {
   if (m.includes("timeout") || m.includes("timed out")) {
     return "A conexão demorou para responder. Verifique sua internet e tente novamente.";
   }
-  if (m.includes("network") || m.includes("fetch failed")) {
+  if (m.includes("network") || m.includes("fetch failed") || m.includes("failed to fetch")) {
     return "Falha de conexão. Verifique sua internet e tente novamente.";
+  }
+  // Resposta vazia/inválida do servidor (ex.: 500 com HTML ou corpo vazio —
+  // o `res.json()` quebra com "Unexpected end of JSON input"). Nunca exibe
+  // o erro técnico: orienta a tentar de novo.
+  if (
+    m.includes("unexpected end of json") ||
+    m.includes("unexpected token") ||
+    m.includes("is not valid json") ||
+    (m.includes("failed to execute") && m.includes("json")) ||
+    m.includes("unexpected end of input")
+  ) {
+    return "Não foi possível iniciar o pagamento agora. Tente novamente em instantes ou escolha outra forma de pagamento.";
   }
   const cleaned = raw.replace(/Mercado Pago API[^\:]*:\s*/i, "").replace(/\(.*\)/, "").trim();
   if (cleaned.length > 160) return `${cleaned.slice(0, 157)}...`;
   return cleaned || "Não foi possível processar o pagamento. Tente novamente.";
+}
+
+/**
+ * Lê a resposta como JSON de forma segura: se o servidor retornar corpo
+ * vazio ou HTML (ex.: 500 inesperado), retorna `{}` em vez de quebrar com
+ * "Unexpected end of JSON input". Quem chama decide a mensagem amigável.
+ */
+async function readJsonSafe(res: Response): Promise<Record<string, any>> {
+  const text = await res.text().catch(() => "");
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {};
+  }
 }
 
 export default function CheckoutPageClient({
@@ -315,13 +343,13 @@ export default function CheckoutPageClient({
           ...(useCredit === true ? { useAffiliateCredit: true } : {}),
         }),
       });
-      const json = await res.json();
+      const json = await readJsonSafe(res);
       if (!res.ok) {
         if (res.status === 401) {
           setStep("identify");
           throw new Error("Faça login para continuar.");
         }
-        throw new Error(friendlyError(json.error || "Não foi possível iniciar o pagamento. Tente novamente."));
+        throw new Error(friendlyError(json.error || `Não foi possível iniciar o pagamento (erro ${res.status}). Tente novamente.`));
       }
       // Crédito 100%: sem gateway — pagamento já confirmado no backend.
       if (json.zeroCharge) {
@@ -350,7 +378,7 @@ export default function CheckoutPageClient({
         startPolling();
       }
     } catch (e) {
-      setCheckoutError(e instanceof Error ? e.message : "Erro ao iniciar pagamento.");
+      setCheckoutError(e instanceof Error ? friendlyError(e.message) : "Erro ao iniciar pagamento.");
       setStep("error");
     } finally {
       setCheckoutLoading(false);
@@ -548,7 +576,7 @@ export default function CheckoutPageClient({
                 </div>
                 <div>
                   <label className="block text-[13px] font-semibold text-[#0f1a2a] mb-2">Senha</label>
-                  <input type="password" required minLength={6} autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mínimo 6 caracteres" className="w-full rounded-[14px] border border-[#dde6de] bg-white px-4 sm:px-5 py-4 text-[15px] leading-relaxed text-[#0f1a2a] placeholder:text-[#9aa8b5] focus:outline-none focus:ring-2 focus:ring-[#103d2d]/15 focus:border-[#103d2d] transition" />
+                  <PasswordField id="checkout-signup-password" required minLength={6} autoComplete="new-password" value={password} onChange={setPassword} placeholder="Mínimo 6 caracteres" className="w-full rounded-[14px] border border-[#dde6de] bg-white px-4 sm:px-5 py-4 pr-12 text-[15px] leading-relaxed text-[#0f1a2a] placeholder:text-[#9aa8b5] focus:outline-none focus:ring-2 focus:ring-[#103d2d]/15 focus:border-[#103d2d] transition" />
                 </div>
               </div>
               {authError && (
@@ -591,7 +619,7 @@ export default function CheckoutPageClient({
                 </div>
                 <div>
                   <label className="block text-[13px] font-semibold text-[#0f1a2a] mb-2">Senha</label>
-                  <input type="password" required autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Sua senha" className="w-full rounded-[14px] border border-[#dde6de] bg-white px-4 sm:px-5 py-4 text-[15px] leading-relaxed text-[#0f1a2a] placeholder:text-[#9aa8b5] focus:outline-none focus:ring-2 focus:ring-[#103d2d]/15 focus:border-[#103d2d] transition" />
+                  <PasswordField id="checkout-login-password" required autoComplete="current-password" value={password} onChange={setPassword} placeholder="Sua senha" className="w-full rounded-[14px] border border-[#dde6de] bg-white px-4 sm:px-5 py-4 pr-12 text-[15px] leading-relaxed text-[#0f1a2a] placeholder:text-[#9aa8b5] focus:outline-none focus:ring-2 focus:ring-[#103d2d]/15 focus:border-[#103d2d] transition" />
                 </div>
               </div>
               {authError && <p className="rounded-[12px] bg-[#fef2f2] border border-[#fde4e4] px-4 py-3 text-sm text-[#991b1b] leading-5">{authError}</p>}

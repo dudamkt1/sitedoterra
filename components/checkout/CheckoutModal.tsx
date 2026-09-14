@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { loadStripe } from "@stripe/stripe-js";
+import { PasswordField } from "@/components/PasswordField";
 
 const INTENT_KEY = "checkout_intent_v1";
 
@@ -84,12 +85,39 @@ function friendlyError(raw: string): string {
   if (m.includes("timeout") || m.includes("timed out")) {
     return "A conexão demorou para responder. Verifique sua internet e tente novamente.";
   }
-  if (m.includes("network") || m.includes("fetch failed")) {
+  if (m.includes("network") || m.includes("fetch failed") || m.includes("failed to fetch")) {
     return "Falha de conexão. Verifique sua internet e tente novamente.";
+  }
+  // Resposta vazia/inválida do servidor (ex.: 500 com HTML ou corpo vazio —
+  // o `res.json()` quebra com "Unexpected end of JSON input"). Nunca exibe
+  // o erro técnico: orienta a tentar de novo.
+  if (
+    m.includes("unexpected end of json") ||
+    m.includes("unexpected token") ||
+    m.includes("is not valid json") ||
+    (m.includes("failed to execute") && m.includes("json")) ||
+    m.includes("unexpected end of input")
+  ) {
+    return "Não foi possível iniciar o pagamento agora. Tente novamente em instantes ou escolha outra forma de pagamento.";
   }
   const cleaned = raw.replace(/Mercado Pago API[^\:]*:\s*/i, "").replace(/\(.*\)/, "").trim();
   if (cleaned.length > 160) return `${cleaned.slice(0, 157)}...`;
   return cleaned || "Não foi possível processar o pagamento. Tente novamente.";
+}
+
+/**
+ * Lê a resposta como JSON de forma segura: se o servidor retornar corpo
+ * vazio ou HTML (ex.: 500 inesperado), retorna `{}` em vez de quebrar com
+ * "Unexpected end of JSON input". Quem chama decide a mensagem amigável.
+ */
+async function readJsonSafe(res: Response): Promise<Record<string, any>> {
+  const text = await res.text().catch(() => "");
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {};
+  }
 }
 
 export function CheckoutModal({ open, onClose, planId }: { open: boolean; onClose: () => void; planId?: string }) {
@@ -233,13 +261,13 @@ export function CheckoutModal({ open, onClose, planId }: { open: boolean; onClos
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ planId, embedded: true }),
       });
-      const json = await res.json();
+      const json = await readJsonSafe(res);
       if (!res.ok) {
         if (res.status === 401) {
           setStep("identify");
           throw new Error("Faça login para continuar.");
         }
-        throw new Error(friendlyError(json.error || "Não foi possível iniciar o pagamento. Tente novamente."));
+        throw new Error(friendlyError(json.error || `Não foi possível iniciar o pagamento (erro ${res.status}). Tente novamente.`));
       }
       if (json.gateway === "mercadopago" && json.url) {
         setMpUrl(json.url);
@@ -254,7 +282,7 @@ export function CheckoutModal({ open, onClose, planId }: { open: boolean; onClos
         startPolling();
       }
     } catch (e) {
-      setCheckoutError(e instanceof Error ? e.message : "Erro ao iniciar pagamento.");
+      setCheckoutError(e instanceof Error ? friendlyError(e.message) : "Erro ao iniciar pagamento.");
       setStep("error");
     } finally {
       setCheckoutLoading(false);
@@ -394,7 +422,9 @@ export function CheckoutModal({ open, onClose, planId }: { open: boolean; onClos
                         </div>
                         <div>
                           <label className="text-sm font-medium text-slate-700">Senha</label>
-                          <input type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mínimo 6 caracteres" className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-4 py-3.5 text-[15px] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1d5c3a]/15 focus:border-[#1d5c3a]" />
+                          <div className="mt-1.5">
+                            <PasswordField id="checkout-modal-signup-password" required minLength={6} value={password} onChange={setPassword} placeholder="Mínimo 6 caracteres" className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3.5 pr-11 text-[15px] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1d5c3a]/15 focus:border-[#1d5c3a]" />
+                          </div>
                         </div>
                       </div>
                       {authError && <p className="rounded-xl bg-red-50 border border-red-100 px-4 py-3 text-sm text-red-700">{authError}</p>}
@@ -421,7 +451,9 @@ export function CheckoutModal({ open, onClose, planId }: { open: boolean; onClos
                         </div>
                         <div>
                           <label className="text-sm font-medium text-slate-700">Senha</label>
-                          <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-4 py-3.5 text-[15px] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1d5c3a]/15 focus:border-[#1d5c3a]" />
+                          <div className="mt-1.5">
+                            <PasswordField id="checkout-modal-login-password" required value={password} onChange={setPassword} placeholder="••••••••" className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3.5 pr-11 text-[15px] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1d5c3a]/15 focus:border-[#1d5c3a]" />
+                          </div>
                         </div>
                       </div>
                       {authError && <p className="rounded-xl bg-red-50 border border-red-100 px-4 py-3 text-sm text-red-700">{authError}</p>}
