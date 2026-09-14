@@ -9,10 +9,16 @@ import type { ResolvedHomeSection } from "@/types";
  * - `fallback`: indica que o destino é uma página de fallback do sistema
  *   (ex.: site não ativado). Em conjunto com `anchor === null`, significa
  *   "não tente scroll, exiba a página de fallback renderizada pelo servidor".
+ * - `external`: abre a URL em NOVA ABA (`_blank`). Usado quando o afiliado
+ *   tem site ativo mas a seção de planos está DESATIVADA (ou sem conteúdo
+ *   renderizável): o site do afiliado continua aberto na aba atual e a
+ *   seção de planos do DOMÍNIO PRINCIPAL abre em outra aba, com `?ref=`
+ *   preservado para manter todo o rastreio do programa de afiliados.
  * - `label`: descrição legível (debug/UI) — não usada para lógica.
  */
 export type AffiliateDestination =
   | { kind: "anchor"; anchor: string; label: string }
+  | { kind: "external"; url: string; label: string }
   | { kind: "none"; label: string };
 
 export interface ResolveDestinationInput {
@@ -96,6 +102,23 @@ export function resolveAffiliateDestination(input: ResolveDestinationInput): Aff
 
   // 5) Nenhum destino encontrado — fica no topo
   return { kind: "none", label: "topo da home" };
+}
+
+/**
+ * Retorna TRUE quando a seção `pricing` está habilitada E vai renderizar o
+ * anchor `#planos` (oferta comercial OU planos manuais). É a condição que
+ * define se o visitante do link de afiliado pode permanecer no domínio do
+ * afiliado (`true`) ou se deve ser levado ao domínio principal em nova aba
+ * (`false` → destino `external`).
+ */
+export function hasRenderablePricing(sections: ResolvedHomeSection[]): boolean {
+  const visible = (sections || []).filter((s) => s.enabled);
+  const pricing = visible.find((s) => s.type === "pricing");
+  if (!pricing) return false;
+  const content = (pricing.content || {}) as Record<string, unknown>;
+  const offer = content.offer as { activation_price_cents?: number } | null | undefined;
+  const plans = (content.plans as unknown[] | undefined) || [];
+  return Boolean(offer) || plans.length > 0;
 }
 
 /**

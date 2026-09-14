@@ -13,10 +13,11 @@ import { getOfficialHomeTenant, isOfficialHomeTenantById } from "@/lib/site-offi
 import { resolvePwaForRequest } from "@/lib/pwa/resolver";
 import { pwaUrls, pwaIconPaths, pwaVersionToken } from "@/lib/pwa/config";
 import { themePrimaryColor, type SiteThemeConfig } from "@/lib/site-theme";
-import { resolveAffiliateDestination } from "@/lib/affiliate-destination";
+import { resolveAffiliateDestination, hasRenderablePricing } from "@/lib/affiliate-destination";
 import {
   isAffiliateInactiveSiteAllowed,
   buildAffiliateRedirectTarget,
+  buildAffiliateExternalPlansUrl,
 } from "@/lib/affiliate";
 import type { PublicTenant } from "@/types";
 
@@ -202,7 +203,26 @@ export default async function TenantSitePage({
     // configuração ATUAL da HOME. Se a seção Planos não estiver
     // habilitada, ele usa a Trustbar, Hero CTA, primeira seção visível
     // ou nenhum scroll.
-    const destination = resolveAffiliateDestination({ sections, access: effectiveAccess });
+    //
+    // REGRA DE AFILIADO (planos desativados → domínio principal em _blank):
+    // quando o visitante chega por link de afiliado (?ref= válido) e o
+    // afiliado mantém o site ativo MAS desativou a seção de planos (ou ela
+    // está sem conteúdo renderizável), NÃO fazemos scroll local. Em vez
+    // disso, o AffiliateAttribution abre o domínio principal na seção
+    // `#planos` em NOVA ABA, com `?ref=` preservado — o site do afiliado
+    // continua aberto na aba atual e a compra no domínio principal mantém
+    // a indicação original (rastreio via /api/affiliate/click nas 2 abas).
+    // Se o site + seção de planos estão ativos, mantém o comportamento
+    // padrão (scroll para #planos no próprio domínio).
+    const baseDestination = resolveAffiliateDestination({ sections, access: effectiveAccess });
+    const destination =
+      hasAffiliateRef && !hasRenderablePricing(sections)
+        ? {
+            kind: "external" as const,
+            url: buildAffiliateExternalPlansUrl(ref as string),
+            label: "planos no domínio principal (nova aba)",
+          }
+        : baseDestination;
     return (
       <>
         <link rel="canonical" href={canonicalUrl} />

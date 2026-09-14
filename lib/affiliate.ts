@@ -614,6 +614,37 @@ export async function registerAffiliateClickServerSide(opts: {
 }
 
 /**
+ * Constrói a URL ABSOLUTA do domínio principal na seção `#planos`, com o
+ * `?ref=` preservado — usada para abrir em NOVA ABA (`_blank`) quando o
+ * afiliado NÃO tem site ativo ou tem a seção de planos DESATIVADA no
+ * próprio site.
+ *
+ * Diferente de `buildAffiliateRedirectTarget` (que pode retornar URL
+ * relativa para redirect same-tab server-side), esta SEMPRE retorna URL
+ * absoluta para o domínio principal, pois será aberta via `window.open`
+ * a partir do domínio do afiliado (cross-origin).
+ *
+ * Prioridade da base:
+ *   1. `NEXT_PUBLIC_HOME_URL` (domínio principal oficial — ex.:
+ *      https://oleos.topconsultores.com.br)
+ *   2. `NEXT_PUBLIC_APP_URL`
+ *   3. Fallback hardcoded `https://oleos.topconsultores.com.br`
+ *
+ * O `?ref=` garante que o AffiliateAttribution da HOME capture a
+ * atribuição via /api/affiliate/click (novo visitor_token first-party no
+ * domínio principal, mesmo affiliate_user_id) — todo o rastreio do
+ * programa de afiliados é mantido até o checkout/conversão.
+ */
+export function buildAffiliateExternalPlansUrl(ref: string): string {
+  const base = (
+    process.env.NEXT_PUBLIC_HOME_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    "https://oleos.topconsultores.com.br"
+  ).replace(/\/$/, "");
+  return `${base}/?ref=${encodeURIComponent(ref)}#planos`;
+}
+
+/**
  * Constrói a URL absoluta de destino do redirect quando o afiliado NÃO
  * tem site ativo: o visitante deve ir direto para a HOME pública do
  * domínio principal, na seção `#planos`, com o `?ref=` preservado.

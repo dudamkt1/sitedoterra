@@ -15,6 +15,13 @@ import type { AffiliateDestination } from "@/lib/affiliate-destination";
  *   - `kind: "anchor"` → scroll suave até `#${destination.anchor}`
  *     (caso normal: `#planos`, mas pode ser qualquer outro anchor se a
  *     seção de planos não existir no momento).
+ *   - `kind: "external"` → abre `destination.url` em NOVA ABA (`_blank`).
+ *     Usado quando o afiliado tem site ativo mas a seção de planos está
+ *     DESATIVADA: o site do afiliado continua aberto na aba atual e os
+ *     planos do DOMÍNIO PRINCIPAL abrem em outra aba, com `?ref=`
+ *     preservado (o rastreio continua na nova aba via AffiliateAttribution
+ *     da HOME). O click na aba atual TAMBÉM é registrado, então nenhuma
+ *     indicação é perdida.
  *   - `kind: "none"`   → não faz scroll (ex.: site não está ativo e o
  *     servidor já renderizou uma página de fallback).
  *
@@ -64,6 +71,21 @@ export function AffiliateAttribution({
 
     const subdomain = typeof window !== "undefined" ? window.location.host : "unknown";
 
+    // Caso EXTERNAL (afiliado sem seção de planos): abre o domínio principal
+    // em nova aba IMEDIATAMENTE (síncrono, sem esperar o fetch — reduz a
+    // chance de bloqueio de popup) e registra o click em paralelo. A aba
+    // atual (site do afiliado) continua aberta; a nova aba carrega
+    // `/?ref=<uuid>#planos` no domínio principal, onde o AffiliateAttribution
+    // da HOME registra o segundo click (novo visitor_token first-party no
+    // domínio principal, mesmo affiliate_user_id) — rastreio preservado.
+    if (destination.kind === "external") {
+      try {
+        window.open(destination.url, "_blank", "noopener,noreferrer");
+      } catch {
+        // ignora — o fallback do fetch + limpeza de URL ainda executa abaixo
+      }
+    }
+
     // 1) Registra o click IMEDIATAMENTE — antes de qualquer scroll, navegação
     //    ou mudança de URL. Isso garante que a atribuição fique preservada
     //    mesmo se o visitante fechar a aba durante o scroll, ou se o destino
@@ -99,6 +121,8 @@ export function AffiliateAttribution({
         if (destination.kind === "anchor") {
           scrollToAnchor(destination.anchor, siteHomeSelector);
         }
+        // kind === "external": nova aba já aberta acima — a aba atual NÃO
+        // navega (continua no site do afiliado).
         // kind === "none": site indisponível, sem scroll. O servidor já
         // renderizou a página de fallback apropriada.
       });
