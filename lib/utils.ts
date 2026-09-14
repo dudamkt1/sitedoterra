@@ -136,6 +136,11 @@ export function formatDate(value: string | null | undefined): string {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
+    // Banco/Vercel gravam em UTC: sem timeZone explícito, o servidor (UTC)
+    // exibe o horário deslocado do Brasil. Fixo em America/Sao_Paulo para
+    // bater com o horário real do pagamento (também evita divergência
+    // de hidratação entre servidor e cliente).
+    timeZone: "America/Sao_Paulo",
   });
 }
 
@@ -147,6 +152,7 @@ export function formatDateTime(value: string | null | undefined): string {
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "America/Sao_Paulo",
   });
 }
 

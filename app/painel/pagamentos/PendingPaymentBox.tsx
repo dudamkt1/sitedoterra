@@ -15,10 +15,20 @@ export function PendingPaymentBox({ tenantId }: { tenantId?: string | null }) {
   const checkPendingPayment = useCallback(async () => {
     if (!tenantId) return;
     try {
+      // Sincroniza UMA vez com o MP ao abrir a página (cobre webhook não
+      // entregue) e só depois lê o status local. Sem reload aqui — a tabela
+      // se atualiza pelo AutoRefresh; reload só no botão, após confirmação.
+      try {
+        await fetch("/api/payments/sync", { method: "POST" });
+      } catch {
+        // Best-effort: segue para a leitura local mesmo assim.
+      }
       const res = await fetch("/api/subscription/status");
       const data = await res.json();
       if (data.pendingActivationPayment) {
         setPendingActivationPayment(true);
+      } else {
+        setPendingActivationPayment(false);
       }
     } catch {
       // Best-effort
@@ -64,7 +74,7 @@ export function PendingPaymentBox({ tenantId }: { tenantId?: string | null }) {
     window.location.href = "/checkout";
   }
 
-  if (pendingActivationPayment === null) return null;
+  if (!pendingActivationPayment) return null;
 
   return (
     <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">

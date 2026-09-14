@@ -185,6 +185,8 @@ export default function CheckoutPageClient({
   const [pix, setPix] = useState<PixData | null>(null);
   const [copiedPix, setCopiedPix] = useState(false);
   const [processingMsg, setProcessingMsg] = useState<string | null>(null);
+  /** "Já paguei": sincronizando com o MP antes de decidir o destino. */
+  const [verifying, setVerifying] = useState(false);
   /** Crédito de afiliado (centavos) — SOMENTE exibição; valores válidos vêm do backend. */
   const [creditCents, setCreditCents] = useState(0);
   const [creditEnabled, setCreditEnabled] = useState(false);
@@ -393,6 +395,12 @@ export default function CheckoutPageClient({
 
   function startPolling() {
     if (pollRef.current) clearInterval(pollRef.current);
+    // Sincroniza UMA vez com o MP (fonte de verdade) ao começar a aguardar —
+    // cobre o caso em que o webhook não foi entregue: o próximo tick do
+    // polling já encontra o banco atualizado e libera a tela sozinho.
+    try {
+      fetch("/api/payments/sync", { method: "POST" }).catch(() => {});
+    } catch {}
     let attempts = 0;
     pollRef.current = setInterval(async () => {
       attempts += 1;
@@ -426,6 +434,38 @@ export default function CheckoutPageClient({
     setCopiedPix(false);
     setStep("pix");
     startPolling();
+  }
+  /**
+   * "Já paguei — verificar agora" (etapa PIX): concilia direto no Mercado
+   * Pago (fonte de verdade) e decide na hora:
+   *   - pagamento confirmado → tela de sucesso (a mensagem "Aguardando..."
+   *     some imediatamente, sem precisar fechar nada);
+   *   - ainda não confirmado → leva para /painel/pagamentos, onde o
+   *     acompanhamento continua (auto-atualização + Verificar pagamento).
+   */
+  async function handleAlreadyPaid() {
+    if (verifying) return;
+    setVerifying(true);
+    try {
+      try {
+        await fetch("/api/payments/sync", { method: "POST" });
+      } catch {
+        // Best-effort: segue para a leitura local mesmo assim.
+      }
+      const r = await fetch("/api/subscription/status");
+      const j = await r.json().catch(() => ({}));
+      if (j.activated) {
+        if (pollRef.current) clearInterval(pollRef.current);
+        setStep("success");
+        clearIntent();
+        return;
+      }
+    } catch {
+      // Best-effort: em caso de erro, segue para pagamentos.
+    } finally {
+      setVerifying(false);
+    }
+    router.push("/painel/pagamentos");
   }
   function handleBrickPending() {
     setStep("pending");
@@ -1222,8 +1262,8 @@ export default function CheckoutPageClient({
           </div>
 
           <div className="mt-4 flex flex-col gap-2 w-full">
-            <button type="button" onClick={() => startPolling()} className="w-full rounded-full bg-[#0f1a2a] px-6 py-3.5 text-sm font-semibold text-white hover:bg-black transition leading-5">
-              Já paguei — verificar agora
+            <button type="button" onClick={handleAlreadyPaid} disabled={verifying} className="w-full rounded-full bg-[#0f1a2a] px-6 py-3.5 text-sm font-semibold text-white hover:bg-black transition leading-5 disabled:opacity-60">
+              {verifying ? "Verificando pagamento..." : "Já paguei — verificar agora"}
             </button>
             <button type="button" onClick={() => setStep("payment")} className="w-full rounded-full border border-[#dde6de] bg-white px-6 py-3.5 text-sm font-medium text-[#2d3a4a] hover:bg-[#f6faf7] transition leading-5">
               Escolher outra forma

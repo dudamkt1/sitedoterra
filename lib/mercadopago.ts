@@ -522,13 +522,13 @@ export async function searchMpPaymentsByExternalReference(
   externalReference: string,
   limit = 10
 ): Promise<MpPayment[]> {
+  // Busca por external_reference (índice do MP). Sem filtro de datas: o
+  // range fixo antigo (begin 2020) podia ser rejeitado pela API (400) e
+  // derrubava a sincronização inteira.
   const qs = new URLSearchParams({
     external_reference: externalReference,
     sort: "date_created",
     criteria: "desc",
-    range: "date_created",
-    begin_date: "2020-01-01T00:00:00.000-03:00",
-    end_date: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
   });
   qs.set("limit", String(Math.min(Math.max(limit, 1), 50)));
   const res = await mpFetch<{ results?: MpPayment[] }>(`/v1/payments/search?${qs.toString()}`);
