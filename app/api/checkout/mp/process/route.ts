@@ -94,14 +94,22 @@ export async function POST(request: Request) {
   const [firstName, ...rest] = fullName.split(/\s+/).filter(Boolean);
 
   try {
+    // BASE SEM DESCONTO: `quote.originalCents` já contém o desconto PIX do
+    // método (buildCheckoutQuote) — passar ele aqui faria o
+    // processBrickPayment aplicar o desconto UMA SEGUNDA VEZ (ex.: 297 com
+    // 5% virava 282,15 na cotação e 268,04 na cobrança). A base correta é o
+    // valor cheio do plano; desconto PIX e crédito são aplicados UMA vez
+    // dentro do processBrickPayment, resultando exatamente no total da
+    // cotação (= valor exibido no site).
+    const fullBaseCents =
+      kind === "subscription" ? quote.plan.monthly_price_cents : quote.plan.activation_price_cents;
     const payment = await processBrickPayment({
       tenantId: tenant.id,
       planId: quote.plan.id,
       email: profile.email,
       firstName: firstName || null,
       lastName: rest.length > 0 ? rest.join(" ") : null,
-      // Base do método (cotação) — desconto PIX e crédito aplicados no servidor.
-      activationAmountCents: quote.originalCents,
+      activationAmountCents: fullBaseCents,
       planName: quote.plan.name,
       visitorToken,
       // Config oficial: desconto aplicado SOMENTE se o método efetivo for pix.

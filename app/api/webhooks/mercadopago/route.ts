@@ -136,6 +136,96 @@ async function handleNotification(type: string, dataId: string) {
 
 // ============================ ATIVAÇÃO PAGA ============================
 
+/**
+ * Reconcilia a linha "pending" criada no `/api/checkout` com o pagamento
+ * aprovado no Mercado Pago — em vez de inserir uma SEGUNDA linha (que
+ * deixava um "pendente" fantasma em /painel/pagamentos mesmo após o sucesso).
+ *
+ * 1) Idempotência: se já existe linha com este `mercadopago_payment_id`,
+ *    reaproveita (webhook entregue 2x não duplica).
+ * 2) Senão, reaproveita a pending da mesma tentativa — primeiro pela
+ *    preferência (fluxo Checkout Pro/link), senão a pending mais recente
+ *    do tipo (fluxo Brick dentro do site) — marcando-a como `succeeded`.
+ * 3) Outras pendings órfãs da mesma cobrança → `cancelled` (nunca exibe
+ *    "pendente" após o sucesso).
+ * 4) Sem pending (recorrência, p.ex.) → insere a linha de sucesso.
+ */
+async function reconcileSucceededPayment(
+  admin: ReturnType<typeof createAdminClient>,
+  opts: {
+    tenantId: string;
+    type: "activation" | "subscription";
+    subscriptionId?: string | null;
+    payment: MpPayment;
+    amountCents: number;
+    paidAt: string;
+    metadata: Record<string, unknown>;
+  }
+): Promise<string | null> {
+  const mpId = String(opts.payment.id);
+
+  // 1) Idempotência pelo id do pagamento no MP.
+  const { data: existing } = await admin
+    .from("payments")
+    .select("id")
+    .eq("mercadopago_payment_id", mpId)
+    .maybeSingle();
+  if (existing) return (existing as { id: string }).id;
+
+  // 2) Pending da mesma tentativa.
+  const { data: pendings } = await admin
+    .from("payments")
+    .select("id, metadata")
+    .eq("tenant_id", opts.tenantId)
+    .eq("type", opts.type)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false })
+    .limit(10);
+  const list = (pendings as { id: string; metadata: any }[] | null) || [];
+  const prefId = opts.payment.preference_id || null;
+  const match = prefId
+    ? list.find((p) => p?.metadata?.preference_id === prefId) || list[0] || null
+    : list[0] || null;
+
+  const succeededFields: Record<string, unknown> = {
+    ...(opts.subscriptionId ? { subscription_id: opts.subscriptionId } : {}),
+    mercadopago_payment_id: mpId,
+    ...(prefId ? { mercadopago_preference_id: prefId } : {}),
+    type: opts.type,
+    amount_cents: opts.amountCents,
+    currency: (opts.payment.currency_id || "brl").toLowerCase(),
+    status: "succeeded",
+    paid_at: opts.paidAt,
+  };
+
+  if (match) {
+    const mergedMeta = { ...((match.metadata as Record<string, unknown>) || {}), ...opts.metadata };
+    const { data } = await admin
+      .from("payments")
+      .update({ ...succeededFields, metadata: mergedMeta })
+      .eq("id", match.id)
+      .select("id")
+      .maybeSingle();
+    // 3) Pendings órfãs da mesma cobrança → canceladas.
+    await admin
+      .from("payments")
+      .update({ status: "cancelled" })
+      .eq("tenant_id", opts.tenantId)
+      .eq("type", opts.type)
+      .eq("status", "pending")
+      .neq("id", match.id);
+    return (data as { id: string } | null)?.id || match.id;
+  }
+
+  // 4) Sem pending — insere a linha de sucesso.
+  const { data: inserted } = await admin
+    .from("payments")
+    .insert({ tenant_id: opts.tenantId, ...succeededFields, metadata: opts.metadata })
+    .select("id")
+    .maybeSingle();
+  return (inserted as { id: string } | null)?.id || null;
+}
+
 async function handleActivationPayment(payment: MpPayment) {
   if (payment.status !== "approved") return;
 
@@ -160,36 +250,34 @@ async function handleActivationPayment(payment: MpPayment) {
   const amountCents = Math.round((payment.transaction_amount || 0) * 100);
   const creditUsageId = (payment.metadata?.credit_usage_id as string | undefined) || null;
 
-  // Registra o pagamento de ativação (idempotente: upsert pelo id do MP)
-  const { data: paymentRow } = await admin.from("payments").upsert(
-    {
-      tenant_id: tenantId,
-      mercadopago_payment_id: String(payment.id),
-      mercadopago_preference_id: payment.preference_id || null,
-      type: "activation",
-      amount_cents: amountCents,
-      currency: (payment.currency_id || "brl").toLowerCase(),
-      status: "succeeded",
-      paid_at: payment.date_approved ? new Date(payment.date_approved).toISOString() : new Date().toISOString(),
-      metadata: {
-        plan_id: planId,
-        gateway: "mercadopago",
-        external_reference: ref,
-        ...(creditUsageId ? { credit_usage_id: creditUsageId } : {}),
-        ...(typeof payment.metadata?.credit_applied_cents !== "undefined"
-          ? { credit_applied_cents: payment.metadata.credit_applied_cents }
-          : {}),
-        ...(typeof payment.metadata?.original_amount_cents !== "undefined"
-          ? { original_amount_cents: payment.metadata.original_amount_cents }
-          : {}),
-      },
+  // Registra o pagamento de ativação reconciliando a linha "pending" do
+  // checkout (sem duplicar e sem deixar "pendente" fantasma no painel).
+  const paidAt = payment.date_approved
+    ? new Date(payment.date_approved).toISOString()
+    : new Date().toISOString();
+  const paymentRowId = await reconcileSucceededPayment(admin, {
+    tenantId,
+    type: "activation",
+    payment,
+    amountCents,
+    paidAt,
+    metadata: {
+      plan_id: planId,
+      gateway: "mercadopago",
+      external_reference: ref,
+      ...(creditUsageId ? { credit_usage_id: creditUsageId } : {}),
+      ...(typeof payment.metadata?.credit_applied_cents !== "undefined"
+        ? { credit_applied_cents: payment.metadata.credit_applied_cents }
+        : {}),
+      ...(typeof payment.metadata?.original_amount_cents !== "undefined"
+        ? { original_amount_cents: payment.metadata.original_amount_cents }
+        : {}),
     },
-    { onConflict: "mercadopago_payment_id" }
-  ).select("id").maybeSingle();
+  });
 
   // Crédito de afiliado: confirma a utilização SOMENTE com pagamento aprovado.
   if (creditUsageId) {
-    const applied = await applyAffiliateCredit(creditUsageId, paymentRow?.id || null);
+    const applied = await applyAffiliateCredit(creditUsageId, paymentRowId);
     if (!applied) {
       console.error("[mercadopago webhook] falha ao confirmar crédito de afiliado", {
         usage_id: creditUsageId,
@@ -348,32 +436,29 @@ async function handleManualMonthlyPayment(payment: MpPayment) {
   const amountCents = Math.round((payment.transaction_amount || 0) * 100);
   const creditUsageId = (payment.metadata?.credit_usage_id as string | undefined) || null;
 
-  const { data: paymentRow } = await admin.from("payments").upsert(
-    {
-      tenant_id: tenantId,
-      subscription_id: sub.id,
-      mercadopago_payment_id: String(payment.id),
-      mercadopago_preference_id: payment.preference_id || null,
-      type: "subscription",
-      amount_cents: amountCents,
-      currency: (payment.currency_id || "brl").toLowerCase(),
-      status: "succeeded",
-      paid_at: payment.date_approved ? new Date(payment.date_approved).toISOString() : new Date().toISOString(),
-      metadata: {
-        gateway: "mercadopago",
-        external_reference: ref,
-        manual_monthly: true,
-        ...(creditUsageId ? { credit_usage_id: creditUsageId } : {}),
-        ...(typeof payment.metadata?.credit_applied_cents !== "undefined"
-          ? { credit_applied_cents: payment.metadata.credit_applied_cents }
-          : {}),
-        ...(typeof payment.metadata?.original_amount_cents !== "undefined"
-          ? { original_amount_cents: payment.metadata.original_amount_cents }
-          : {}),
-      },
+  const paidAt = payment.date_approved
+    ? new Date(payment.date_approved).toISOString()
+    : new Date().toISOString();
+  const paymentRowId = await reconcileSucceededPayment(admin, {
+    tenantId,
+    type: "subscription",
+    subscriptionId: sub.id,
+    payment,
+    amountCents,
+    paidAt,
+    metadata: {
+      gateway: "mercadopago",
+      external_reference: ref,
+      manual_monthly: true,
+      ...(creditUsageId ? { credit_usage_id: creditUsageId } : {}),
+      ...(typeof payment.metadata?.credit_applied_cents !== "undefined"
+        ? { credit_applied_cents: payment.metadata.credit_applied_cents }
+        : {}),
+      ...(typeof payment.metadata?.original_amount_cents !== "undefined"
+        ? { original_amount_cents: payment.metadata.original_amount_cents }
+        : {}),
     },
-    { onConflict: "mercadopago_payment_id" }
-  ).select("id").maybeSingle();
+  });
 
   const periodStart = new Date().toISOString();
   await admin.from("billing_history").upsert(
@@ -397,7 +482,7 @@ async function handleManualMonthlyPayment(payment: MpPayment) {
   }
 
   if (creditUsageId) {
-    const applied = await applyAffiliateCredit(creditUsageId, paymentRow?.id || null);
+    const applied = await applyAffiliateCredit(creditUsageId, paymentRowId);
     if (!applied) {
       console.error("[mercadopago webhook] falha ao confirmar crédito de afiliado", {
         usage_id: creditUsageId,

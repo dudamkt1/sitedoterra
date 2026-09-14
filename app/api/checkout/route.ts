@@ -48,10 +48,12 @@ export async function POST(request: Request) {
   // cálculo e reserva acontecem no backend (buildCheckoutQuote).
   const useAffiliateCredit = body.useAffiliateCredit === true;
   // Destino pós-pagamento (whitelist interna — evita open redirect).
+  // Após a confirmação, o usuário permanece no painel, em /painel/meu-site
+  // (com ?ativado=1, que exibe o aviso de "Pagamento recebido").
   const rawSuccessPath = typeof body.successPath === "string" ? body.successPath : "";
-  const successPath = /^\/painel\/meu-site(\?.*)?$/.test(rawSuccessPath)
+  const successPath = /^\/painel\/(meu-site|assinatura)(\?.*)?$/.test(rawSuccessPath)
     ? rawSuccessPath
-    : "/painel/assinatura?sucesso=1";
+    : "/painel/meu-site?ativado=1";
 
   const admin = createAdminClient();
   const profile = await getProfile(user.id);

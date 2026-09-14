@@ -702,7 +702,7 @@ export function CheckoutModal({ open, onClose, planId }: { open: boolean; onClos
                 <p className="text-sm text-emerald-800/80 mt-1 leading-5">Você já pode acessar seu painel. A mensalidade de {brl(monthlyCents)}/mês só começará após {trialMonths} {trialMonths === 1 ? "mês" : "meses"}.</p>
               </div>
               <div className="mt-6 flex flex-col gap-2 w-full">
-                <button type="button" onClick={() => (window.location.href = "/painel")} className="w-full rounded-full bg-[#1d5c3a] px-6 py-3.5 text-[15px] font-semibold text-white shadow-[0_8px_24px_rgba(29,92,58,0.18)] hover:bg-[#164a2e] transition">
+                <button type="button" onClick={() => (window.location.href = "/painel/meu-site")} className="w-full rounded-full bg-[#1d5c3a] px-6 py-3.5 text-[15px] font-semibold text-white shadow-[0_8px_24px_rgba(29,92,58,0.18)] hover:bg-[#164a2e] transition">
                   Ir para meu painel
                 </button>
                 <p className="text-xs text-slate-400">Você também receberá a confirmação por e-mail.</p>

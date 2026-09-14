@@ -46,6 +46,12 @@ export default async function PagamentosPage(p: { demoCtx?: DashboardContext }) 
       ...((history as any[]) || []).map((h) => ({ ...h, source: "cobranca" })),
       ...((payments as any[]) || []).map((x) => ({ ...x, source: "pagamento" })),
     ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    // A ativação é única: se já existe ativação paga, pendings de ativação
+    // são tentativas antigas órfãs (o webhook atual já reconcilia/cancela as
+    // novas) — ocultá-las evita o "pendente" fantasma após o sucesso.
+    if (rows.some((r) => r.type === "activation" && r.status === "succeeded")) {
+      rows = rows.filter((r) => !(r.type === "activation" && r.status === "pending"));
+    }
   }
 
   return (

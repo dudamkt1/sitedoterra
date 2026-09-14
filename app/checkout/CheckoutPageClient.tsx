@@ -1316,7 +1316,7 @@ export default function CheckoutPageClient({
           </div>
         )}
         <div className="mt-6 flex flex-col gap-2 w-full">
-          <button type="button" onClick={() => (window.location.href = "/painel")} className="w-full rounded-full bg-[#103d2d] px-6 py-3.5 text-[15px] font-semibold text-white shadow-[0_8px_24px_rgba(16,61,45,0.18)] hover:bg-[#0e3326] transition">
+          <button type="button" onClick={() => (window.location.href = "/painel/meu-site")} className="w-full rounded-full bg-[#103d2d] px-6 py-3.5 text-[15px] font-semibold text-white shadow-[0_8px_24px_rgba(16,61,45,0.18)] hover:bg-[#0e3326] transition">
             Ir para meu painel
           </button>
           <p className="text-xs text-[#6b7a89]">Você também receberá a confirmação por e-mail.</p>
