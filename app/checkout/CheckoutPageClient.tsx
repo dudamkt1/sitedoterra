@@ -101,6 +101,11 @@ export function friendlyError(raw: string): string {
   if (m.includes("cc_rejected_max_attempts") || m.includes("max_attempts")) {
     return "Muitas tentativas. Aguarde alguns minutos antes de tentar novamente.";
   }
+  // Rejeição na criação da cobrança (ex.: meio excluído inválido no MP).
+  // Erro operacional do servidor: nunca expor o texto técnico.
+  if (m.includes("account_money") || m.includes("bad_request") || m.includes("excluded")) {
+    return "Não foi possível preparar esta forma de pagamento agora. Tente novamente ou escolha outra forma de pagamento.";
+  }
   if (m.includes("timeout") || m.includes("timed out")) {
     return "A conexão demorou para responder. Verifique sua internet e tente novamente.";
   }

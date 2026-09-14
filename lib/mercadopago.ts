@@ -49,8 +49,20 @@ async function mpFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   });
   if (!res.ok) {
     const text = await res.text();
+    // A API do MP devolve erros como JSON (ex.:
+    // {"message":"account_money cannot be excluded","error":"bad_request",
+    // "status":400}). Extrair o `message` evita vazar JSON cru até a tela
+    // de erro do checkout.
+    let detail = text.slice(0, 500);
+    try {
+      const parsed = JSON.parse(text) as { message?: unknown; error?: unknown };
+      const msg = String(parsed?.message || parsed?.error || "").trim();
+      if (msg) detail = msg.slice(0, 300);
+    } catch {
+      // corpo não-JSON: mantém o texto cru (truncado)
+    }
     throw new Error(
-      `Mercado Pago API ${init.method || "GET"} ${path} falhou (${res.status}): ${text.slice(0, 500)}`
+      `Mercado Pago API ${init.method || "GET"} ${path} falhou (${res.status}): ${detail}`
     );
   }
   return res.json() as Promise<T>;
@@ -161,6 +173,10 @@ export async function createActivationPreference(
 
   // O usuário já escolheu PIX ou CARTÃO no /checkout: restringe os meios da
   // preferência para não exigir uma segunda escolha dentro do Mercado Pago.
+  // ATENÇÃO: `account_money` (saldo MP) NÃO pode ser excluído — a API rejeita
+  // com 400 "account_money cannot be excluded" e NENHUM pagamento (PIX ou
+  // cartão) é criado. Por isso ele fica de fora das listas abaixo (o saldo
+  // MP continua aceito como forma de pagamento, sem prejuízo ao lojista).
   const paymentMethods =
     input.payMethod === "pix"
       ? {
@@ -170,7 +186,6 @@ export async function createActivationPreference(
             { id: "prepaid_card" },
             { id: "ticket" },
             { id: "atm" },
-            { id: "account_money" },
           ],
         }
       : input.payMethod === "card"
@@ -181,7 +196,6 @@ export async function createActivationPreference(
               { id: "prepaid_card" },
               { id: "ticket" },
               { id: "atm" },
-              { id: "account_money" },
             ],
           }
         : undefined;
