@@ -393,10 +393,10 @@ async function handleActivationPayment(payment: MpPayment) {
     },
   });
 
-  // Reembolso chegou antes do approved (fora de ordem): o reembolso
-  // prevalece — NÃO ativa o site.
-  if (rowStatus === "refunded") {
-    console.warn("[mp] approved ignorado: pagamento já reembolsado", { mp_payment_id: payment.id });
+  // Reembolso (ou pedido de reembolso) chegou antes do approved (fora de
+  // ordem): o reembolso prevalece — NÃO ativa o site.
+  if (rowStatus === "refunded" || rowStatus === "refund_pending") {
+    console.warn("[mp] approved ignorado: pagamento já em reembolso", { mp_payment_id: payment.id, rowStatus });
     return;
   }
 
@@ -648,8 +648,8 @@ async function handleManualMonthlyPayment(payment: MpPayment) {
     },
   });
 
-  if (rowStatus === "refunded") {
-    console.warn("[mp] approved ignorado: pagamento já reembolsado", { mp_payment_id: payment.id });
+  if (rowStatus === "refunded" || rowStatus === "refund_pending") {
+    console.warn("[mp] approved ignorado: pagamento já em reembolso", { mp_payment_id: payment.id, rowStatus });
     return;
   }
 
@@ -724,10 +724,12 @@ async function handleMpRefund(payment: MpPayment) {
     ...(payment.status === "charged_back" ? { chargeback: true } : {}),
   };
 
-  // Localiza a linha do pagamento original (qualquer status).
+  // Localiza a linha do pagamento original (qualquer status — inclui
+  // `refund_pending` do pedido de garantia; a confirmação do MP promove para
+  // `refunded` e desativa o site).
   const { data: original } = await admin
     .from("payments")
-    .select("id, type, status, tenant_id, subscription_id")
+    .select("id, type, status, tenant_id, subscription_id, metadata")
     .eq("mercadopago_payment_id", mpId)
     .maybeSingle();
   const orig = original as {
@@ -736,6 +738,7 @@ async function handleMpRefund(payment: MpPayment) {
     status: string;
     tenant_id: string;
     subscription_id: string | null;
+    metadata: Record<string, unknown> | null;
   } | null;
 
   const payType: string = orig?.type || (ref.startsWith("mon_") || ref.startsWith("sub_") ? "subscription" : "activation");
@@ -744,7 +747,10 @@ async function handleMpRefund(payment: MpPayment) {
     if (orig.status !== "refunded") {
       await admin
         .from("payments")
-        .update({ status: "refunded", metadata: refundMeta })
+        .update({
+          status: "refunded",
+          metadata: { ...(orig.metadata || {}), ...refundMeta },
+        })
         .eq("id", orig.id);
     }
   } else {
@@ -763,7 +769,8 @@ async function handleMpRefund(payment: MpPayment) {
   }
 
   // Linha de histórico da devolução (id próprio para não sobrescrever a
-  // linha "Pago" original — histórico intacto).
+  // linha "Pago" original — histórico intacto). Promove eventual linha
+  // "aguardando reembolso" para reembolsada.
   await admin.from("billing_history").upsert(
     {
       tenant_id: tenantId,
@@ -775,6 +782,13 @@ async function handleMpRefund(payment: MpPayment) {
     },
     { onConflict: "mercadopago_payment_id", ignoreDuplicates: true }
   );
+  try {
+    await admin
+      .from("billing_history")
+      .update({ status: "refunded" })
+      .eq("tenant_id", tenantId)
+      .eq("mercadopago_payment_id", `${mpId}:refund_pending`);
+  } catch {}
 
   if (payType === "activation") {
     // Site desativado — usuário poderá pagar novamente e reativar (novo

@@ -74,15 +74,21 @@ export async function POST(request: Request) {
   const subActive = effectiveSubscriptionStatus(
     sub as { status: SubscriptionStatus; trial_end: string | null } | null
   ) === "active";
-  const lastSucceeded = (lastPay as { status?: string } | null)?.status === "succeeded";
+  const lastStatus = (lastPay as { status?: string } | null)?.status;
+  const lastSucceeded = lastStatus === "succeeded";
+  // Aguardando reembolso: o site segue no ar até o MP confirmar — a troca
+  // de slug nunca desativa nesse intervalo.
+  const lastAwaitingRefund = lastStatus === "refund_pending";
   const wasActive = (currentTenant as { site_status?: string } | null)?.site_status === "active";
 
-  // Pagamento PAGO ou site já ativo: mantém ativo (nunca rebaixa para pending).
-  // Só vai para pending quando NUNCA houve pagamento e não há assinatura ativa.
-  const siteStatus = !billingEnabled || subActive || lastSucceeded || wasActive ? "active" : "pending";
+  // Pagamento PAGO (ou aguardando reembolso) ou site já ativo: mantém ativo
+  // (nunca rebaixa para pending). Só vai para pending quando NUNCA houve
+  // pagamento e não há assinatura ativa.
+  const siteStatus = !billingEnabled || subActive || lastSucceeded || lastAwaitingRefund || wasActive ? "active" : "pending";
 
   // Cura a assinatura quando há pagamento PAGO mas ela não está ativa
   // (ex.: linha antiga cancelada) — evita "Cancelada" + site fora do ar.
+  // Nunca cura durante o fluxo de reembolso (pedido respeitado).
   if (lastSucceeded && !subActive) {
     try {
       const { ensureTenantActivated } = await import("@/lib/mp-payment-processor");

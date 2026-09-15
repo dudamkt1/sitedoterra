@@ -137,6 +137,7 @@ export function StatusBadge({ status }: { status: string }) {
     error: { label: "Erro", cls: "badge-red" },
     removed: { label: "Removido", cls: "badge-gray" },
     failed: { label: "Falhou", cls: "badge-red" },
+    refund_pending: { label: "Aguardando reembolso", cls: "badge-yellow" },
     refunded: { label: "Reembolsado", cls: "badge-gray" },
     pending_activation: { label: "Aguardando ativação", cls: "badge-yellow" },
     paused: { label: "Pausada", cls: "badge-gray" },

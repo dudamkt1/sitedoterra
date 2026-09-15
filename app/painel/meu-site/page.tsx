@@ -24,6 +24,7 @@ export default async function MeuSitePage({ searchParams }: { searchParams?: { a
   // mensalidade) — é ela que vale, não um reembolso antigo já superado por
   // um pagamento posterior.
   let refundedPayment: { amount_cents: number; created_at: string } | null = null;
+  let refundPendingPayment: { amount_cents: number; created_at: string } | null = null;
   if (!isDemo && ctx.tenant?.id) {
     try {
       const admin = createAdminClient();
@@ -48,6 +49,10 @@ export default async function MeuSitePage({ searchParams }: { searchParams?: { a
             .maybeSingle();
           siteActive = (t as { site_status?: string } | null)?.site_status === "active";
         }
+      } else if (row?.status === "refund_pending") {
+        // Reembolso solicitado: site segue no ar até o MP confirmar a
+        // devolução — apenas avisa o status, sem CTA de reativação.
+        refundPendingPayment = { amount_cents: row.amount_cents, created_at: row.created_at };
       } else if (row?.status === "refunded") {
         refundedPayment = { amount_cents: row.amount_cents, created_at: row.created_at };
       }
@@ -74,10 +79,26 @@ export default async function MeuSitePage({ searchParams }: { searchParams?: { a
         <ActivationReturnNotice siteActive={siteActive} />
       )}
 
+      {/* Reembolso solicitado (aguardando confirmação do MP): site segue no
+          ar — apenas informa o status. Quando o dinheiro voltar, o aviso
+          abaixo de "reembolsado" assume com o CTA de reativação. */}
+      {refundPendingPayment && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
+          <p className="text-sm font-semibold text-amber-900">
+            ⏳ Reembolso em andamento — status: aguardando reembolso
+          </p>
+          <p className="text-sm text-amber-800 mt-1.5">
+            Pedido de {formatBRL(refundPendingPayment.amount_cents)} em{" "}
+            {formatDateTime(refundPendingPayment.created_at)} registrado. Assim que o
+            Mercado Pago confirmar a devolução, o status muda para reembolsado.
+          </p>
+        </div>
+      )}
+
       {/* Pagamento devolvido/reembolsado como ÚLTIMA atualização: site
-          desativado, com CTA para pagar novamente e reativar (novo registro;
-          histórico intacto). Se um pagamento posterior consta PAGO, o site é
-          ativado acima e este aviso não aparece. */}
+           desativado, com CTA para pagar novamente e reativar (novo registro;
+           histórico intacto). Se um pagamento posterior consta PAGO, o site é
+           ativado acima e este aviso não aparece. */}
       {refundedPayment && !siteActive && (
         <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
           <div className="flex items-start justify-between gap-3 flex-wrap">

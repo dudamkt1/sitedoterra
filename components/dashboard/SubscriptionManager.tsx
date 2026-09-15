@@ -33,6 +33,13 @@ interface SubManagerProps {
    * exibe o botão "Quero Cancelar". A janela é revalidada no backend.
    */
   guaranteeUntil?: string | null;
+  /**
+   * Reembolso da ativação em andamento (pagamento `refund_pending`).
+   * Exibe STATUS "Aguardando reembolso" e esconde ações de cancelar/reativar.
+   */
+  refundPending?: boolean;
+  /** Status da última ativação (succeeded | refund_pending | refunded | null). */
+  latestActivationStatus?: string | null;
 }
 
 export function SubscriptionManager({
@@ -53,6 +60,8 @@ export function SubscriptionManager({
   installments = 0,
   installmentsWithoutInterest = true,
   guaranteeUntil = null,
+  refundPending = false,
+  latestActivationStatus = null,
 }: SubManagerProps) {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
@@ -211,9 +220,17 @@ export function SubscriptionManager({
     setLoading(false);
   }
 
+  /** Reembolso em andamento / concluído (derivação sincronizada com o backend). */
+  const isRefundPending =
+    refundPending || activation?.status === "refund_pending" || latestActivationStatus === "refund_pending";
+  // Reembolsado vale SOMENTE quando a ÚLTIMA ativação está devolvida — um
+  // reembolso antigo superado por novo pagamento não contamina o status.
+  const isRefunded = !isRefundPending && latestActivationStatus === "refunded";
+
   /** Garantia de 7 dias: solicita cancelamento + devolução no Mercado Pago. */
   const guaranteeActive =
-    activationPaid && siteActive && Boolean(guaranteeUntil) && Date.now() <= new Date(guaranteeUntil as string).getTime();
+    activationPaid && siteActive && !isRefundPending && !isRefunded &&
+    Boolean(guaranteeUntil) && Date.now() <= new Date(guaranteeUntil as string).getTime();
 
   async function guaranteeCancel() {
     setGuaranteeLoading(true);
@@ -271,21 +288,28 @@ export function SubscriptionManager({
   const trialEndMs = nextBilling ? new Date(nextBilling).getTime() : NaN;
   const isTrialVigente =
     activationPaid && Number.isFinite(trialEndMs) && trialEndMs > Date.now();
-  // STATUS exibido: ativação PAGA + site no ar = ATIVO. "Cancelada" aparece
-  // SOMENTE quando o site está fora do ar por cancelamento do usuário
-  // (agendado/finalizado) ou reembolso da garantia de 7 dias — nunca logo
-  // após a ativação.
+  // STATUS exibido (sincronizado com o reembolso):
+  // - reembolso pedido → "Aguardando reembolso" (site segue no ar até o MP confirmar);
+  // - dinheiro devolvido → "Reembolsado" (site desativado, histórico preservado);
+  // - ativação PAGA + site no ar = ATIVO. "Cancelada" aparece SOMENTE quando o
+  //   site está fora do ar por cancelamento do usuário — nunca logo após a ativação.
   const displaySubscriptionStatus =
-    activationPaid && siteActive && (isTrialVigente || subscription?.status === "trialing")
-      ? "active"
-      : activationPaid && siteActive && (!subscription || subscription?.status === "canceled" || subscription?.status === "paused")
-        ? "active"
-        : subscription?.status || "awaiting_activation";
+    isRefundPending
+      ? "refund_pending"
+      : isRefunded && !siteActive
+        ? "refunded"
+        : activationPaid && siteActive && (isTrialVigente || subscription?.status === "trialing")
+          ? "active"
+          : activationPaid && siteActive && (!subscription || subscription?.status === "canceled" || subscription?.status === "paused")
+            ? "active"
+            : subscription?.status || "awaiting_activation";
   const isActive =
-    (subscription?.status === "active" || subscription?.status === "trialing") && !cancelScheduled
+    !isRefundPending && !isRefunded &&
+    ((subscription?.status === "active" || subscription?.status === "trialing") && !cancelScheduled
     || (activationPaid && siteActive && isTrialVigente && !cancelScheduled)
-    || (activationPaid && siteActive && !subscription);
+    || (activationPaid && siteActive && !subscription));
   const isCanceled =
+    !isRefundPending && !isRefunded &&
     (subscription?.status === "canceled" ||
       subscription?.status === "paused" ||
       cancelScheduled) &&
@@ -293,11 +317,15 @@ export function SubscriptionManager({
     // a assinatura está válida até a primeira mensalidade.
     !siteActive &&
     !isTrialVigente;
-  const statusLabel = cancelScheduled
-    ? "Cancelamento agendado para o fim do período"
-    : isTrialVigente
-      ? `Período incluso até ${formatDate(nextBilling)} — depois mensal sem fidelidade`
-      : undefined;
+  const statusLabel = isRefundPending
+    ? "Reembolso solicitado — aguardando confirmação do Mercado Pago"
+    : isRefunded && !siteActive
+      ? "Pagamento devolvido — site desativado, dados preservados"
+      : cancelScheduled
+        ? "Cancelamento agendado para o fim do período"
+        : isTrialVigente
+          ? `Período incluso até ${formatDate(nextBilling)} — depois mensal sem fidelidade`
+          : undefined;
 
   return (
     <div className="space-y-6">
@@ -320,7 +348,19 @@ export function SubscriptionManager({
       {/* Ações */}
       <div className="card" id="assinatura-acoes" style={{ scrollMarginTop: 90 }}>
         <h2 className="card-title mb-4">Ações</h2>
-        {isTrialVigente && siteActive && (
+        {isRefundPending && (
+          <div className="mb-4 w-full rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            ⏳ <strong>Aguardando reembolso</strong> — seu pedido foi registrado e o admin já foi avisado.
+            Assim que o Mercado Pago confirmar a devolução, o status muda para <strong>reembolsado</strong> e o site será desativado (dados preservados).
+          </div>
+        )}
+        {isRefunded && !siteActive && (
+          <div className="mb-4 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700">
+            💸 <strong>Pagamento reembolsado</strong> — o valor foi devolvido e o site está desativado.
+            Seus dados e conteúdo estão preservados: é só ativar novamente para voltar ao ar.
+          </div>
+        )}
+        {isTrialVigente && siteActive && !isRefundPending && (
           <div className="mb-4 w-full rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
             ✅ Site ativo — {trialMonths} {trialMonths === 1 ? "mês incluso" : "meses inclusos"} após a ativação.
             Primeira mensalidade em <strong>{formatDate(nextBilling)}</strong> ({formatBRL(monthlyPriceCents)}/mês, sem fidelidade — cancele quando quiser).
@@ -352,6 +392,17 @@ export function SubscriptionManager({
           {isCanceled && billingEnabled && (
             <button className="btn btn-gold" onClick={reactivate} disabled={loading}>
               {loading ? "Processando..." : "♻️ Reativar assinatura"}
+            </button>
+          )}
+
+          {isRefunded && !siteActive && billingEnabled && (
+            <button
+              type="button"
+              className="btn btn-gold"
+              onClick={() => window.location.href = `/checkout`}
+              disabled={loading}
+            >
+              ⚡ Ativar meu site novamente
             </button>
           )}
 

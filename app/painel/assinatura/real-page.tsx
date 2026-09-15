@@ -42,25 +42,34 @@ export default async function AssinaturaPage(p: { demoCtx?: DashboardContext }) 
   let payments: any[] = DEMO_ROWS;
   let activation: any = null;
 
+  let refundPending = false;
+  let latestActivationStatus: string | null = null;
+
   if (tenantId && !p.demoCtx) {
     const admin = createAdminClient();
-    const [hist, pays, act, lastPay] = await Promise.all([
+    const [hist, pays, act, lastPay, latestAct] = await Promise.all([
       admin.from("billing_history").select("*").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(20),
       admin.from("payments").select("*").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(20),
       admin.from("payments").select("*").eq("tenant_id", tenantId).eq("type", "activation").eq("status", "succeeded").order("created_at", { ascending: false }).limit(1).maybeSingle(),
       admin.from("payments").select("status").eq("tenant_id", tenantId).in("type", ["activation", "subscription"]).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+      admin.from("payments").select("status").eq("tenant_id", tenantId).eq("type", "activation").order("created_at", { ascending: false }).limit(1).maybeSingle(),
     ]);
     billingHistory = (hist.data as any[]) || [];
     payments = (pays.data as any[]) || [];
     activation = act.data as any;
+    latestActivationStatus = ((latestAct.data as { status?: string } | null)?.status) || null;
+    refundPending = latestActivationStatus === "refund_pending";
 
     // Cura: ativação PAGA como última atualização mas assinatura ausente/
     // cancelada (ex.: falha antiga) → recria assinatura ativa em trial e
     // religa o site, para o STATUS exibir ATIVO em vez de "Cancelada".
+    // NUNCA cura durante/depois de reembolso (pedido respeitado; após
+    // reembolsado o site permanece desativado até novo pagamento).
     const lastSucceeded = (lastPay.data as { status?: string } | null)?.status === "succeeded";
+    const refundFlow = latestActivationStatus === "refund_pending" || latestActivationStatus === "refunded";
     const subStatus = (ctx.subscription as { status?: string } | null)?.status;
     const siteActiveNow = ctx.tenant?.site_status === "active";
-    if (lastSucceeded && (!ctx.subscription || (subStatus !== "active" && subStatus !== "trialing") || !siteActiveNow)) {
+    if (!refundFlow && lastSucceeded && (!ctx.subscription || (subStatus !== "active" && subStatus !== "trialing") || !siteActiveNow)) {
       try {
         const { ensureTenantActivated } = await import("@/lib/mp-payment-processor");
         const healed = await ensureTenantActivated(tenantId);
@@ -134,7 +143,9 @@ export default async function AssinaturaPage(p: { demoCtx?: DashboardContext }) 
         pixDiscountPercent={mp.pixDiscountPercent}
         installments={mp.installments}
         installmentsWithoutInterest={mp.installmentsWithoutInterest}
-        guaranteeUntil={guaranteeUntil}
+        guaranteeUntil={refundPending ? null : guaranteeUntil}
+        refundPending={refundPending}
+        latestActivationStatus={latestActivationStatus}
       />
     </div>
   );

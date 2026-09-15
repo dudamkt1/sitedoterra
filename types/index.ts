@@ -24,7 +24,7 @@ export type DomainStatus =
   | "error"
   | "removed"
   | "blocked";
-export type PaymentStatus = "pending" | "succeeded" | "failed" | "refunded" | "cancelled";
+export type PaymentStatus = "pending" | "succeeded" | "failed" | "refund_pending" | "refunded" | "cancelled";
 export type PaymentType = "activation" | "subscription" | "manual" | "refund";
 
 export interface Profile {
