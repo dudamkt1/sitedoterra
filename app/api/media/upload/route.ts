@@ -77,13 +77,38 @@ export async function POST(request: Request) {
 
   const tenantId = scope === "tenant" ? ctx.tenant.id : null;
 
-  // Quota (apenas tenants).
+  // Otimização server-side (rede de segurança): o caminho principal já chega
+  // otimizado do browser, mas uploads vindos de outros clientes passam pelo
+  // sharp aqui (WebP q80 / PNG otimizado, máx. 1600px, sem EXIF).
+  let outBuffer: Buffer = buffer;
+  let outMime = file.type || "application/octet-stream";
+  let outExt = validation.extension;
+  let optimized = false;
+  let savedBytes = 0;
+  if (outMime.toLowerCase().startsWith("image/")) {
+    try {
+      const { optimizeImage } = await import("@/lib/media/optimize-image");
+      const opt = await optimizeImage(buffer);
+      outBuffer = opt.buffer;
+      optimized = !opt.skipped;
+      savedBytes = Math.max(0, opt.originalBytes - opt.outputBytes);
+      if (opt.extension) {
+        outExt = opt.extension;
+        outMime = opt.mimeType;
+      }
+    } catch (e) {
+      console.warn("[media/upload] otimização sharp falhou — enviando original", e);
+    }
+  }
+  const outSize = outBuffer.length;
+
+  // Quota (apenas tenants) — sobre o tamanho FINAL (pós-otimização).
   if (scope === "tenant") {
     const [used, quota] = await Promise.all([
       getTenantStorageUsed(ctx.tenant.id),
       getMediaQuotaBytes(ctx.tenant.id),
     ]);
-    if (used + fileSize > quota) {
+    if (used + outSize > quota) {
       return NextResponse.json(
         {
           error:
@@ -98,7 +123,7 @@ export async function POST(request: Request) {
     scope,
     tenantId,
     category: validation.category,
-    extension: validation.extension,
+    extension: outExt,
   });
   const publicUrl = r2PublicUrl(storageKey);
 
@@ -106,8 +131,8 @@ export async function POST(request: Request) {
   try {
     await r2PutObject({
       key: storageKey,
-      body: buffer,
-      contentType: file.type || "application/octet-stream",
+      body: new Uint8Array(outBuffer),
+      contentType: outMime,
     });
   } catch (err) {
     console.error("Erro no upload server-side ao R2", err);
@@ -126,8 +151,8 @@ export async function POST(request: Request) {
       public_url: publicUrl,
       original_name: validation.cleanName,
       file_name: storageKey.split("/").pop() || null,
-      mime_type: file.type || "application/octet-stream",
-      file_size: fileSize,
+      mime_type: outMime,
+      file_size: outSize,
       category: validation.category.code,
       folder: validation.category.folder,
       is_public: true,
@@ -147,7 +172,7 @@ export async function POST(request: Request) {
     tenant_id: tenantId,
     user_id: ctx.user.id,
     action: "upload",
-    details: { size: fileSize, mime: file.type, category: validation.category.code, via: "server" },
+    details: { size: outSize, original_size: fileSize, mime: outMime, category: validation.category.code, via: "server", optimized, saved_bytes: savedBytes },
   });
 
   return NextResponse.json({ media: toMediaView(media) });

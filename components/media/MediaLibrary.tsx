@@ -171,28 +171,39 @@ export function MediaLibrary({
         <p className="text-sm text-gray-400">Carregando mídias...</p>
       ) : items.length === 0 ? (
         <p className="text-sm text-gray-400">
-          Nenhum arquivo encontrado. Envie sua primeira imagem para o Cloudflare R2.
+          Nenhum arquivo encontrado. Envie sua primeira imagem ou vídeo para o Cloudflare R2.
         </p>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-          {items.map((m) => (
+          {items.map((m) => {
+            const isVideo = (m.mime_type || "").toLowerCase().startsWith("video/");
+            return (
             <div key={m.id} className="card !p-0 overflow-hidden">
               <div className="aspect-video bg-gray-100 relative group">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={m.public_url}
-                  alt={m.original_name || "imagem"}
-                  loading="lazy"
-                  referrerPolicy="no-referrer"
-                  className="w-full h-full object-cover"
-                />
+                {isVideo ? (
+                  <video
+                    src={m.public_url}
+                    preload="metadata"
+                    playsInline
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={m.public_url}
+                    alt={m.original_name || "imagem"}
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
+                    className="w-full h-full object-cover"
+                  />
+                )}
                 {selectable && (
                   <button
                     type="button"
                     onClick={() => onSelect && onSelect(m)}
                     className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-[#1d5c3a]/70 text-white text-sm font-semibold flex items-center justify-center"
                   >
-                    Usar esta imagem ✓
+                    {isVideo ? "Usar este vídeo ✓" : "Usar esta imagem ✓"}
                   </button>
                 )}
               </div>
@@ -201,7 +212,7 @@ export function MediaLibrary({
                   {m.original_name || "arquivo"}
                 </p>
                 <p className="text-[0.7rem] text-gray-400 mt-0.5">
-                  {categoryLabel(m.category)} · {formatBytes(m.file_size)}
+                  {isVideo ? "Vídeo" : categoryLabel(m.category)} · {formatBytes(m.file_size)}
                 </p>
                 {showOwner && (
                   <p className="text-[0.7rem] text-gray-500 mt-0.5">
@@ -225,7 +236,8 @@ export function MediaLibrary({
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

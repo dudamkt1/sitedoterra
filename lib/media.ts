@@ -29,21 +29,32 @@ export const MEDIA_CATEGORIES: MediaCategory[] = [
   { code: "products", label: "Produtos", maxBytes: 10 * 1024 * 1024, folder: "produtos" },
   { code: "gallery", label: "Galeria", maxBytes: 10 * 1024 * 1024, folder: "galeria" },
   { code: "banner", label: "Banner", maxBytes: 15 * 1024 * 1024, folder: "banners" },
+  // Vídeo (comprimido no navegador antes do upload: 720p H.264).
+  { code: "video", label: "Vídeo", maxBytes: 100 * 1024 * 1024, folder: "videos" },
 ];
 
 export function getMediaCategory(code?: string | null): MediaCategory {
   return MEDIA_CATEGORIES.find((c) => c.code === code) || MEDIA_CATEGORIES[0];
 }
 
-/** Formatos aceitos (sem SVG — risco de XSS). Preferir WEBP. */
-const ALLOWED_MIME_TYPES = new Set([
+/** Formatos de imagem aceitos (sem SVG — risco de XSS). Preferir WEBP. */
+const ALLOWED_IMAGE_MIME_TYPES = new Set([
   "image/jpeg",
   "image/pjpeg",
   "image/png",
   "image/webp",
 ]);
 
-const ALLOWED_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp"]);
+const ALLOWED_IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp"]);
+
+/** Formatos de vídeo aceitos (o browser comprime p/ MP4/H.264 antes de subir). */
+const ALLOWED_VIDEO_MIME_TYPES = new Set([
+  "video/mp4",
+  "video/webm",
+  "video/quicktime",
+]);
+
+const ALLOWED_VIDEO_EXTENSIONS = new Set(["mp4", "webm", "mov"]);
 
 export class MediaError extends Error {
   status: number;
@@ -90,13 +101,35 @@ export function validateUpload(args: {
   const category = getMediaCategory(args.category || "general");
   const mime = (args.mimeType || "").toLowerCase();
   const name = sanitizeOriginalName(args.fileName);
+  const isVideoCategory = category.code === "video";
 
-  if (!ALLOWED_MIME_TYPES.has(mime)) {
+  if (isVideoCategory) {
+    if (!ALLOWED_VIDEO_MIME_TYPES.has(mime)) {
+      throw new MediaError(400, "Formato de vídeo não permitido. Use MP4 ou WebM (até " + (category.maxBytes / 1024 / 1024).toFixed(0) + " MB).");
+    }
+    const ext = extFromName(name) || mime.split("/")[1];
+    if (!ext || !ALLOWED_VIDEO_EXTENSIONS.has(ext)) {
+      throw new MediaError(400, `Extensão "${ext || "desconhecida"}" não permitida. Use .mp4 ou .webm`);
+    }
+    const size = Number(args.fileSize);
+    if (!(size > 0) || Number.isNaN(size)) {
+      throw new MediaError(400, "Tamanho do arquivo inválido.");
+    }
+    if (size > category.maxBytes) {
+      throw new MediaError(
+        400,
+        `Arquivo muito grande. O limite para "${category.label}" é ${(category.maxBytes / 1024 / 1024).toFixed(0)} MB.`
+      );
+    }
+    return { category, extension: ext, cleanName: name };
+  }
+
+  if (!ALLOWED_IMAGE_MIME_TYPES.has(mime)) {
     throw new MediaError(400, "Formato não permitido. Use JPEG, PNG ou WEBP (imagens de até " + (category.maxBytes / 1024 / 1024).toFixed(0) + " MB).");
   }
 
   const ext = extFromName(name) || mime.split("/")[1];
-  if (!ext || !ALLOWED_EXTENSIONS.has(ext)) {
+  if (!ext || !ALLOWED_IMAGE_EXTENSIONS.has(ext)) {
     throw new MediaError(400, `Extensão "${ext || "desconhecida"}" não permitida. Use .jpg, .jpeg, .png ou .webp`);
   }
 

@@ -23,6 +23,7 @@ export const MEDIA_CATEGORIES_CLIENT = [
   { code: "products", label: "Produtos" },
   { code: "gallery", label: "Galeria" },
   { code: "banner", label: "Banner" },
+  { code: "video", label: "Vídeo" },
 ];
 
 export function categoryLabel(code?: string | null): string {
@@ -81,7 +82,48 @@ export async function confirmUpload(id: string): Promise<MediaFile> {
 }
 
 /**
- * Pipeline completo de upload (R2): presign → PUT direto → confirmar.
+ * Envia um blob já preparado (pós-otimização) ao R2: presign → PUT → confirmar.
+ */
+async function uploadPreparedBlob(args: {
+  blob: Blob;
+  fileName: string;
+  mimeType: string;
+  category: string;
+  scope: "tenant" | "system";
+  onProgress?: (pct: number) => void;
+}): Promise<MediaFile> {
+  const scope = args.scope;
+  const presign = await requestPresign({
+    scope,
+    category: args.category,
+    mimeType: args.mimeType,
+    fileName: args.fileName,
+    fileSize: args.blob.size,
+  });
+
+  // PUT ao R2 via XHR para progresso real.
+  await new Promise<void>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", presign.uploadUrl);
+    xhr.setRequestHeader("Content-Type", args.mimeType);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && args.onProgress) {
+        args.onProgress(Math.round((e.loaded / e.total) * 100));
+      }
+    };
+    xhr.onload = () =>
+      xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error("Falha no upload para o armazenamento."));
+    xhr.onerror = () => reject(new Error("Falha de rede no upload."));
+    xhr.send(args.blob);
+  });
+
+  return confirmUpload(presign.id);
+}
+
+/**
+ * Pipeline completo de upload (R2): otimizar → presign → PUT direto → confirmar.
+ * A otimização (imagem via canvas, vídeo via ffmpeg.wasm) acontece ANTES do
+ * presign, então validação/quota no servidor usam o tamanho final.
  * Se o PUT direto falhar por CORS/rede do bucket, faz FALLBACK enviando o
  * arquivo PELO SERVIDOR (/api/media/upload), que faz o PUT ao R2 server-side
  * (sem CORS) — garantindo que o envio funcione em qualquer origem.
@@ -91,43 +133,28 @@ export async function uploadMedia(args: {
   category: string;
   scope?: "tenant" | "system";
   onProgress?: (pct: number) => void;
+  onStage?: (stage: "optimizing" | "uploading", detail?: string) => void;
 }): Promise<MediaFile> {
   const scope = args.scope || "tenant";
-  const file = args.file;
-  const mimeType = file.type || "application/octet-stream";
+  const { prepareFileForUpload } = await import("@/lib/media/compress-client");
+  const prepared = await prepareFileForUpload(args.file, { onStage: args.onStage });
+  args.onStage?.("uploading");
 
   try {
-    const presign = await requestPresign({
-      scope,
+    return await uploadPreparedBlob({
+      blob: prepared.blob,
+      fileName: prepared.fileName,
+      mimeType: prepared.mimeType,
       category: args.category,
-      mimeType,
-      fileName: file.name,
-      fileSize: file.size,
+      scope,
+      onProgress: args.onProgress,
     });
-
-    // PUT ao R2 via XHR para progresso real.
-    await new Promise<void>((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open("PUT", presign.uploadUrl);
-      xhr.setRequestHeader("Content-Type", mimeType);
-      xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable && args.onProgress) {
-          args.onProgress(Math.round((e.loaded / e.total) * 100));
-        }
-      };
-      xhr.onload = () =>
-        xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error("Falha no upload para o armazenamento."));
-      xhr.onerror = () => reject(new Error("Falha de rede no upload."));
-      xhr.send(file);
-    });
-
-    return confirmUpload(presign.id);
   } catch (e) {
     // Fallback: envia pelo servidor (sem CORS). Preserva a mensagem de erro se
     // o fallback também falhar (ex.: arquivo grande além do limite do servidor).
     try {
       const form = new FormData();
-      form.append("file", file);
+      form.append("file", prepared.blob, prepared.fileName);
       form.append("category", args.category);
       form.append("scope", scope);
       const { res, data } = await json("/api/media/upload", { method: "POST", body: form });
@@ -138,6 +165,65 @@ export async function uploadMedia(args: {
       throw e instanceof Error ? e : new Error("Erro no upload.");
     }
   }
+}
+
+/**
+ * Upload de vídeo COM thumbnail/poster: sobe o vídeo otimizado e, em seguida,
+ * o poster (frame do meio) como item separado na categoria "general".
+ * Retorna a mídia do vídeo + URL pública do poster (ou null).
+ */
+export async function uploadVideoWithPoster(args: {
+  file: File;
+  category?: string;
+  scope?: "tenant" | "system";
+  onProgress?: (pct: number) => void;
+  onStage?: (stage: "optimizing" | "uploading", detail?: string) => void;
+}): Promise<{ media: MediaFile; posterUrl: string | null }> {
+  const scope = args.scope || "tenant";
+  const category = args.category || "video";
+  const { prepareFileForUpload } = await import("@/lib/media/compress-client");
+  const prepared = await prepareFileForUpload(args.file, { onStage: args.onStage });
+  args.onStage?.("uploading");
+
+  let media: MediaFile;
+  try {
+    media = await uploadPreparedBlob({
+      blob: prepared.blob,
+      fileName: prepared.fileName,
+      mimeType: prepared.mimeType,
+      category,
+      scope,
+      onProgress: args.onProgress,
+    });
+  } catch (e) {
+    const form = new FormData();
+    form.append("file", prepared.blob, prepared.fileName);
+    form.append("category", category);
+    form.append("scope", scope);
+    const { res, data } = await json("/api/media/upload", { method: "POST", body: form });
+    if (!res.ok) throw e instanceof Error ? e : new Error("Erro no upload.");
+    if (args.onProgress) args.onProgress(100);
+    media = data.media as MediaFile;
+  }
+
+  let posterUrl: string | null = null;
+  if (prepared.poster && prepared.poster.size > 0) {
+    try {
+      const base = prepared.fileName.replace(/\.[a-z0-9]+$/i, "");
+      const poster = await uploadPreparedBlob({
+        blob: prepared.poster,
+        fileName: `${base}-poster.jpg`,
+        mimeType: "image/jpeg",
+        category: "general",
+        scope,
+      });
+      posterUrl = poster.public_url;
+    } catch (e) {
+      console.warn("[media] upload do poster falhou (vídeo ok)", e);
+    }
+  }
+
+  return { media, posterUrl };
 }
 
 /** Lista mídias de um tenant/sistema/admin. */
