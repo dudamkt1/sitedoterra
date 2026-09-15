@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser, getProfile } from "@/lib/auth";
 import { refundMpPayment } from "@/lib/mercadopago";
+import { handleMpRefund } from "@/lib/mp-payment-processor";
 
 export const runtime = "nodejs";
 
@@ -10,8 +11,9 @@ export const runtime = "nodejs";
  *
  * Somente após esta autorização o sistema emite a devolução no Mercado Pago
  * (antes disso o pedido fica em `refund_pending` para o admin conversar com
- * o usuário e tentar reverter). A conclusão (pagamento → reembolsado, site
- * desativado) acontece via webhook/sync do MP.
+ * o usuário e tentar reverter). Assim que o MP aceita, a baixa é aplicada NA
+ * HORA (pagamento → reembolsado, site desativado) — sem esperar o webhook —
+ * para impedir duplo reembolso (novo clique encontra `refunded` e é barrado).
  *
  * Body: { paymentId: string }
  */
@@ -59,6 +61,13 @@ export async function POST(request: Request) {
   if (!pay.mercadopago_payment_id) {
     return NextResponse.json(
       { error: "Pagamento sem referência do Mercado Pago." },
+      { status: 400 }
+    );
+  }
+  const mpNum = Number(pay.mercadopago_payment_id);
+  if (!Number.isFinite(mpNum)) {
+    return NextResponse.json(
+      { error: "Referência do Mercado Pago inválida." },
       { status: 400 }
     );
   }
@@ -113,11 +122,31 @@ export async function POST(request: Request) {
     });
   } catch {}
 
+  // Baixa IMEDIATA (não espera o webhook): pagamento → reembolsado, site
+  // desativado, assinaturas canceladas. Novo clique em "Autorizar" encontra
+  // `refunded` e é barrado — impossível reembolsar 2x. O webhook do MP segue
+  // idempotente como redundância.
+  try {
+    await handleMpRefund({
+      id: mpNum,
+      status: "refunded",
+      external_reference: `act_${pay.tenant_id}`,
+      transaction_amount: (pay.amount_cents || 0) / 100,
+      currency_id: "brl",
+      date_approved: null,
+      date_created: new Date().toISOString(),
+      preference_id: null,
+      metadata: { tenant_id: pay.tenant_id, type: "activation" },
+    });
+  } catch (e) {
+    console.error("[admin/refunds/authorize] falha na baixa imediata (webhook cobre)", e);
+  }
+
   return NextResponse.json({
     ok: true,
-    status: "refund_pending",
+    status: "refunded",
     refund_status: refundStatus,
     message:
-      "Reembolso autorizado e devolução emitida no Mercado Pago. Assim que confirmado, o status muda para reembolsado e o site é desativado.",
+      "Reembolso autorizado e enviado — sistema atualizado para reembolsado e site desativado.",
   });
 }

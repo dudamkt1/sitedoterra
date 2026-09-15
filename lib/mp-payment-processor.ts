@@ -709,7 +709,13 @@ async function handleManualMonthlyPayment(payment: MpPayment) {
  *     de "mensalidade em aberto" já existente no painel);
  *   - recorrência → inadimplência + suspensão (mesma regra de recusado).
  */
-async function handleMpRefund(payment: MpPayment) {
+/**
+ * Exportado para a autorização manual do admin (`/api/admin/refunds/authorize`):
+ * após o MP aceitar a devolução, a baixa é aplicada NA HORA (pagamento →
+ * reembolsado, site desativado) em vez de esperar o webhook — evita duplo
+ * reembolso. O webhook continua idempotente como redundância.
+ */
+export async function handleMpRefund(payment: MpPayment) {
   const admin = createAdminClient();
   const ref = payment.external_reference || "";
   const tenantId = tenantIdFromPayment(payment);
