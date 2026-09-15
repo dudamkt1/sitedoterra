@@ -73,14 +73,14 @@ export default async function AdminHome() {
 
   let refundDisplay: any[] = [];
   try {
-    const tenantIds = [...new Set(refundRows.map((r) => r.tenant_id).filter(Boolean))];
+    const tenantIds = Array.from(new Set(refundRows.map((r) => r.tenant_id).filter(Boolean)));
     if (tenantIds.length > 0) {
       const { data: tRows } = await admin
         .from("tenants")
         .select("id, slug, user_id, site_status")
         .in("id", tenantIds);
       const tList = (tRows || []) as any[];
-      const userIds = [...new Set(tList.map((t) => t.user_id).filter(Boolean))];
+      const userIds = Array.from(new Set(tList.map((t) => t.user_id).filter(Boolean)));
       const emailByUser: Record<string, string> = {};
       if (userIds.length > 0) {
         const { data: pRows } = await admin.from("profiles").select("user_id, email").in("user_id", userIds);
