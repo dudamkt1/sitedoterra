@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { approveMaturedConversions } from "@/lib/affiliate";
 import { AdminAffiliateDashboard } from "@/components/affiliate/AdminAffiliateDashboard";
 
 export const dynamic = "force-dynamic";
@@ -47,6 +48,11 @@ interface PayoutRow {
 }
 
 export default async function AdminAfiliadosPage() {
+  // Aprovação automática global antes de listar (7 dias sem reembolso).
+  try {
+    await approveMaturedConversions();
+  } catch {}
+
   const admin = createAdminClient();
 
   // 1) Configurações globais (via RPC — funciona)

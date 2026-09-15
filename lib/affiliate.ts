@@ -274,8 +274,81 @@ export async function getPendingConversions(limit = 50, offset = 0) {
   return data;
 }
 
-/** Admin: aprova/estorna conversão */
-export async function updateConversionStatus(conversionId: string, status: "aprovado" | "estornado") {
+/**
+ * Janela de garantia das indicações (dias): a comissão fica "pendente"
+ * enquanto o comprador pode pedir reembolso da ativação (garantia de 7 dias).
+ * Passado o prazo sem reembolso, vai sozinha para "aprovado" (Saldo Disponível).
+ */
+export const AFFILIATE_APPROVAL_DAYS = 7;
+
+/**
+ * Aprovação AUTOMÁTICA de conversões maduras (lazy, sem cron).
+ *
+ * - Conversões "pendente" com mais de AFFILIATE_APPROVAL_DAYS dias:
+ *   - comprador reembolsado (último pagamento de ativação/mensalidade =
+ *     `refunded`) → `estornado` (nunca vira saldo);
+ *   - senão → `aprovado` (entra no Saldo Disponível).
+ * - Idempotente: só toca `pendente`; pode rodar em todo carregamento do
+ *   painel do afiliado e do /admin/afiliados. O admin continua podendo
+ *   alterar manualmente a qualquer momento.
+ */
+export async function approveMaturedConversions(
+  affiliateUserId?: string
+): Promise<{ approved: number; reversed: number }> {
+  const admin = createAdminClient();
+  const cutoff = new Date(Date.now() - AFFILIATE_APPROVAL_DAYS * 86_400_000).toISOString();
+
+  let query = admin
+    .from("affiliate_conversions")
+    .select("id, affiliate_user_id, new_customer_user_id")
+    .eq("status", "pendente")
+    .lte("created_at", cutoff)
+    .limit(200);
+  if (affiliateUserId) query = query.eq("affiliate_user_id", affiliateUserId);
+
+  const { data, error } = await query;
+  if (error || !data || data.length === 0) return { approved: 0, reversed: 0 };
+
+  let approved = 0;
+  let reversed = 0;
+  for (const c of data as { id: string; affiliate_user_id: string; new_customer_user_id: string }[]) {
+    try {
+      let refunded = false;
+      const { data: tenant } = await admin
+        .from("tenants")
+        .select("id")
+        .eq("user_id", c.new_customer_user_id)
+        .maybeSingle();
+      if (tenant) {
+        const { data: pay } = await admin
+          .from("payments")
+          .select("status")
+          .eq("tenant_id", (tenant as { id: string }).id)
+          .in("type", ["activation", "subscription"])
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        refunded = (pay as { status?: string } | null)?.status === "refunded";
+      }
+      const next = refunded ? "estornado" : "aprovado";
+      const { error: upErr } = await admin
+        .from("affiliate_conversions")
+        .update({ status: next })
+        .eq("id", c.id)
+        .eq("status", "pendente");
+      if (!upErr) {
+        if (refunded) reversed += 1;
+        else approved += 1;
+      }
+    } catch (e) {
+      console.error("[affiliate] falha na aprovação automática", c.id, e);
+    }
+  }
+  return { approved, reversed };
+}
+
+/** Admin: altera manualmente o status da conversão (pendente/aprovado/estornado) */
+export async function updateConversionStatus(conversionId: string, status: "pendente" | "aprovado" | "estornado") {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("affiliate_conversions")

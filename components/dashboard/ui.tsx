@@ -141,6 +141,13 @@ export function StatusBadge({ status }: { status: string }) {
     refunded: { label: "Reembolsado", cls: "badge-gray" },
     pending_activation: { label: "Aguardando ativação", cls: "badge-yellow" },
     paused: { label: "Pausada", cls: "badge-gray" },
+    pendente: { label: "Pendente", cls: "badge-yellow" },
+    aprovado: { label: "Aprovado", cls: "badge-green" },
+    estornado: { label: "Estornado", cls: "badge-gray" },
+    pago: { label: "Pago", cls: "badge-green" },
+    solicitado: { label: "Solicitado", cls: "badge-yellow" },
+    em_analise: { label: "Em análise", cls: "badge-blue" },
+    rejeitado: { label: "Rejeitado", cls: "badge-red" },
   };
   const s = map[status] || { label: status, cls: "badge-gray" };
   return <span className={`badge ${s.cls}`}>{s.label}</span>;

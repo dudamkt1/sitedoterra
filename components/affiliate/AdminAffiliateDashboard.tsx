@@ -90,6 +90,11 @@ export function AdminAffiliateDashboard({ settings, affiliates, conversions, pay
   const [payoutAction, setPayoutAction] = useState<"approve" | "reject" | "pay" | null>(null);
   const [payoutNote, setPayoutNote] = useState("");
 
+  // Conversões: ação manual de status (com confirmação inline)
+  const [actingConversion, setActingConversion] = useState<string | null>(null);
+  const [confirmConversion, setConfirmConversion] = useState<{ id: string; to: "pendente" | "aprovado" | "estornado" } | null>(null);
+  const [convMsg, setConvMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
   // Filtros e paginação da seção "Afiliados Ativos"
   const [affiliateSearch, setAffiliateSearch] = useState("");
   const [affiliatePage, setAffiliatePage] = useState(1);
@@ -143,6 +148,30 @@ export function AdminAffiliateDashboard({ settings, affiliates, conversions, pay
     setSelectedPayout(payout);
     setPayoutAction(action);
     setPayoutNote("");
+  }
+
+  async function confirmConversionStatus() {
+    if (!confirmConversion) return;
+    setActingConversion(confirmConversion.id);
+    setConvMsg(null);
+    try {
+      const res = await fetch(`/api/admin/affiliate/conversion/${confirmConversion.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: confirmConversion.to }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setConfirmConversion(null);
+        window.location.reload();
+      } else {
+        setConvMsg({ ok: false, text: data.error || "Erro ao alterar status." });
+      }
+    } catch {
+      setConvMsg({ ok: false, text: "Erro ao alterar status." });
+    } finally {
+      setActingConversion(null);
+    }
   }
 
   async function confirmPayoutAction() {
@@ -389,6 +418,18 @@ export function AdminAffiliateDashboard({ settings, affiliates, conversions, pay
             <option value="estornado">Estornados</option>
           </Select>
         </div>
+        {pendingConversions > 0 && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 mb-4">
+            🔔 <strong>{pendingConversions} nova(s) compra(s) de indicados</strong> aguardando.
+            Aprove ou estorne abaixo — ou aguarde: passados <strong>7 dias sem reembolso</strong>,
+            aprovam sozinhas e entram no Saldo Disponível do afiliado.
+          </div>
+        )}
+        {convMsg && (
+          <p className={`rounded-lg px-4 py-3 text-sm mb-4 ${convMsg.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"}`}>
+            {convMsg.text}
+          </p>
+        )}
         {filteredConversions.length === 0 ? (
           <p className="text-gray-400 text-center py-8">Nenhuma conversão.</p>
         ) : (
@@ -403,6 +444,7 @@ export function AdminAffiliateDashboard({ settings, affiliates, conversions, pay
                   <th className="pb-2">% Comissão</th>
                   <th className="pb-2">Comissão</th>
                   <th className="pb-2">Status</th>
+                  <th className="pb-2">Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -415,6 +457,42 @@ export function AdminAffiliateDashboard({ settings, affiliates, conversions, pay
                     <td className="py-3 text-gray-600">{c.commission_percent_at_time}%</td>
                     <td className="py-3 font-medium text-[#1d5c3a]">{formatBRL(c.commission_amount * 100)}</td>
                     <td className="py-3"><StatusBadge status={c.status} /></td>
+                    <td className="py-3">
+                      {confirmConversion?.id === c.id ? (
+                        <div className="flex gap-1.5 items-center flex-wrap">
+                          <span className="text-xs text-gray-600">
+                            Mudar para <strong>{confirmConversion.to}</strong>?
+                          </span>
+                          <Button size="sm" onClick={confirmConversionStatus} disabled={actingConversion === c.id}>
+                            {actingConversion === c.id ? "..." : "Confirmar"}
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => setConfirmConversion(null)} disabled={actingConversion === c.id}>
+                            Voltar
+                          </Button>
+                        </div>
+                      ) : c.status === "pendente" ? (
+                        <div className="flex gap-1.5 flex-wrap">
+                          <Button size="sm" variant="outline" onClick={() => setConfirmConversion({ id: c.id, to: "aprovado" })} disabled={actingConversion !== null}>
+                            ✓ Aprovar
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => setConfirmConversion({ id: c.id, to: "estornado" })} disabled={actingConversion !== null}>
+                            ✗ Estornar
+                          </Button>
+                        </div>
+                      ) : (c.status === "aprovado" || c.status === "estornado") ? (
+                        <button
+                          type="button"
+                          className="text-xs text-gray-500 underline"
+                          onClick={() => setConfirmConversion({ id: c.id, to: "pendente" })}
+                          disabled={actingConversion !== null}
+                          title="Voltar para pendente"
+                        >
+                          ↩ pendente
+                        </button>
+                      ) : (
+                        <span className="text-xs text-gray-400">—</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

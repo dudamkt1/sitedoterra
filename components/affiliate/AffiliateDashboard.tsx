@@ -589,7 +589,7 @@ export function AffiliateDashboard({ userId, userEmail, userName, tenantSlug, is
           <StatCard label="Cliques no link" value={summary.total_clicks} icon="🔗" />
           <StatCard label="Conversões" value={summary.total_conversions} icon="✅" />
           <StatCard label="Saldo disponível" value={formatBRL(summary.available_balance * 100)} icon="💰" sub="Saque via Pix ou crédito" />
-          <StatCard label="Saldo pendente" value={formatBRL(summary.pending_balance * 100)} icon="⏳" sub="Aguardando aprovação" />
+          <StatCard label="Saldo pendente" value={formatBRL(summary.pending_balance * 100)} icon="⏳" sub="Disponível após 7 dias" />
         </div>
       )}
 
@@ -788,6 +788,14 @@ export function AffiliateDashboard({ userId, userEmail, userName, tenantSlug, is
           <div className="flex items-center justify-between mb-4">
             <h2 className="card-title">Conversões Recentes</h2>
           </div>
+          {conversions.some((c) => c.status === "pendente") && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 mb-4">
+              ⏳ <strong>Saldo pendente:</strong> sua indicação já pagou! Por segurança, o valor fica pendente
+              durante os <strong>7 dias de garantia</strong>. Passado esse prazo, vai <strong>sozinho para o
+              Saldo Disponível</strong> — sem você precisar fazer nada. Se o comprador pedir reembolso,
+              a comissão é estornada.
+            </div>
+          )}
           {conversions.length === 0 ? (
             <p className="text-gray-400 text-center py-8">Nenhuma conversão registrada ainda.</p>
           ) : (
@@ -927,7 +935,7 @@ export function AffiliateDashboard({ userId, userEmail, userName, tenantSlug, is
               </div>
               <div className="rounded-lg bg-gray-50 border border-gray-100 p-3">
                 <p className="font-semibold text-gray-800">⏳ Aprovação</p>
-                <p className="mt-1">Conversões permanecem <strong>pendentes por 30 dias</strong> antes da aprovação automática.</p>
+                <p className="mt-1">Conversões ficam <strong>pendentes por 7 dias</strong> (garantia do comprador) e depois vão <strong>sozinhas para o Saldo Disponível</strong>. Em caso de reembolso, a comissão é estornada.</p>
               </div>
               <div className="rounded-lg bg-green-50 border border-green-200 p-3">
                 <p className="font-semibold text-gray-800">🛡️ Proteção do seu histórico</p>

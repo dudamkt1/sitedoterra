@@ -1,10 +1,16 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/auth";
+import { approveMaturedConversions } from "@/lib/affiliate";
 
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+
+  // Aprovação automática antes de listar (lista já vem atualizada).
+  try {
+    await approveMaturedConversions(user.id);
+  } catch {}
 
   const admin = createAdminClient();
   const { data, error } = await admin
