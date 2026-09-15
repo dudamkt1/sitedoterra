@@ -44,14 +44,40 @@ export default async function AssinaturaPage(p: { demoCtx?: DashboardContext }) 
 
   if (tenantId && !p.demoCtx) {
     const admin = createAdminClient();
-    const [hist, pays, act] = await Promise.all([
+    const [hist, pays, act, lastPay] = await Promise.all([
       admin.from("billing_history").select("*").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(20),
       admin.from("payments").select("*").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(20),
       admin.from("payments").select("*").eq("tenant_id", tenantId).eq("type", "activation").eq("status", "succeeded").order("created_at", { ascending: false }).limit(1).maybeSingle(),
+      admin.from("payments").select("status").eq("tenant_id", tenantId).in("type", ["activation", "subscription"]).order("created_at", { ascending: false }).limit(1).maybeSingle(),
     ]);
     billingHistory = (hist.data as any[]) || [];
     payments = (pays.data as any[]) || [];
     activation = act.data as any;
+
+    // Cura: ativação PAGA como última atualização mas assinatura ausente/
+    // cancelada (ex.: falha antiga) → recria assinatura ativa em trial e
+    // religa o site, para o STATUS exibir ATIVO em vez de "Cancelada".
+    const lastSucceeded = (lastPay.data as { status?: string } | null)?.status === "succeeded";
+    const subStatus = (ctx.subscription as { status?: string } | null)?.status;
+    const siteActiveNow = ctx.tenant?.site_status === "active";
+    if (lastSucceeded && (!ctx.subscription || (subStatus !== "active" && subStatus !== "trialing") || !siteActiveNow)) {
+      try {
+        const { ensureTenantActivated } = await import("@/lib/mp-payment-processor");
+        const healed = await ensureTenantActivated(tenantId);
+        if (healed) {
+          const [tFresh, sFresh] = await Promise.all([
+            admin.from("tenants").select("site_status").eq("id", tenantId).maybeSingle(),
+            admin.from("subscriptions").select("*, plan:plan_id(*)").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+          ]);
+          if ((tFresh.data as { site_status?: string } | null)?.site_status === "active" && ctx.tenant) {
+            ctx.tenant.site_status = "active";
+          }
+          if (sFresh.data) {
+            (ctx as { subscription?: unknown }).subscription = sFresh.data;
+          }
+        }
+      } catch {}
+    }
   }
 
   const offer = await getActiveOffer();

@@ -116,8 +116,12 @@ export function addMonths(date: Date, months: number): Date {
 
 /**
  * Ativa tenant + perfil: marca conta ativa e site ativo.
- * Ativa com assinatura "active" OU trial válido (trialing com trial_end futuro)
- * — pagamento confirmado (incluindo trial do gateway) sempre liga o site.
+ * REGRA DE OURO: pagamento de ativação PAGO (payments.status = succeeded,
+ * sem reembolso posterior) SEMPRE liga o site — nunca deixa "desativado"
+ * após ativação paga, nem ao trocar o nome de usuário.
+ * Ativa com assinatura "active" OU trial válido (trialing com trial_end futuro).
+ * Se não houver assinatura ativa mas existir ativação PAGA, a assinatura é
+ * curada (criada a partir da oferta vigente, trial de 3 meses) antes de ligar.
  * Fonte compartilhada entre ativação do admin e webhooks de Stripe/MP.
  * Bloqueio do super admin nunca é revertido aqui (só unblock manual reabre).
  */
@@ -132,7 +136,62 @@ export async function activateTenant(tenantId: string, userId?: string) {
     .maybeSingle();
 
   if (effectiveSubscriptionStatus(sub as { status: Subscription["status"]; trial_end: string | null } | null) !== "active") {
-    return;
+    // Cura: ativação PAGA como fonte de verdade — cria assinatura ativa
+    // (trial vigente) em vez de abortar e deixar o site desativado.
+    try {
+      const { data: lastPay } = await admin
+        .from("payments")
+        .select("status, type, created_at")
+        .eq("tenant_id", tenantId)
+        .in("type", ["activation", "subscription"])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const row = lastPay as { status?: string } | null;
+      if (row?.status === "succeeded") {
+        const plan = await getActiveOffer();
+        if (plan) {
+          const trialMonths = Math.max(1, plan.trial_months || 3);
+          const trialEnd = addMonths(new Date(), trialMonths);
+          const { data: stillActive } = await admin
+            .from("subscriptions")
+            .select("id")
+            .eq("tenant_id", tenantId)
+            .in("status", ["active", "trialing"])
+            .limit(1)
+            .maybeSingle();
+          if (!stillActive) {
+            await admin.from("subscriptions").insert({
+              tenant_id: tenantId,
+              plan_id: plan.id,
+              gateway: "mercadopago",
+              status: "active",
+              current_period_start: new Date().toISOString(),
+              current_period_end: trialEnd.toISOString(),
+              next_billing_at: trialEnd.toISOString(),
+              trial_end: trialEnd.toISOString(),
+              activated_at: new Date().toISOString(),
+              snapshot: {
+                gateway: "mercadopago",
+                plan_id: plan.id,
+                currency: "brl",
+                activation_amount_cents: plan.activation_price_cents,
+                monthly_amount_cents: plan.monthly_price_cents,
+                trial_months: trialMonths,
+                trial_period_days: trialMonths * 30,
+                healed_by_activate: true,
+              },
+            });
+          }
+        } else {
+          return;
+        }
+      } else {
+        return;
+      }
+    } catch {
+      return;
+    }
   }
 
   // Conta bloqueada pelo super admin: pagamento não reabre sozinho.

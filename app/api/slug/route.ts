@@ -48,20 +48,47 @@ export async function POST(request: Request) {
     .maybeSingle();
   const billingEnabled = tenantRow?.monthly_billing_enabled !== false;
 
-  // Só libera o site quando houver assinatura ativa (ou estiver isento).
-  // Trial válido conta como ativo — nunca rebaixa um site que o admin ativou.
-  const { data: sub } = await admin
-    .from("subscriptions")
-    .select("status, trial_end")
-    .eq("tenant_id", tenant.id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  // REGRA DE OURO: trocar o nome de usuário NUNCA desativa um site com
+  // ativação PAGA. A última atualização financeira manda: se for `succeeded`,
+  // o site permanece/volta a `active` (espelho do domínio principal com a
+  // URL própria) e a assinatura é curada quando necessário.
+  const [{ data: sub }, { data: lastPay }, { data: currentTenant }] = await Promise.all([
+    admin
+      .from("subscriptions")
+      .select("status, trial_end")
+      .eq("tenant_id", tenant.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    admin
+      .from("payments")
+      .select("status, type")
+      .eq("tenant_id", tenant.id)
+      .in("type", ["activation", "subscription"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    admin.from("tenants").select("site_status").eq("id", tenant.id).maybeSingle(),
+  ]);
 
   const subActive = effectiveSubscriptionStatus(
     sub as { status: SubscriptionStatus; trial_end: string | null } | null
   ) === "active";
-  const siteStatus = billingEnabled && !subActive ? "pending" : "active";
+  const lastSucceeded = (lastPay as { status?: string } | null)?.status === "succeeded";
+  const wasActive = (currentTenant as { site_status?: string } | null)?.site_status === "active";
+
+  // Pagamento PAGO ou site já ativo: mantém ativo (nunca rebaixa para pending).
+  // Só vai para pending quando NUNCA houve pagamento e não há assinatura ativa.
+  const siteStatus = !billingEnabled || subActive || lastSucceeded || wasActive ? "active" : "pending";
+
+  // Cura a assinatura quando há pagamento PAGO mas ela não está ativa
+  // (ex.: linha antiga cancelada) — evita "Cancelada" + site fora do ar.
+  if (lastSucceeded && !subActive) {
+    try {
+      const { ensureTenantActivated } = await import("@/lib/mp-payment-processor");
+      await ensureTenantActivated(tenant.id);
+    } catch {}
+  }
 
   const { error } = await admin
     .from("tenants")

@@ -264,15 +264,40 @@ export function SubscriptionManager({
   }
 
   const cancelScheduled = subscription?.cancel_at_period_end === true;
-  const isActive = subscription?.status === "active" && !cancelScheduled;
-  const isCanceled =
-    subscription?.status === "canceled" ||
-    subscription?.status === "paused" ||
-    cancelScheduled;
   const nextBilling = subscription?.next_billing_at || subscription?.current_period_end;
+  // Trial vigente: ativação PAGA com próxima cobrança no futuro (3 meses
+  // inclusos após a ativação, depois mensal sem fidelidade). Durante o trial
+  // a primeira mensalidade ainda nem chegou — nunca é "cancelada".
+  const trialEndMs = nextBilling ? new Date(nextBilling).getTime() : NaN;
+  const isTrialVigente =
+    activationPaid && Number.isFinite(trialEndMs) && trialEndMs > Date.now();
+  // STATUS exibido: ativação PAGA + site no ar = ATIVO. "Cancelada" aparece
+  // SOMENTE quando o site está fora do ar por cancelamento do usuário
+  // (agendado/finalizado) ou reembolso da garantia de 7 dias — nunca logo
+  // após a ativação.
+  const displaySubscriptionStatus =
+    activationPaid && siteActive && (isTrialVigente || subscription?.status === "trialing")
+      ? "active"
+      : activationPaid && siteActive && (!subscription || subscription?.status === "canceled" || subscription?.status === "paused")
+        ? "active"
+        : subscription?.status || "awaiting_activation";
+  const isActive =
+    (subscription?.status === "active" || subscription?.status === "trialing") && !cancelScheduled
+    || (activationPaid && siteActive && isTrialVigente && !cancelScheduled)
+    || (activationPaid && siteActive && !subscription);
+  const isCanceled =
+    (subscription?.status === "canceled" ||
+      subscription?.status === "paused" ||
+      cancelScheduled) &&
+    // Durante o trial ou com o site no ar, nunca oferece "Reativar":
+    // a assinatura está válida até a primeira mensalidade.
+    !siteActive &&
+    !isTrialVigente;
   const statusLabel = cancelScheduled
     ? "Cancelamento agendado para o fim do período"
-    : undefined;
+    : isTrialVigente
+      ? `Período incluso até ${formatDate(nextBilling)} — depois mensal sem fidelidade`
+      : undefined;
 
   return (
     <div className="space-y-6">
@@ -295,6 +320,12 @@ export function SubscriptionManager({
       {/* Ações */}
       <div className="card" id="assinatura-acoes" style={{ scrollMarginTop: 90 }}>
         <h2 className="card-title mb-4">Ações</h2>
+        {isTrialVigente && siteActive && (
+          <div className="mb-4 w-full rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+            ✅ Site ativo — {trialMonths} {trialMonths === 1 ? "mês incluso" : "meses inclusos"} após a ativação.
+            Primeira mensalidade em <strong>{formatDate(nextBilling)}</strong> ({formatBRL(monthlyPriceCents)}/mês, sem fidelidade — cancele quando quiser).
+          </div>
+        )}
         <div className="flex flex-wrap gap-3">
           {isActive && billingEnabled && (
             <>
@@ -541,7 +572,7 @@ export function SubscriptionManager({
           </div>
           <div className="card">
             <p className="text-xs uppercase tracking-wider text-gray-400 font-semibold">Status</p>
-            <div className="mt-2"><StatusBadge status={subscription?.status || "awaiting_activation"} /></div>
+            <div className="mt-2"><StatusBadge status={displaySubscriptionStatus} /></div>
             {statusLabel && <p className="text-xs text-gray-400 mt-2">{statusLabel}</p>}
             {!billingEnabled && (
               <p className="text-xs text-emerald-600 mt-2">Ativo sem mensalidade recorrente.</p>
