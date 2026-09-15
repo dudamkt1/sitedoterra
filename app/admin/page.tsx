@@ -94,14 +94,20 @@ export default async function AdminHome() {
       }
       const tenantById: Record<string, any> = {};
       for (const t of tList) tenantById[t.id] = t;
-      refundDisplay = refundRows.map((r) => ({
-        ...r,
-        slug: tenantById[r.tenant_id]?.slug || "—",
-        site_status: tenantById[r.tenant_id]?.site_status || "—",
-        email: contactByUser[tenantById[r.tenant_id]?.user_id]?.email || "—",
-        name: contactByUser[tenantById[r.tenant_id]?.user_id]?.name || "—",
-        phone: contactByUser[tenantById[r.tenant_id]?.user_id]?.phone || "",
-      }));
+      refundDisplay = refundRows.map((r) => {
+        const meta = (r.metadata || {}) as Record<string, unknown>;
+        const contactWa =
+          typeof meta.refund_contact_whatsapp === "string" ? meta.refund_contact_whatsapp : "";
+        return {
+          ...r,
+          slug: tenantById[r.tenant_id]?.slug || "—",
+          site_status: tenantById[r.tenant_id]?.site_status || "—",
+          email: contactByUser[tenantById[r.tenant_id]?.user_id]?.email || "—",
+          name: contactByUser[tenantById[r.tenant_id]?.user_id]?.name || "—",
+          // WhatsApp informado no pedido tem prioridade sobre o do perfil.
+          phone: contactWa || contactByUser[tenantById[r.tenant_id]?.user_id]?.phone || "",
+        };
+      });
     } else {
       refundDisplay = refundRows;
     }

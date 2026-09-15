@@ -39,6 +39,21 @@ function defaultMessage(name: string, amountCents: number): string {
   );
 }
 
+function defaultEmailSubject(): string {
+  return "Sobre seu pedido de reembolso — TopConsultores";
+}
+
+function defaultEmailBody(name: string, amountCents: number): string {
+  const who = name && name !== "—" ? `Olá ${name}!` : "Olá!";
+  const amount = formatBRL(amountCents);
+  return (
+    `${who}\n\n` +
+    `Aqui é da equipe TopConsultores. Vimos que você solicitou o reembolso da ativação do seu site (${amount}) ` +
+    `e gostaríamos de conversar antes de concluir: tem algo que possamos resolver para você continuar?\n\n` +
+    `Seu site segue no ar e estamos à disposição!`
+  );
+}
+
 export function AdminRefundsPanel({ rows }: { rows: RefundRow[] }) {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
@@ -48,6 +63,10 @@ export function AdminRefundsPanel({ rows }: { rows: RefundRow[] }) {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [waRow, setWaRow] = useState<RefundRow | null>(null);
   const [waText, setWaText] = useState("");
+  /** E-mail como 2ª opção (quando o usuário não tem WhatsApp). */
+  const [emailRow, setEmailRow] = useState<RefundRow | null>(null);
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -67,6 +86,12 @@ export function AdminRefundsPanel({ rows }: { rows: RefundRow[] }) {
   function openWhatsApp(row: RefundRow) {
     setWaText(defaultMessage(row.name, row.amount_cents));
     setWaRow(row);
+  }
+
+  function openEmail(row: RefundRow) {
+    setEmailSubject(defaultEmailSubject());
+    setEmailBody(defaultEmailBody(row.name, row.amount_cents));
+    setEmailRow(row);
   }
 
   async function authorize(paymentId: string) {
@@ -213,7 +238,9 @@ export function AdminRefundsPanel({ rows }: { rows: RefundRow[] }) {
                               💬 Enviar mensagem
                             </button>
                           ) : (
-                            <span className="text-xs text-gray-400" title={r.email}>sem WhatsApp</span>
+                            <button type="button" className="btn btn-outline !py-1.5 !px-3 !text-xs" onClick={() => openEmail(r)} title={`Enviar e-mail para ${r.email}`}>
+                              ✉️ Enviar e-mail
+                            </button>
                           )}
                         </div>
                       </td>
@@ -265,6 +292,41 @@ export function AdminRefundsPanel({ rows }: { rows: RefundRow[] }) {
                 💬 Abrir WhatsApp e enviar
               </button>
               <button type="button" className="btn btn-outline" onClick={() => setWaRow(null)}>
+                Fechar
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {emailRow && (
+        <Modal open onClose={() => setEmailRow(null)} title={`Enviar e-mail para ${emailRow.name !== "—" ? emailRow.name : emailRow.email}`}>
+          <div className="space-y-3 text-sm">
+            <p className="text-gray-600">
+              Sem WhatsApp cadastrado — a conversa segue pelo e-mail <strong>{emailRow.email}</strong>. Edite como quiser antes de enviar.
+            </p>
+            <div>
+              <label className="label !mb-1">Assunto</label>
+              <input
+                className="input"
+                value={emailSubject}
+                onChange={(e) => setEmailSubject(e.target.value)}
+              />
+            </div>
+            <textarea
+              className="input min-h-32"
+              value={emailBody}
+              onChange={(e) => setEmailBody(e.target.value)}
+            />
+            <div className="flex flex-col sm:flex-row gap-2">
+              <a
+                className="btn btn-primary flex-1 !py-3 text-center"
+                href={`mailto:${encodeURIComponent(emailRow.email)}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`}
+                onClick={() => setEmailRow(null)}
+              >
+                ✉️ Abrir e-mail e enviar
+              </a>
+              <button type="button" className="btn btn-outline" onClick={() => setEmailRow(null)}>
                 Fechar
               </button>
             </div>

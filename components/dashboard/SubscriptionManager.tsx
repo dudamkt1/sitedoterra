@@ -8,6 +8,55 @@ import { formatBRL, formatDate } from "@/lib/utils";
 /** Versão dos Termos e compromisso exibidos nesta tela. */
 const SITE_TERMS_VERSION = "1.0";
 
+/**
+ * Mesmo evento em `billing_history` + `payments`: mostra APENAS a última
+ * ação (sem "Pago 2x" / "Reembolsado 2x"). Agrupa pela referência do gateway
+ * (`:refund`/`:refund_pending` removidos); sem referência, usa o próprio id.
+ */
+function historyGroupKey(r: any): string {
+  const mp = typeof r.mercadopago_payment_id === "string" && r.mercadopago_payment_id
+    ? r.mercadopago_payment_id.split(":")[0]
+    : null;
+  const ref =
+    mp ||
+    r.mercadopago_preference_id ||
+    r.stripe_invoice_id ||
+    r.stripe_checkout_session_id ||
+    r.stripe_charge_id ||
+    r.stripe_payment_intent_id ||
+    null;
+  if (!ref) return `noref:${r.src || "x"}:${r.id}`;
+  return `${r.type || "x"}::${ref}`;
+}
+
+function dedupeHistoryRows(billingHistory: any[], payments: any[]): any[] {
+  const merged = (billingHistory || []).map((h: any) => ({ ...h, src: "cobranca" })).concat(
+    (payments || []).map((p: any) => ({ ...p, src: "pagamento" }))
+  );
+  const groups: { key: string; row: any }[] = [];
+  for (const r of merged) {
+    const key = historyGroupKey(r);
+    let g: { key: string; row: any } | null = null;
+    for (const c of groups) if (c.key === key) { g = c; break; }
+    if (!g) {
+      groups.push({ key, row: r });
+      continue;
+    }
+    const t = new Date(r.created_at).getTime();
+    const ct = new Date(g.row.created_at).getTime();
+    if (
+      Number.isFinite(t) && Number.isFinite(ct)
+        ? t > ct || (t === ct && r.src === "pagamento" && g.row.src !== "pagamento")
+        : r.src === "pagamento"
+    ) {
+      g.row = r;
+    }
+  }
+  return groups
+    .map((g) => g.row)
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+}
+
 interface SubManagerProps {
   subscription: any;
   plans: any[];
@@ -83,6 +132,10 @@ export function SubscriptionManager({
   /** Garantia de 7 dias: confirmação do cancelamento + estado do pedido. */
   const [confirmGuarantee, setConfirmGuarantee] = useState(false);
   const [guaranteeLoading, setGuaranteeLoading] = useState(false);
+  /** WhatsApp com DDD informado no pedido (opcional — admin usa p/ conversar). */
+  const [guaranteeWhatsapp, setGuaranteeWhatsapp] = useState("");
+  /** Reversão do pedido pelo próprio usuário (antes da devolução). */
+  const [revertLoading, setRevertLoading] = useState(false);
   /** Abertura do painel de demonstração ("Ainda tem dúvidas?"). */
   const [demoLoading, setDemoLoading] = useState(false);
 
@@ -236,7 +289,17 @@ export function SubscriptionManager({
     setGuaranteeLoading(true);
     setMsg(null);
     try {
-      const res = await fetch("/api/guarantee-cancel", { method: "POST" });
+      const digits = guaranteeWhatsapp.replace(/\D/g, "");
+      if (digits && (digits.length < 10 || digits.length > 13)) {
+        setMsg({ ok: false, text: "WhatsApp inválido — digite com DDD (ex.: 11999999999) ou deixe em branco." });
+        setGuaranteeLoading(false);
+        return;
+      }
+      const res = await fetch("/api/guarantee-cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ whatsapp: digits || null }),
+      });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setMsg({ ok: false, text: data.error || "Não foi possível solicitar o cancelamento." });
@@ -249,6 +312,26 @@ export function SubscriptionManager({
       setMsg({ ok: false, text: "Não foi possível solicitar agora. Tente novamente." });
     } finally {
       setGuaranteeLoading(false);
+    }
+  }
+
+  /** Usuário desiste do reembolso antes da devolução: mantém site ativo. */
+  async function revertRefundRequest() {
+    setRevertLoading(true);
+    setMsg(null);
+    try {
+      const res = await fetch("/api/guarantee-cancel/revert", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMsg({ ok: false, text: data.error || "Não foi possível reverter agora." });
+      } else {
+        setMsg({ ok: true, text: data.message || "Pedido de reembolso cancelado — seu site segue ativo." });
+        setTimeout(() => window.location.reload(), 2500);
+      }
+    } catch {
+      setMsg({ ok: false, text: "Não foi possível reverter agora. Tente novamente." });
+    } finally {
+      setRevertLoading(false);
     }
   }
 
@@ -350,9 +433,19 @@ export function SubscriptionManager({
         <h2 className="card-title mb-4">Ações</h2>
         {isRefundPending && (
           <div className="mb-4 w-full rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            ⏳ <strong>Aguardando reembolso</strong> — seu pedido foi registrado e está em análise.
-            Nossa equipe pode entrar em contato pelo WhatsApp antes da devolução. Após aprovado, o Mercado Pago confirma,
-            o status muda para <strong>reembolsado</strong> e o site será desativado (dados preservados).
+            <p>
+              ⏳ <strong>Aguardando reembolso</strong> — seu pedido foi registrado e está em análise.
+              Nossa equipe pode entrar em contato pelo WhatsApp antes da devolução. Após aprovado, o Mercado Pago confirma,
+              o status muda para <strong>reembolsado</strong> e o site será desativado (dados preservados).
+            </p>
+            <button
+              type="button"
+              className="btn btn-outline !py-2 !px-4 text-xs mt-3"
+              onClick={revertRefundRequest}
+              disabled={revertLoading}
+            >
+              {revertLoading ? "Revertendo..." : "↩️ Cancelar reembolso mantendo meu site ativo"}
+            </button>
           </div>
         )}
         {isRefunded && !siteActive && (
@@ -368,8 +461,62 @@ export function SubscriptionManager({
           </div>
         )}
         <div className="flex flex-wrap gap-3">
+          {/* Cancelar ATIVAÇÃO do site (primeiro pagamento — garantia de 7
+              dias corridos após o pgto; some após o prazo). Fica ACIMA do
+              cancelamento da mensalidade. O pedido vai para análise do admin
+              (com seu WhatsApp, se informado) e só então é devolvido. */}
+          {guaranteeActive && (
+            <div className="w-full rounded-xl border border-blue-200 bg-blue-50/60 p-4">
+              <p className="font-semibold text-sm text-blue-900">🛡️ Cancelar ativação do site — garantia de 7 dias corridos (até {formatDate(guaranteeUntil)})</p>
+              <p className="text-xs text-blue-800 mt-1">
+                Não ficou satisfeito? Você pode cancelar a ativação e receber o valor de volta.
+                Nossa equipe recebe o pedido na hora e pode entrar em contato antes da devolução.
+              </p>
+              {!confirmGuarantee ? (
+                <button
+                  type="button"
+                  className="btn btn-outline !py-2 !px-4 text-xs mt-3"
+                  onClick={() => setConfirmGuarantee(true)}
+                  disabled={guaranteeLoading}
+                >
+                  Cancelar meu site
+                </button>
+              ) : (
+                <div className="mt-3 rounded-lg bg-white border border-blue-200 px-3 py-2.5 space-y-2.5">
+                  <p className="text-xs text-blue-900">Confirmar cancelamento da ativação com devolução do valor pago?</p>
+                  <div>
+                    <label className="label !mb-1">Seu WhatsApp com DDD (opcional)</label>
+                    <input
+                      type="tel"
+                      inputMode="numeric"
+                      className="input !py-2 text-sm"
+                      value={guaranteeWhatsapp}
+                      placeholder="ex.: 11999999999"
+                      onChange={(e) => setGuaranteeWhatsapp(e.target.value.replace(/\D/g, "").slice(0, 13))}
+                      disabled={guaranteeLoading}
+                    />
+                    <p className="text-[11px] text-blue-800/70 mt-1">
+                      Para conversarmos antes da devolução. Sem WhatsApp, falamos pelo seu e-mail.
+                    </p>
+                  </div>
+                  <div className="flex gap-2 shrink-0 flex-wrap">
+                    <button type="button" className="btn btn-danger !py-1.5 !px-4 text-xs" onClick={guaranteeCancel} disabled={guaranteeLoading}>
+                      {guaranteeLoading ? "Solicitando..." : "Sim, cancelar e devolver"}
+                    </button>
+                    <button type="button" className="btn btn-outline !py-1.5 !px-4 text-xs" onClick={() => setConfirmGuarantee(false)} disabled={guaranteeLoading}>
+                      Voltar
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {isActive && billingEnabled && (
             <>
+              <p className="w-full text-xs uppercase tracking-wider text-gray-400 font-semibold mt-1">
+                Mensalidade
+              </p>
               {(subscription?.gateway ?? activeGateway) === "stripe" && (
                 <button className="btn btn-outline" onClick={openBillingPortal} disabled={loading}>
                   💳 Atualizar forma de pagamento
@@ -405,42 +552,6 @@ export function SubscriptionManager({
             >
               ⚡ Ativar meu site novamente
             </button>
-          )}
-
-          {/* Garantia de 7 dias: visível SOMENTE dentro da janela. Ao
-              confirmar, o backend devolve o valor no Mercado Pago, o admin é
-              avisado e o sistema atualiza tudo sozinho (pagamento →
-              devolvido, site desativado, histórico mantido). Afiliados não
-              são alterados. */}
-          {guaranteeActive && (
-            <div className="w-full rounded-xl border border-blue-200 bg-blue-50/60 p-4">
-              <p className="font-semibold text-sm text-blue-900">🛡️ Garantia de 7 dias — até {formatDate(guaranteeUntil)}</p>
-              <p className="text-xs text-blue-800 mt-1">
-                Não ficou satisfeito? Você pode cancelar e receber o valor da ativação de volta. O Super Admin é avisado na hora e a devolução é feita automaticamente.
-              </p>
-              {!confirmGuarantee ? (
-                <button
-                  type="button"
-                  className="btn btn-outline !py-2 !px-4 text-xs mt-3"
-                  onClick={() => setConfirmGuarantee(true)}
-                  disabled={guaranteeLoading}
-                >
-                  Quero Cancelar
-                </button>
-              ) : (
-                <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-2 rounded-lg bg-white border border-blue-200 px-3 py-2.5">
-                  <span className="text-xs text-blue-900 flex-1">Confirmar cancelamento com devolução do valor pago?</span>
-                  <div className="flex gap-2 shrink-0">
-                    <button type="button" className="btn btn-danger !py-1.5 !px-4 text-xs" onClick={guaranteeCancel} disabled={guaranteeLoading}>
-                      {guaranteeLoading ? "Solicitando..." : "Sim, cancelar e devolver"}
-                    </button>
-                    <button type="button" className="btn btn-outline !py-1.5 !px-4 text-xs" onClick={() => setConfirmGuarantee(false)} disabled={guaranteeLoading}>
-                      Voltar
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
           )}
 
           {!subscription && billingEnabled && (
@@ -661,7 +772,7 @@ export function SubscriptionManager({
         </div>
       </div>
 
-      {/* Histórico de pagamentos */}
+      {/* Histórico de pagamentos (sem repetir: por pagamento, só a última ação) */}
       <div className="card">
         <h2 className="card-title mb-4">Histórico de pagamentos</h2>
         {billingHistory.length === 0 && payments.length === 0 ? (
@@ -678,23 +789,12 @@ export function SubscriptionManager({
                 </tr>
               </thead>
               <tbody>
-                {billingHistory.map((h) => (
-                  <tr key={h.id}>
-                    <td>{formatDate(h.created_at)}</td>
-                    <td>{h.type === "activation" ? "Ativação" : "Mensalidade"}</td>
-                    <td>{formatBRL(h.amount_cents)}</td>
-                    <td><StatusBadge status={h.status} /></td>
-                  </tr>
-                ))}
-                {payments.filter((p) => !billingHistory.some((b) =>
-                  (b.stripe_charge_id && b.stripe_charge_id === p.stripe_payment_intent_id) ||
-                  (b.mercadopago_payment_id && b.mercadopago_payment_id === p.mercadopago_payment_id)
-                )).map((p) => (
-                  <tr key={p.id}>
-                    <td>{formatDate(p.created_at)}</td>
-                    <td>{p.type === "activation" ? "Ativação" : p.type === "subscription" ? "Mensalidade" : p.type}</td>
-                    <td>{formatBRL(p.amount_cents)}</td>
-                    <td><StatusBadge status={p.status} /></td>
+                {dedupeHistoryRows(billingHistory, payments).map((r: any) => (
+                  <tr key={`${r.src}:${r.id}`}>
+                    <td>{formatDate(r.created_at)}</td>
+                    <td>{r.type === "activation" ? "Ativação" : r.type === "subscription" ? "Mensalidade" : r.type}</td>
+                    <td>{formatBRL(r.amount_cents)}</td>
+                    <td><StatusBadge status={r.status} /></td>
                   </tr>
                 ))}
               </tbody>

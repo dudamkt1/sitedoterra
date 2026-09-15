@@ -26,7 +26,7 @@ const GUARANTEE_DAYS = 7;
  *
  * Nada de afiliados é alterado: o programa permanece ativo para o usuário.
  */
-export async function POST() {
+export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
@@ -36,6 +36,18 @@ export async function POST() {
   if (!tenant) {
     return NextResponse.json({ error: "Tenant não encontrado" }, { status: 400 });
   }
+
+  // WhatsApp com DDD informado no pedido (opcional — admin usa p/ conversar;
+  // sem ele, o contato é feito pelo e-mail).
+  let contactWhatsapp = "";
+  try {
+    const body = await request.json().catch(() => ({}));
+    const raw = typeof body?.whatsapp === "string" ? body.whatsapp.replace(/\D/g, "") : "";
+    if (raw) {
+      contactWhatsapp = raw.length === 10 || raw.length === 11 ? `55${raw}` : raw;
+      if (contactWhatsapp.length < 10 || contactWhatsapp.length > 13) contactWhatsapp = "";
+    }
+  } catch {}
 
   const admin = createAdminClient();
 
@@ -119,35 +131,37 @@ export async function POST() {
   // depois que o admin autorizar (para conversar com o usuário antes).
   const requestedAt = new Date().toISOString();
   const refundStatus = "awaiting_admin";
+  const pendingMeta = {
+    ...(pay.metadata || {}),
+    refund_requested_at: requestedAt,
+    refund_requested_by: user.id,
+    refund_status: refundStatus,
+    ...(contactWhatsapp ? { refund_contact_whatsapp: contactWhatsapp } : {}),
+  };
   try {
     await admin
       .from("payments")
-      .update({
-        status: "refund_pending",
-        metadata: {
-          ...(pay.metadata || {}),
-          refund_requested_at: requestedAt,
-          refund_requested_by: user.id,
-          refund_status: refundStatus,
-        },
-      })
+      .update({ status: "refund_pending", metadata: pendingMeta })
       .eq("id", pay.id);
   } catch (e) {
     // Enum ainda sem o novo valor (migration pendente): registra via metadata
     // para não perder o pedido — o restante do fluxo lê os dois formatos.
     console.error("[guarantee-cancel] fallback sem enum refund_pending", e);
     try {
-      await admin
-        .from("payments")
-        .update({
-          metadata: {
-            ...(pay.metadata || {}),
-            refund_requested_at: requestedAt,
-            refund_requested_by: user.id,
-            refund_status: refundStatus,
-          },
-        })
-        .eq("id", pay.id);
+      await admin.from("payments").update({ metadata: pendingMeta }).eq("id", pay.id);
+    } catch {}
+  }
+  // Guarda o WhatsApp no perfil (se ainda não houver) para o admin conversar.
+  if (contactWhatsapp) {
+    try {
+      const { data: prof } = await admin
+        .from("profiles")
+        .select("phone")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (!(prof as { phone?: string } | null)?.phone) {
+        await admin.from("profiles").update({ phone: contactWhatsapp }).eq("user_id", user.id);
+      }
     } catch {}
   }
   try {
@@ -183,6 +197,7 @@ export async function POST() {
         mp_payment_id: pay.mercadopago_payment_id,
         amount_cents: pay.amount_cents,
         refund_status: refundStatus,
+        ...(contactWhatsapp ? { refund_contact_whatsapp: contactWhatsapp } : {}),
       },
     });
   } catch {}
@@ -204,6 +219,9 @@ export async function POST() {
           `<li>Pagamento MP: <strong>${pay.mercadopago_payment_id}</strong></li>`,
           `<li>Tenant: <strong>${tenant.id}</strong></li>`,
           `<li>Status: <strong>aguardando sua autorização</strong> (nada foi devolvido ainda)</li>`,
+          contactWhatsapp
+            ? `<li>WhatsApp do usuário: <strong>${contactWhatsapp}</strong></li>`
+            : `<li>WhatsApp: <strong>não informado — usar o e-mail (${user.email})</strong></li>`,
           `</ul>`,
           `<p>Veja em <strong>/admin (Visão geral → Pedidos de Reembolso)</strong>: converse com o usuário pelo WhatsApp e, se mantido o pedido, clique em <strong>Autorizar reembolso</strong>. Só então o Mercado Pago devolve o valor — quando confirmado, o pagamento vai para reembolsado e o site é desativado automaticamente, mantendo o histórico.</p>`,
         ].join(""),

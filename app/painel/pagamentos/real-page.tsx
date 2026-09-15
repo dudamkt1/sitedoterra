@@ -16,6 +16,64 @@ function paymentRef(r: any): string {
   );
 }
 
+/**
+ * Chave de agrupamento de um lançamento: o mesmo evento é registrado em
+ * `payments` e em `billing_history` (ex.: Pago aparece nas duas tabelas, e o
+ * reembolso gera `${mpId}:refund`). O sufixo `:refund`/`:refund_pending` é
+ * removido para que o grupo represente UM pagamento.
+ * Lançamentos sem referência do gateway (ex.: crédito de afiliado) usam o
+ * próprio id — nunca são agrupados entre si.
+ */
+function groupKey(r: any): string {
+  const mp = typeof r.mercadopago_payment_id === "string" && r.mercadopago_payment_id
+    ? r.mercadopago_payment_id.split(":")[0]
+    : null;
+  const ref =
+    mp ||
+    r.mercadopago_preference_id ||
+    r.stripe_invoice_id ||
+    r.stripe_checkout_session_id ||
+    r.stripe_charge_id ||
+    r.stripe_payment_intent_id ||
+    null;
+  if (!ref) return `noref:${r.source || "x"}:${r.id}`;
+  return `${r.type || "x"}::${ref}`;
+}
+
+/**
+ * Remove duplicidades entre `payments` e `billing_history`: por pagamento
+ * (referência do gateway) mostra APENAS a última ação — sem repetir o mesmo
+ * status (ex.: Pago 2x, Reembolsado 2x). Em empate de data, prefere a linha
+ * de `payments` (fonte com metadata completa).
+ */
+function dedupeRows(rows: any[]): any[] {
+  const groups: { key: string; row: any }[] = [];
+  const find = (key: string) => {
+    for (const g of groups) if (g.key === key) return g;
+    return null;
+  };
+  for (const r of rows) {
+    const key = groupKey(r);
+    const g = find(key);
+    if (!g) {
+      groups.push({ key, row: r });
+      continue;
+    }
+    const t = new Date(r.created_at).getTime();
+    const ct = new Date(g.row.created_at).getTime();
+    if (
+      Number.isFinite(t) && Number.isFinite(ct)
+        ? t > ct || (t === ct && r.source === "pagamento" && g.row.source !== "pagamento")
+        : r.source === "pagamento"
+    ) {
+      g.row = r;
+    }
+  }
+  return groups
+    .map((g) => g.row)
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+}
+
 export const dynamic = "force-dynamic";
 
 const DEMO_ROWS = [
@@ -54,16 +112,19 @@ export default async function PagamentosPage(p: { demoCtx?: DashboardContext }) 
       admin.from("payments").select("*").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(50),
       admin.from("billing_history").select("*").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(50),
     ]);
-    rows = [
+    const merged = [
       ...((history as any[]) || []).map((h) => ({ ...h, source: "cobranca" })),
       ...((payments as any[]) || []).map((x) => ({ ...x, source: "pagamento" })),
-    ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    ];
     // A ativação é única: se já existe ativação paga, pendings de ativação
     // são tentativas antigas órfãs (o webhook atual já reconcilia/cancela as
     // novas) — ocultá-las evita o "pendente" fantasma após o sucesso.
-    if (rows.some((r) => r.type === "activation" && r.status === "succeeded")) {
-      rows = rows.filter((r) => !(r.type === "activation" && r.status === "pending"));
-    }
+    const withoutOrphans =
+      merged.some((r) => r.type === "activation" && (r.status === "succeeded" || r.status === "refund_pending" || r.status === "refunded"))
+        ? merged.filter((r) => !(r.type === "activation" && r.status === "pending"))
+        : merged;
+    // Mesmo evento em `payments` + `billing_history`: mostra só a última ação.
+    rows = dedupeRows(withoutOrphans);
   }
 
   const hasPending = rows.some((r) => r.status === "pending");
