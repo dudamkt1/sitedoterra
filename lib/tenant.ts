@@ -15,6 +15,17 @@ function hasSupabaseEnv(): boolean {
 // Cache 60s para slugs públicos (HOME e checkout batem no mesmo slug repetidamente)
 const tenantBySlugCache = new Map<string, { data: PublicTenant | null; ts: number }>();
 
+/**
+ * Invalida o cache de tenant público (chamar após salvar site_settings,
+ * slug ou seções — senão o site público serve conteúdo velho por até 60s).
+ */
+export function invalidateTenantSlugCache(slug?: string): void {
+  try {
+    if (slug) tenantBySlugCache.delete(slug);
+    else tenantBySlugCache.clear();
+  } catch {}
+}
+
 export async function getPublicTenantBySlug(slug: string): Promise<PublicTenant | null> {
   if (!hasSupabaseEnv()) return null;
   const cached = tenantBySlugCache.get(slug);

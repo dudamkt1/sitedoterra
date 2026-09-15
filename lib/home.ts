@@ -48,6 +48,15 @@ export function deepMerge<T extends Record<string, unknown>>(base: T, ...overrid
 let globalSectionsCache: { data: SiteSection[]; ts: number } | null = null;
 let activeOfferCache: { data: unknown; ts: number } | null = null;
 
+/**
+ * Invalida o cache de seções globais (chamar após salvar site_settings,
+ * tenant_sections ou site_sections — senão o site público serve conteúdo
+ * velho por até 60s).
+ */
+export function invalidateGlobalSectionsCache(): void {
+  globalSectionsCache = null;
+}
+
 export async function getGlobalSections(): Promise<SiteSection[]> {
   if (!hasSupabaseEnv()) return DEFAULT_SECTIONS;
   if (globalSectionsCache && Date.now() - globalSectionsCache.ts < 60_000) return globalSectionsCache.data;

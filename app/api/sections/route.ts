@@ -4,6 +4,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser, getProfile } from "@/lib/auth";
 import { ensureTenantForUser } from "@/lib/onboarding";
 import { invalidateOfficialHomeCache } from "@/lib/site-official";
+import { invalidateTenantSlugCache } from "@/lib/tenant";
+import { invalidateGlobalSectionsCache } from "@/lib/home";
 import { blockIfDemo } from "@/lib/demo/auth";
 import { resolveHomeSections } from "@/lib/home";
 import { normalizeSectionPermissions } from "@/lib/site-sections";
@@ -208,6 +210,8 @@ export async function POST(request: Request) {
 
   // Invalida caches para refletir mudança na Home e na rota do tenant.
   invalidateOfficialHomeCache();
+  invalidateGlobalSectionsCache();
+  invalidateTenantSlugCache(tenant.slug);
   try {
     revalidatePath("/");
     if (tenant.slug) revalidatePath(`/${tenant.slug}`);
