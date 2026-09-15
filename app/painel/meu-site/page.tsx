@@ -89,8 +89,8 @@ export default async function MeuSitePage({ searchParams }: { searchParams?: { a
           </p>
           <p className="text-sm text-amber-800 mt-1.5">
             Pedido de {formatBRL(refundPendingPayment.amount_cents)} em{" "}
-            {formatDateTime(refundPendingPayment.created_at)} registrado. Assim que o
-            Mercado Pago confirmar a devolução, o status muda para reembolsado.
+            {formatDateTime(refundPendingPayment.created_at)} registrado e em análise.
+            Após aprovado, o Mercado Pago confirma a devolução e o status muda para reembolsado.
           </p>
         </div>
       )}

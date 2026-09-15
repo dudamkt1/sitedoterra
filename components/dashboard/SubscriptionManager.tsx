@@ -318,7 +318,7 @@ export function SubscriptionManager({
     !siteActive &&
     !isTrialVigente;
   const statusLabel = isRefundPending
-    ? "Reembolso solicitado — aguardando confirmação do Mercado Pago"
+    ? "Reembolso solicitado — em análise, aguardando autorização"
     : isRefunded && !siteActive
       ? "Pagamento devolvido — site desativado, dados preservados"
       : cancelScheduled
@@ -350,8 +350,9 @@ export function SubscriptionManager({
         <h2 className="card-title mb-4">Ações</h2>
         {isRefundPending && (
           <div className="mb-4 w-full rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            ⏳ <strong>Aguardando reembolso</strong> — seu pedido foi registrado e o admin já foi avisado.
-            Assim que o Mercado Pago confirmar a devolução, o status muda para <strong>reembolsado</strong> e o site será desativado (dados preservados).
+            ⏳ <strong>Aguardando reembolso</strong> — seu pedido foi registrado e está em análise.
+            Nossa equipe pode entrar em contato pelo WhatsApp antes da devolução. Após aprovado, o Mercado Pago confirma,
+            o status muda para <strong>reembolsado</strong> e o site será desativado (dados preservados).
           </div>
         )}
         {isRefunded && !siteActive && (

@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { ensureTenantForUser } from "@/lib/onboarding";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { refundMpPayment } from "@/lib/mercadopago";
 import { getSuperAdminEmails } from "@/lib/admin";
 import { getEmailConfig, createTransportFromConfig, isEmailConfigured } from "@/lib/email";
 
@@ -13,12 +12,15 @@ const GUARANTEE_DAYS = 7;
 /**
  * POST /api/guarantee-cancel — Garantia de 7 dias ("Quero Cancelar").
  *
- * Fluxo em duas etapas (sincronizado painel <-> admin <-> MP):
+ * Fluxo com APROVAÇÃO DO ADMIN (sincronizado painel <-> admin <-> MP):
  *   1. Na solicitação: pagamento de ativação vai IMEDIATAMENTE para
  *      `refund_pending` (STATUS "Aguardando reembolso" no painel) + pedido
  *      visível em /admin "Visão geral" (Pedidos de Reembolso) + e-mail ao
- *      Super Admin. O site segue no ar até o dinheiro voltar.
- *   2. Na confirmação do MP (webhook `refunded` ou sync): pagamento vai para
+ *      Super Admin. O dinheiro NÃO é devolvido ainda — o admin pode
+ *      conversar com o usuário (WhatsApp) e tentar reverter antes.
+ *   2. Somente após o admin AUTORIZAR (/admin → Autorizar reembolso), o
+ *      sistema emite a devolução no Mercado Pago.
+ *   3. Na confirmação do MP (webhook `refunded` ou sync): pagamento vai para
  *      `refunded` (STATUS "Reembolsado"), site DESATIVADO, histórico
  *      preservado.
  *
@@ -112,10 +114,11 @@ export async function POST() {
     );
   }
 
-  // 1) Marca "aguardando reembolso" ANTES de chamar o MP — o status muda na
-  // hora no painel e o pedido aparece no /admin, mesmo se a API do MP
-  // estiver lenta ou fora do ar (o admin resolve manualmente).
+  // 1) Marca "aguardando reembolso" — o status muda na hora no painel e o
+  // pedido aparece no /admin para ANÁLISE. A devolução no MP só acontece
+  // depois que o admin autorizar (para conversar com o usuário antes).
   const requestedAt = new Date().toISOString();
+  const refundStatus = "awaiting_admin";
   try {
     await admin
       .from("payments")
@@ -125,7 +128,7 @@ export async function POST() {
           ...(pay.metadata || {}),
           refund_requested_at: requestedAt,
           refund_requested_by: user.id,
-          refund_status: "requested",
+          refund_status: refundStatus,
         },
       })
       .eq("id", pay.id);
@@ -141,7 +144,7 @@ export async function POST() {
             ...(pay.metadata || {}),
             refund_requested_at: requestedAt,
             refund_requested_by: user.id,
-            refund_status: "requested",
+            refund_status: refundStatus,
           },
         })
         .eq("id", pay.id);
@@ -159,46 +162,12 @@ export async function POST() {
     });
   } catch {}
 
-  // 2) Emite a devolução no Mercado Pago (best-effort: falhou, o pedido segue
-  // pendente para o admin concluir; nunca esconde o pedido do usuário).
-  let refundStatus = "requested";
-  let mpError: string | null = null;
-  try {
-    const refund = await refundMpPayment(pay.mercadopago_payment_id);
-    refundStatus = String(refund?.status || "requested");
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "";
-    if (/already|refund/i.test(msg) && /refund/i.test(msg)) {
-      refundStatus = "already_refunded";
-    } else {
-      mpError = msg.slice(0, 300) || "falha na API do MP";
-      console.error("[guarantee-cancel] reembolso MP falhou — pedido segue pendente", e);
-    }
-  }
-  try {
-    const { data: cur } = await admin
-      .from("payments")
-      .select("metadata")
-      .eq("id", pay.id)
-      .maybeSingle();
-    await admin
-      .from("payments")
-      .update({
-        metadata: {
-          ...(((cur as { metadata?: Record<string, unknown> } | null)?.metadata) || {}),
-          refund_status: refundStatus,
-          ...(mpError ? { refund_error: mpError } : {}),
-        },
-      })
-      .eq("id", pay.id);
-  } catch {}
-
   const amountBRL = ((pay.amount_cents || 0) / 100).toLocaleString("pt-BR", {
     style: "currency",
     currency: "BRL",
   });
 
-  // 3) Auditoria (sempre) + e-mail ao Super Admin (best-effort via SMTP).
+  // 2) Auditoria (sempre) + e-mail ao Super Admin (best-effort via SMTP).
   // O /admin "Visão geral" lê os pedidos direto da tabela `payments`
   // (status refund_pending), então o aviso não depende do e-mail.
   try {
@@ -227,16 +196,16 @@ export async function POST() {
       await transporter.sendMail({
         from: `"${fromName}" <${cfg!.smtp_from_email}>`,
         to: recipients.join(", "),
-        subject: `Garantia 7 dias: reembolso aguardando (${amountBRL})`,
+        subject: `Garantia 7 dias: authorize o reembolso (${amountBRL})`,
         html: [
           `<p>O usuário <strong>${user.email}</strong> solicitou o reembolso dentro da garantia de 7 dias.</p>`,
           `<ul>`,
           `<li>Valor: <strong>${amountBRL}</strong></li>`,
           `<li>Pagamento MP: <strong>${pay.mercadopago_payment_id}</strong></li>`,
           `<li>Tenant: <strong>${tenant.id}</strong></li>`,
-          `<li>Status do reembolso no MP: <strong>${refundStatus}</strong></li>`,
+          `<li>Status: <strong>aguardando sua autorização</strong> (nada foi devolvido ainda)</li>`,
           `</ul>`,
-          `<p>Veja em <strong>/admin (Visão geral → Pedidos de Reembolso)</strong>. Quando o Mercado Pago confirmar a devolução, o pagamento vai para reembolsado e o site é desativado automaticamente, mantendo o histórico.</p>`,
+          `<p>Veja em <strong>/admin (Visão geral → Pedidos de Reembolso)</strong>: converse com o usuário pelo WhatsApp e, se mantido o pedido, clique em <strong>Autorizar reembolso</strong>. Só então o Mercado Pago devolve o valor — quando confirmado, o pagamento vai para reembolsado e o site é desativado automaticamente, mantendo o histórico.</p>`,
         ].join(""),
       });
     }
@@ -249,8 +218,6 @@ export async function POST() {
     status: "refund_pending",
     refund_status: refundStatus,
     message:
-      mpError
-        ? "Pedido de reembolso registrado — status: aguardando reembolso. A devolução automática falhou por instabilidade, mas o admin já foi avisado e concluirá a devolução."
-        : "Pedido de reembolso registrado — status: aguardando reembolso. Assim que o Mercado Pago confirmar a devolução, o status muda para reembolsado e o site será desativado — seus dados ficam preservados.",
+      "Pedido de reembolso registrado — status: aguardando reembolso. Nossa equipe vai analisar e pode entrar em contato pelo WhatsApp antes da devolução. Assim que aprovado, o Mercado Pago confirma e o status muda para reembolsado — seus dados ficam preservados.",
   });
 }
