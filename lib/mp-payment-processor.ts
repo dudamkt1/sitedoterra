@@ -800,6 +800,20 @@ export async function handleMpRefund(payment: MpPayment) {
     // Site desativado — usuário poderá pagar novamente e reativar (novo
     // pagamento aprovado gera novo registro; histórico anterior intacto).
     await deactivateTenant(tenantId, `reembolso do pagamento ${mpId}`);
+    // Comissão do afiliado que indicou este comprador: o dinheiro voltou,
+    // então a indicação NÃO gera saldo — estorna na hora (pendente ou já
+    // aprovado) para o /painel/afiliados refletir o motivo. Reembolso de
+    // MENSALIDADE não toca na comissão da ativação.
+    try {
+      const { reverseAffiliateConversionsForRefund } = await import("@/lib/affiliate");
+      await reverseAffiliateConversionsForRefund({
+        tenantId,
+        mpPaymentId: mpId,
+        reason: payment.status === "charged_back" ? "chargeback" : "refund",
+      });
+    } catch (e) {
+      console.error("[mp] falha ao estornar comissão de afiliado no reembolso", e);
+    }
     // Cancela assinaturas ativa/trialing vinculadas (sem elas o serviço não
     // continua válido; a reativação cria nova assinatura sem duplicar).
     const { data: actives } = await admin

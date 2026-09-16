@@ -282,15 +282,109 @@ export async function getPendingConversions(limit = 50, offset = 0) {
 export const AFFILIATE_APPROVAL_DAYS = 7;
 
 /**
- * Aprovação AUTOMÁTICA de conversões maduras (lazy, sem cron).
+ * Decisão pura sobre o destino de uma conversão pendente a partir do
+ * pagamento mais recente do comprador (ativação/mensalidade):
+ * - `estornado`: dinheiro DEVOLVIDO (`refunded`) — nunca vira saldo;
+ * - `aguardar`: reembolso EM ANÁLISE (`refund_pending` ou pedido registrado
+ *   via metadata) — NÃO aprova ainda; a comissão só entra se o pagamento
+ *   for mantido (ou estorna quando a devolução confirmar);
+ * - `aprovado`: pagamento mantido.
+ */
+export function decideConversionFate(
+  payment: { status?: string | null; metadata?: Record<string, unknown> | null } | null
+): "estornado" | "aguardar" | "aprovado" {
+  const status = payment?.status || null;
+  if (status === "refunded") return "estornado";
+  const meta = (payment?.metadata || {}) as Record<string, unknown>;
+  const pendingByMeta = Boolean(meta.refund_requested_at) && !meta.refunded_at;
+  if (status === "refund_pending" || pendingByMeta) return "aguardar";
+  return "aprovado";
+}
+
+/**
+ * ESTORNO IMEDIATO no reembolso: quando o dinheiro da ativação é DEVOLVIDO
+ * (`refunded`), as conversões do comprador indicado (`pendente` ou
+ * `aprovado`) viram `estornado` NA HORA — o saldo do afiliado corrige
+ * sozinho (as RPCs de saldo só somam `aprovado`/`pendente`) e o painel
+ * explica o motivo. Chamado pelo funil único de reembolso (`handleMpRefund`,
+ * que cobre webhook + autorização manual do admin).
  *
- * - Conversões "pendente" com mais de AFFILIATE_APPROVAL_DAYS dias:
- *   - comprador reembolsado (último pagamento de ativação/mensalidade =
- *     `refunded`) → `estornado` (nunca vira saldo);
- *   - senão → `aprovado` (entra no Saldo Disponível).
- * - Idempotente: só toca `pendente`; pode rodar em todo carregamento do
- *   painel do afiliado e do /admin/afiliados. O admin continua podendo
- *   alterar manualmente a qualquer momento.
+ * - Idempotente: só toca `pendente`/`aprovado` (nunca `estornado` nem `pago`).
+ * - Nunca quebra o reembolso: best-effort com try/catch + auditoria.
+ */
+export async function reverseAffiliateConversionsForRefund(input: {
+  tenantId: string;
+  mpPaymentId?: string | null;
+  reason?: "refund" | "chargeback";
+}): Promise<{ reversed: number }> {
+  try {
+    const admin = createAdminClient();
+    const { data: t } = await admin
+      .from("tenants")
+      .select("user_id")
+      .eq("id", input.tenantId)
+      .maybeSingle();
+    const customerId = (t as { user_id?: string } | null)?.user_id;
+    if (!customerId) return { reversed: 0 };
+
+    const { data: convs } = await admin
+      .from("affiliate_conversions")
+      .select("id, affiliate_user_id, commission_amount")
+      .eq("new_customer_user_id", customerId)
+      .in("status", ["pendente", "aprovado"]);
+    if (!convs || convs.length === 0) return { reversed: 0 };
+
+    let reversed = 0;
+    for (const c of convs as { id: string; affiliate_user_id: string; commission_amount: number }[]) {
+      const { error } = await admin
+        .from("affiliate_conversions")
+        .update({ status: "estornado" })
+        .eq("id", c.id)
+        .in("status", ["pendente", "aprovado"]);
+      if (error) {
+        console.error("[affiliate] falha ao estornar conversão no reembolso", c.id, error.message);
+        continue;
+      }
+      reversed += 1;
+      try {
+        await admin.from("audit_logs").insert({
+          actor_id: null,
+          actor_role: null,
+          action: "affiliate.conversion_reversed_refund",
+          entity_type: "affiliate_conversion",
+          entity_id: c.id,
+          metadata: {
+            tenant_id: input.tenantId,
+            affiliate_user_id: c.affiliate_user_id,
+            commission_amount: Number(c.commission_amount) || 0,
+            mp_payment_id: input.mpPaymentId || null,
+            reason: input.reason || "refund",
+          },
+        });
+      } catch {}
+    }
+    return { reversed };
+  } catch (e) {
+    console.error("[affiliate] reverseAffiliateConversionsForRefund falhou", (e as Error)?.message);
+    return { reversed: 0 };
+  }
+}
+
+/**
+ * Aprovação AUTOMÁTICA de conversões (lazy, sem cron) + ESTORNO IMEDIATO de
+ * reembolsos já confirmados. Roda em todo carregamento do painel do afiliado
+ * e do /admin/afiliados, então o saldo corrige sozinho em qualquer timing:
+ *
+ * - Pagamento do comprador DEVOLVIDO (`refunded`), em QUALQUER idade da
+ *   conversão `pendente` → `estornado` na hora (cobre reembolsos de ontem que
+ *   ainda apareciam como "saldo pendente");
+ * - Reembolso EM ANÁLISE (`refund_pending`) → mantém `pendente` (NÃO aprova
+ *   enquanto o pedido não se resolve; aprova se o pagamento for mantido,
+ *   estorna se a devolução confirmar);
+ * - `pendente` com mais de AFFILIATE_APPROVAL_DAYS dias e pagamento mantido
+ *   → `aprovado` (entra no Saldo Disponível).
+ * - Idempotente: só toca `pendente`; pode rodar sempre. O admin continua
+ *   podendo alterar manualmente a qualquer momento.
  */
 export async function approveMaturedConversions(
   affiliateUserId?: string
@@ -300,9 +394,8 @@ export async function approveMaturedConversions(
 
   let query = admin
     .from("affiliate_conversions")
-    .select("id, affiliate_user_id, new_customer_user_id")
+    .select("id, affiliate_user_id, new_customer_user_id, created_at")
     .eq("status", "pendente")
-    .lte("created_at", cutoff)
     .limit(200);
   if (affiliateUserId) query = query.eq("affiliate_user_id", affiliateUserId);
 
@@ -311,9 +404,9 @@ export async function approveMaturedConversions(
 
   let approved = 0;
   let reversed = 0;
-  for (const c of data as { id: string; affiliate_user_id: string; new_customer_user_id: string }[]) {
+  for (const c of data as { id: string; affiliate_user_id: string; new_customer_user_id: string; created_at: string }[]) {
     try {
-      let refunded = false;
+      let fate: "estornado" | "aguardar" | "aprovado" = "aprovado";
       const { data: tenant } = await admin
         .from("tenants")
         .select("id")
@@ -322,22 +415,25 @@ export async function approveMaturedConversions(
       if (tenant) {
         const { data: pay } = await admin
           .from("payments")
-          .select("status")
+          .select("status, metadata")
           .eq("tenant_id", (tenant as { id: string }).id)
           .in("type", ["activation", "subscription"])
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
-        refunded = (pay as { status?: string } | null)?.status === "refunded";
+        fate = decideConversionFate(
+          pay as { status?: string | null; metadata?: Record<string, unknown> | null } | null
+        );
       }
-      const next = refunded ? "estornado" : "aprovado";
+      if (fate === "aguardar") continue;
+      if (fate === "aprovado" && c.created_at > cutoff) continue;
       const { error: upErr } = await admin
         .from("affiliate_conversions")
-        .update({ status: next })
+        .update({ status: fate })
         .eq("id", c.id)
         .eq("status", "pendente");
       if (!upErr) {
-        if (refunded) reversed += 1;
+        if (fate === "estornado") reversed += 1;
         else approved += 1;
       }
     } catch (e) {

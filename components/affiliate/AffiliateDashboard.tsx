@@ -73,6 +73,8 @@ interface AffiliateConversion {
   status: "pendente" | "aprovado" | "pago" | "estornado";
   created_at: string;
   new_customer_user_id: string;
+  /** Contexto de reembolso do pagamento do comprador (quando houver). */
+  refund_info?: { payment_status: string; refunded_at: string | null } | null;
 }
 
 interface AffiliatePayout {
@@ -796,6 +798,25 @@ export function AffiliateDashboard({ userId, userEmail, userName, tenantSlug, is
               a comissão é estornada.
             </div>
           )}
+          {conversions.some((c) => c.status === "estornado") && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900 mb-4">
+              💸 <strong>Pagamento devolvido:</strong>{" "}
+              {conversions.filter((c) => c.status === "estornado").length}{" "}
+              {conversions.filter((c) => c.status === "estornado").length === 1 ? "indicação teve" : "indicações tiveram"} o
+              pagamento <strong>reembolsado</strong> ao comprador — por isso essa comissão foi{" "}
+              <strong>estornada e não gera saldo</strong> (nem disponível, nem pendente). O valor estornado foi de{" "}
+              <strong>
+                {formatBRL(
+                  Math.round(
+                    conversions
+                      .filter((c) => c.status === "estornado")
+                      .reduce((s, c) => s + Number(c.commission_amount || 0), 0) * 100
+                  )
+                )}
+              </strong>
+              . Novas indicações continuam gerando comissão normalmente.
+            </div>
+          )}
           {conversions.length === 0 ? (
             <p className="text-gray-400 text-center py-8">Nenhuma conversão registrada ainda.</p>
           ) : (
@@ -817,7 +838,19 @@ export function AffiliateDashboard({ userId, userEmail, userName, tenantSlug, is
                       <td className="py-3 text-gray-600">{c.new_customer_user_id.slice(0, 8)}...</td>
                       <td className="py-3 text-gray-600">{formatBRL(c.sale_amount * 100)}</td>
                       <td className="py-3 font-medium text-[#1d5c3a]">{formatBRL(c.commission_amount * 100)}</td>
-                      <td className="py-3"><StatusBadge status={c.status} /></td>
+                      <td className="py-3">
+                        <StatusBadge status={c.status} />
+                        {c.status === "estornado" && (
+                          <p className="mt-1 text-xs text-red-600">
+                            💸 Pagamento devolvido{c.refund_info?.refunded_at ? ` em ${formatDate(c.refund_info.refunded_at)}` : ""} — sem comissão desta indicação.
+                          </p>
+                        )}
+                        {c.status === "pendente" && c.refund_info?.payment_status === "refund_pending" && (
+                          <p className="mt-1 text-xs text-amber-700">
+                            ⏳ Pagamento em análise de reembolso — a comissão só entra no saldo se o pagamento for mantido.
+                          </p>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
