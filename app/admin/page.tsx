@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { StatCard } from "@/components/dashboard/ui";
 import { AdminRefundsPanel } from "@/components/admin/AdminRefundsPanel";
+import { AdminOverviewAlerts } from "@/components/admin/AdminOverviewAlerts";
 import { formatBRL } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -139,6 +140,7 @@ export default async function AdminHome() {
     <div>
       <h1 className="text-3xl font-semibold mb-1" style={{ fontFamily: "var(--font-display)" }}>Visão geral</h1>
       <p className="text-sm text-gray-500 mb-8">Painel financeiro e de operação da plataforma.</p>
+      <AdminOverviewAlerts />
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((s) => <StatCard key={s.label} label={s.label} value={s.value} icon={s.icon} />)}
       </div>

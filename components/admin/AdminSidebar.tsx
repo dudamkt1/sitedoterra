@@ -57,9 +57,23 @@ function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(href + "/");
 }
 
+const SEEN_KEY = "admin_seen_notifications";
+
+function readSeenIds(): Set<string> {
+  try {
+    const raw = window.localStorage.getItem(SEEN_KEY);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw);
+    return new Set(Array.isArray(arr) ? arr : []);
+  } catch {
+    return new Set();
+  }
+}
+
 export default function AdminSidebar({ email }: { email: string }) {
   const pathname = usePathname();
   const [unread, setUnread] = useState(0);
+  const [overview, setOverview] = useState(0);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -79,6 +93,40 @@ export default function AdminSidebar({ email }: { email: string }) {
     return () => {
       alive = false;
       clearInterval(t);
+    };
+  }, [pathname]);
+
+  // Badge VERMELHA da "Visão geral": pedidos de reembolso + qualquer info
+  // de usuário (feedback pendente, novo cadastro). Desconta o que o admin
+  // já viu (localStorage `admin_seen_notifications`) — após ver, ela some;
+  // só volta a aparecer quando chegar um evento NOVO.
+  useEffect(() => {
+    let alive = true;
+    async function loadOverview() {
+      try {
+        const res = await fetch("/api/admin/notifications", { cache: "no-store" });
+        if (!res.ok) return;
+        const j = await res.json();
+        const seen = readSeenIds();
+        const items = (j.items || []) as { id: string }[];
+        const fresh = items.filter((i) => !seen.has(i.id)).length;
+        if (alive) setOverview(fresh);
+      } catch {
+        // silencioso
+      }
+    }
+    loadOverview();
+    const t = setInterval(loadOverview, 30_000);
+    function onSeen() {
+      loadOverview();
+    }
+    window.addEventListener("admin-notifications-seen", onSeen);
+    window.addEventListener("storage", onSeen);
+    return () => {
+      alive = false;
+      clearInterval(t);
+      window.removeEventListener("admin-notifications-seen", onSeen);
+      window.removeEventListener("storage", onSeen);
     };
   }, [pathname]);
 
@@ -105,6 +153,16 @@ export default function AdminSidebar({ email }: { email: string }) {
     if (count <= 0) return null;
     return (
       <span className="ml-auto inline-flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-rose-500 px-1.5 text-[11px] font-bold leading-none text-white shadow-[0_0_0_2px_rgba(13,51,32,0.9)]">
+        {count > 99 ? "99+" : count}
+      </span>
+    );
+  }
+
+  // Notificação VERMELHA da "Visão geral" (reembolso / infos de usuário).
+  function OverviewBadge({ count }: { count: number }) {
+    if (count <= 0) return null;
+    return (
+      <span className="ml-auto inline-flex min-h-[20px] min-w-[20px] animate-pulse items-center justify-center rounded-full bg-red-600 px-1.5 text-[11px] font-bold leading-none text-white shadow-[0_0_0_2px_rgba(13,51,32,0.9)]">
         {count > 99 ? "99+" : count}
       </span>
     );
@@ -161,6 +219,7 @@ export default function AdminSidebar({ email }: { email: string }) {
             const active = isActive(pathname, l.href);
             const Icon = l.icon;
             const isFeedback = l.href === "/admin/feedback";
+            const isOverview = l.href === "/admin";
             return (
               <Link
                 key={l.href}
@@ -180,6 +239,7 @@ export default function AdminSidebar({ email }: { email: string }) {
                   <Icon className="h-4 w-4" />
                 </span>
                 <span className="min-w-0 flex-1 truncate">{l.label}</span>
+                {isOverview && <OverviewBadge count={overview} />}
                 {isFeedback && <Badge count={unread} />}
                 {active && <ChevronRight className="h-4 w-4 shrink-0 opacity-60" />}
               </Link>
@@ -247,6 +307,7 @@ export default function AdminSidebar({ email }: { email: string }) {
               const active = isActive(pathname, l.href);
               const Icon = l.icon;
               const isFeedback = l.href === "/admin/feedback";
+              const isOverview = l.href === "/admin";
               return (
                 <Link
                   key={l.href}
@@ -260,6 +321,7 @@ export default function AdminSidebar({ email }: { email: string }) {
                     <Icon className="h-4 w-4" />
                   </span>
                   <span className="min-w-0 flex-1 truncate">{l.label}</span>
+                  {isOverview && <OverviewBadge count={overview} />}
                   {isFeedback && <Badge count={unread} />}
                 </Link>
               );
@@ -295,6 +357,7 @@ export default function AdminSidebar({ email }: { email: string }) {
             const active = isActive(pathname, t.href);
             const Icon = t.icon;
             const showBadge = t.href === "/admin/feedback" && unread > 0;
+            const showOverview = t.href === "/admin" && overview > 0;
             return (
               <Link
                 key={t.href}
@@ -310,6 +373,11 @@ export default function AdminSidebar({ email }: { email: string }) {
                   {showBadge && (
                     <span className="absolute -right-2 -top-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white">
                       {unread > 99 ? "99+" : unread}
+                    </span>
+                  )}
+                  {showOverview && (
+                    <span className="absolute -right-2 -top-1.5 inline-flex h-4 min-w-4 animate-pulse items-center justify-center rounded-full bg-red-600 px-1 text-[9px] font-bold text-white">
+                      {overview > 99 ? "99+" : overview}
                     </span>
                   )}
                 </span>
