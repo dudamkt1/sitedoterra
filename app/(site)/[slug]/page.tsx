@@ -137,14 +137,38 @@ export default async function TenantSitePage({
   params: { slug: string };
   searchParams?: { ref?: string };
 }) {
-  // Site público de DEMONSTRAÇÃO: renderiza com os dados locais do visitante
-  // (localStorage) sem tocar em nenhum tenant real.
+  // Site público de DEMONSTRAÇÃO: a base é a HOME MODELO viva do
+  // /admin/editor-home (tenant oficial, sempre atual); as personalizações do
+  // visitante continuam 100% locais (localStorage) por cima do modelo e nunca
+  // chegam ao banco. Sem personalização local, a demo espelha o modelo atual.
   if (params.slug === "demonstracao") {
     const pwa = await resolvePwaForRequest({ slugParam: "demonstracao" });
     const { manifestUrl, swUrl, iconUrl } = pwaUrls(pwa?.basePath || "/demonstracao/");
+    let demoModel: {
+      site: Record<string, unknown>;
+      sections: { type: string; enabled: boolean; content: Record<string, unknown> }[];
+    } | null = null;
+    try {
+      const official = await getOfficialHomeTenant();
+      const modelSections = await resolveHomeSections({
+        tenant: official,
+        tenantDataOverridesGlobal: true,
+        ignoreTenantOverrides: true,
+      });
+      demoModel = {
+        site: ((official.site_data || {}) as Record<string, unknown>) || {},
+        sections: modelSections.map((s) => ({
+          type: s.type,
+          enabled: s.enabled,
+          content: (s.content || {}) as Record<string, unknown>,
+        })),
+      };
+    } catch {
+      // Sem modelo (Supabase fora): a demo cai nos padrões estáticos.
+    }
     return (
       <>
-        <DemoPublicSite />
+        <DemoPublicSite model={demoModel} />
         <PwaRegister
           enabled={Boolean(pwa?.settings.enabled)}
           slug="demonstracao"

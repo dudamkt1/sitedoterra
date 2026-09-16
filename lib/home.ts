@@ -110,11 +110,15 @@ export const SECTIONS_SNAPSHOT_MARKER = "_sections_snapshot_at";
  * (nunca sobrescreve personalização existente; idempotente e seguro para
  * repetir). Ao final, carimba `site_settings.data._sections_snapshot_at`.
  *
+ * REGRA DE REATIVAÇÃO EXATA: se o carimbo já existe (site já foi ativado
+ * antes, mesmo que desativado no momento), NADA é copiado — a HOME própria
+ * armazenada é restaurada exatamente como estava, sem puxar o modelo atual.
+ *
  * Usado em:
  *  - ativação do tenant (`activateTenant` — futuros usuários recebem a HOME
- *    definida pelo admin como padrão);
- *  - primeira resolução pós-deploy (tenants antigos: congela o estado atual
- *    uma única vez; daí em diante o admin não os altera mais).
+ *    definida pelo admin como padrão; reativações não tocam em nada);
+ *  - primeira resolução pós-deploy (tenants antigos já ativos: congela o
+ *    estado atual uma única vez; daí em diante o admin não os altera mais).
  *
  * Retorna quantas linhas foram criadas. Nunca lança (best-effort).
  */
@@ -122,10 +126,15 @@ export async function snapshotTenantSections(tenantId: string): Promise<number> 
   if (!hasSupabaseEnv() || !tenantId) return 0;
   try {
     const admin = createAdminClient();
-    const [{ data: globals }, { data: existing }] = await Promise.all([
+    const [{ data: settingsRow }, { data: globals }, { data: existing }] = await Promise.all([
+      admin.from("site_settings").select("data").eq("tenant_id", tenantId).maybeSingle(),
       admin.from("site_sections").select("id, enabled, content, settings"),
       admin.from("tenant_sections").select("section_id").eq("tenant_id", tenantId),
     ]);
+    // Reativação (ou snapshot já feito): carimbo presente = configuração
+    // própria existente — restaura exatamente como estava, sem copiar nada.
+    const currentData = ((settingsRow?.data as Record<string, unknown>) || {}) as Record<string, unknown>;
+    if (typeof currentData[SECTIONS_SNAPSHOT_MARKER] === "string") return 0;
     const globalRows = (globals as { id: string; enabled: boolean; content: unknown; settings: unknown }[] | null) || [];
     // Sem template global no banco não há o que fotografar (a renderização
     // usa os padrões estáticos em memória, igual a hoje).
@@ -150,15 +159,7 @@ export async function snapshotTenantSections(tenantId: string): Promise<number> 
     }
     // Carimba o congelamento (cria site_settings se ainda não existir).
     try {
-      const { data: settingsRow } = await admin
-        .from("site_settings")
-        .select("data")
-        .eq("tenant_id", tenantId)
-        .maybeSingle();
-      const data = {
-        ...((settingsRow?.data as Record<string, unknown>) || {}),
-        [SECTIONS_SNAPSHOT_MARKER]: new Date().toISOString(),
-      };
+      const data = { ...currentData, [SECTIONS_SNAPSHOT_MARKER]: new Date().toISOString() };
       await admin.from("site_settings").upsert({ tenant_id: tenantId, data }, { onConflict: "tenant_id" });
     } catch (e) {
       console.warn("[home] carimbo de snapshot falhou", (e as Error)?.message);
@@ -279,12 +280,17 @@ export interface ResolveOptions {
    */
   ignoreTenantOverrides?: boolean;
   /**
-   * CONGELAMENTO (sites de tenants ativos em `/[slug]` e no painel do dono):
+   * CONGELAMENTO (sites de tenants em `/[slug]` e no painel do dono):
    * o conteúdo editorial é lido da FOTOGRAFIA do tenant (`tenant_sections`,
    * feita na ativação) e o template global vigente é IGNORADO — edições do
    * /admin/editor-home (logo, textos, imagens) NÃO propagam para sites já
-   * ativos. Seções criadas pelo admin DEPOIS do congelamento nem aparecem
+   * ativados. Seções criadas pelo admin DEPOIS do congelamento nem aparecem
    * nesses sites (só futuros tenants as recebem ao ativar).
+   *
+   * O congelamento efetivo exige site JÁ ATIVADO alguma vez (site_status
+   * diferente de "pending" ou carimbo de snapshot presente — desativados
+   * continuam congelados). Sites NUNCA ativados ignoram este modo e seguem a
+   * HOME modelo ao vivo, mesmo com a flag ligada.
    *
    * Continuam vivos (não congelam): dados do próprio tenant
    * (`site_settings` — o painel individual segue alterando o site) e dados
@@ -316,19 +322,23 @@ export async function resolveHomeSections(opts: ResolveOptions): Promise<Resolve
   const siteData = (opts.tenant?.site_data || {}) as Record<string, unknown>;
   let tenantMap: Map<string, TenantSection> = (tenantMapRaw as Map<string, TenantSection>) || new Map();
 
-  // Congelamento: sites ativos não seguem mais o template global. Se o
-  // tenant ainda não foi fotografado (tenants antigos ou ativação recente),
-  // fotografa AGORA o template vigente — uma única vez (carimbo em
-  // site_settings) — e usa a fotografia nesta renderização.
+  // Congelamento: vale SOMENTE para sites que já foram ativados alguma vez
+  // (site_status diferente de "pending" ou carimbo presente — desativados
+  // continuam congelados). Sites NUNCA ativados seguem a HOME modelo ao vivo:
+  // edições do admin refletem neles até a ativação. Se o tenant ainda não foi
+  // fotografado, fotografa AGORA o template vigente — uma única vez — e usa a
+  // fotografia nesta renderização.
   const tenantId = opts.tenant?.tenant_id;
-  const frozenTenant = opts.frozenTenantContent === true && !!tenantId && hasSupabaseEnv();
-  if (frozenTenant && tenantId) {
-    const marked = typeof siteData[SECTIONS_SNAPSHOT_MARKER] === "string";
-    if (!marked || tenantMap.size === 0) {
-      const created = await snapshotTenantSections(tenantId);
-      if (created > 0) tenantMap = await getTenantSections(tenantId);
-    }
+  const tenantStatus = (opts.tenant as { site_status?: unknown } | null)?.site_status;
+  const marked = typeof siteData[SECTIONS_SNAPSHOT_MARKER] === "string";
+  const everActivated =
+    marked || (typeof tenantStatus === "string" ? tenantStatus !== "pending" : tenantMap.size > 0);
+  const frozenCandidate = opts.frozenTenantContent === true && !!tenantId && hasSupabaseEnv();
+  if (frozenCandidate && tenantId && everActivated && (!marked || tenantMap.size === 0)) {
+    const created = await snapshotTenantSections(tenantId);
+    if (created > 0) tenantMap = await getTenantSections(tenantId);
   }
+  const frozenTenant = frozenCandidate && everActivated && tenantMap.size > 0;
 
   // Fonte de verdade comercial: a seção "Planos / Oferta" exibe os dados
   // cadastrados pelo Super Admin (tabela plans), nunca valores em código.

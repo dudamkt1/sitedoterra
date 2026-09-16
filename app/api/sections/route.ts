@@ -71,10 +71,12 @@ export async function GET() {
   const siteData = (settingsRow?.data as Record<string, unknown>) || {};
 
   const sections = await resolveHomeSections({
-    tenant: { tenant_id: tenant.id, slug: tenant.slug, site_data: siteData } as never,
+    tenant: { tenant_id: tenant.id, slug: tenant.slug, site_status: tenant.site_status, site_data: siteData } as never,
     tenantDataOverridesGlobal: true,
     // Painel do dono mostra o CONTEÚDO CONGELADO do próprio site (igual ao
     // público em /[slug]); o tenant oficial (HOME viva) segue o global.
+    // Sites NUNCA ativados (status "pending") seguem a HOME modelo ao vivo,
+    // mesmo com a flag ligada — o congelamento exige ativação.
     frozenTenantContent: !(await isOfficialHomeTenantById(tenant.id)),
   });
 

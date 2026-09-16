@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { SiteHome } from "@/components/site/SiteHome";
 import type { ResolvedHomeSection } from "@/types";
 import { loadDemoData } from "@/lib/demo/storage";
-import { DEMO_SECTION_TYPES } from "@/lib/demo/seed";
+import { DEMO_SECTION_TYPES, buildDemoSeed } from "@/lib/demo/seed";
+import { diffAgainstSeed, buildDemoSite } from "@/lib/demo/model-diff";
 import { anchorFor, DEFAULT_SECTION_CONTENT } from "@/lib/site-sections";
 import type { DemoData } from "@/lib/demo/types";
 import type { SectionType } from "@/types";
@@ -56,7 +57,20 @@ function mergeContent(
   return out;
 }
 
-function buildSections(demo: DemoData): ResolvedHomeSection[] {
+export interface DemoModelSection {
+  type: string;
+  enabled: boolean;
+  content: Record<string, unknown>;
+}
+
+function buildSections(
+  demo: DemoData,
+  seed: DemoData,
+  site: DemoData["site"],
+  model?: { site: Record<string, unknown>; sections: DemoModelSection[] } | null
+): ResolvedHomeSection[] {
+  const modelByType = new Map((model?.sections || []).map((s) => [s.type, s]));
+
   const types: SectionType[] = [
     "header",
     ...DEMO_SECTION_TYPES,
@@ -64,50 +78,51 @@ function buildSections(demo: DemoData): ResolvedHomeSection[] {
   ];
 
   return types.map((type, idx) => {
-    const base = JSON.parse(JSON.stringify(DEFAULT_SECTION_CONTENT[type]));
+    const modelEntry = modelByType.get(type);
+    // Base viva: conteúdo atual do modelo; sem modelo, o padrão estático.
+    const base = JSON.parse(
+      JSON.stringify(modelEntry?.content ?? DEFAULT_SECTION_CONTENT[type] ?? {})
+    ) as Record<string, unknown>;
+    const seedContent = ((seed.sections as Record<string, { content: Record<string, unknown> }>)[type]?.content ?? {}) as Record<string, unknown>;
     const savedState = demo.sections[type];
-    let enabled = true;
-    let content = base;
-
-    if (savedState) {
-      enabled = savedState.enabled;
-      // Remove nulls salvos para que melhorias nos padrões (ex.: novas
-      // imagens padrão) cheguem a quem já tinha demonstração iniciada.
-      const cleaned: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(savedState.content || {})) {
-        if (v !== null) cleaned[k] = v;
-      }
-      content = mergeContent(base, cleaned);
-    }
+    // Só as edições reais do visitante sobem por cima do modelo.
+    const diff = savedState ? diffAgainstSeed((savedState.content || {}) as Record<string, unknown>, seedContent) : {};
+    // Visibilidade: o modelo pode desligar; o visitante também — mas o
+    // visitante não religa o que o modelo desligou.
+    let enabled = modelEntry?.enabled !== false;
+    if (savedState) enabled = enabled && savedState.enabled !== false;
+    let content = mergeContent(base, diff);
 
     // Campos globais de "Informações do site" têm prioridade na Hero,
     // espelhando o comportamento do painel real.
     if (type === "hero") {
       content = {
         ...content,
-        firstName: demo.site.name || (content.firstName as string),
-        lastName: demo.site.surname || (content.lastName as string),
-        role: demo.site.role || (content.role as string),
-        eyebrow: demo.site.eyebrow || (content.eyebrow as string),
-        description: demo.site.description || (content.description as string),
-        badgeTitle: demo.site.badgeTitle || (content.badgeTitle as string),
-        badgeSubtitle: demo.site.badgeSubtitle || (content.badgeSubtitle as string),
+        firstName: site.name || (content.firstName as string),
+        lastName: site.surname || (content.lastName as string),
+        role: site.role || (content.role as string),
+        eyebrow: site.eyebrow || (content.eyebrow as string),
+        description: site.description || (content.description as string),
+        badgeTitle: site.badgeTitle || (content.badgeTitle as string),
+        badgeSubtitle: site.badgeSubtitle || (content.badgeSubtitle as string),
         stats: [
-          { value: demo.site.stats.years, label: "Anos de experiência" },
-          { value: demo.site.stats.clients, label: "Clientes atendidas" },
-          { value: demo.site.stats.satisfaction, label: "Satisfação" },
+          { value: site.stats.years, label: "Anos de experiência" },
+          { value: site.stats.clients, label: "Clientes atendidas" },
+          { value: site.stats.satisfaction, label: "Satisfação" },
         ].filter((s) => Boolean(s.value)),
       };
     }
 
     if (type === "header") {
-      content = { logoText: demo.site.logoText };
+      // Mantém o logo do modelo quando houver; o texto efetivo (edição local
+      // ou modelo ou seed) tem prioridade sobre o conteúdo da seção.
+      content = { ...content, logoText: site.logoText || (content.logoText as string) };
     }
 
     if (type === "footer") {
       content = {
-        aboutText: `${demo.site.fullName} — ${demo.site.role}. Bem-estar natural com óleos essenciais.`,
-        social: demo.site.social,
+        aboutText: `${site.fullName} — ${site.role}. Bem-estar natural com óleos essenciais.`,
+        social: site.social,
         showPlatformCredit: true,
       };
     }
@@ -134,16 +149,22 @@ function buildSections(demo: DemoData): ResolvedHomeSection[] {
   });
 }
 
-export function DemoPublicSite() {
+export function DemoPublicSite({ model }: { model?: { site: Record<string, unknown>; sections: DemoModelSection[] } | null }) {
   const [demo, setDemo] = useState<DemoData | null>(null);
 
   useEffect(() => {
     setDemo(loadDemoData());
   }, []);
 
-  const sections = useMemo(() => (demo ? buildSections(demo) : []), [demo]);
+  // Seed estático = linha de base para detectar edições reais do visitante.
+  const seed = useMemo(() => buildDemoSeed(), []);
+  const site = useMemo(() => (demo ? buildDemoSite(demo, seed, model) : null), [demo, seed, model]);
+  const sections = useMemo(
+    () => (demo && site ? buildSections(demo, seed, site, model) : []),
+    [demo, seed, site, model]
+  );
 
-  if (!demo) {
+  if (!demo || !site) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#faf8f2]">
         <p className="text-sm text-gray-500">Preparando demonstração...</p>
@@ -151,10 +172,10 @@ export function DemoPublicSite() {
     );
   }
 
-  const instagramUrl = demo.site.instagram
-    ? /^https?:\/\//i.test(demo.site.instagram)
-      ? demo.site.instagram
-      : `https://instagram.com/${demo.site.instagram.replace(/^@/, "")}`
+  const instagramUrl = site.instagram
+    ? /^https?:\/\//i.test(site.instagram)
+      ? site.instagram
+      : `https://instagram.com/${site.instagram.replace(/^@/, "")}`
     : undefined;
 
   return (
@@ -180,17 +201,17 @@ export function DemoPublicSite() {
         slug="demonstracao"
         sections={sections}
         contact={{
-          whatsapp: demo.site.whatsapp?.replace(/[^\d]/g, "") || undefined,
-          whatsapp_floating_enabled: demo.site.whatsapp_floating_enabled ?? false,
-          email: demo.site.email || undefined,
+          whatsapp: site.whatsapp?.replace(/[^\d]/g, "") || undefined,
+          whatsapp_floating_enabled: site.whatsapp_floating_enabled ?? false,
+          email: site.email || undefined,
           instagram: instagramUrl,
-          profileName: demo.site.fullName || undefined,
+          profileName: site.fullName || undefined,
         }}
         logo={{
-          mode: demo.site.logoMode,
-          url: demo.site.logoMode === "image" ? demo.site.logoUrl || undefined : undefined,
-          lightUrl: demo.site.logoLightUrl || undefined,
-          text: demo.site.logoText || undefined,
+          mode: site.logoMode,
+          url: site.logoMode === "image" ? site.logoUrl || undefined : undefined,
+          lightUrl: site.logoLightUrl || undefined,
+          text: site.logoText || undefined,
         }}
         extraNav={[{ label: "Quero meu site", href: "/cadastro" }]}
       />

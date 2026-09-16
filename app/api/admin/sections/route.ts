@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser, getProfile } from "@/lib/auth";
 import { SECTION_TYPES, SECTION_TYPE_LABELS, DEFAULT_SECTION_CONTENT } from "@/lib/site-sections";
 import { normalizeParagraphs, sanitizeProductsContent } from "@/lib/section-fields";
+import { invalidateGlobalSectionsCache } from "@/lib/home";
+import { invalidateOfficialHomeCache } from "@/lib/site-official";
+import { invalidateTenantSlugCache } from "@/lib/tenant";
 import { slugify } from "@/lib/utils";
 
 export const runtime = "nodejs";
@@ -35,6 +39,24 @@ function cleanPermissions(p: unknown): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const k of keys) out[k] = base[k] !== undefined ? Boolean(base[k]) : true;
   return out;
+}
+
+/**
+ * Pós-mutação do modelo: derruba os caches em memória e revalida as páginas
+ * vivas no modelo (domínio principal `/` e `/demonstracao`) para que a HOME
+ * modelo reflita IMEDIATAMENTE a edição do Super Admin. Sites de tenants já
+ * ativados são congelados e não são afetados (nem precisam revalidar).
+ */
+function afterModelMutation() {
+  invalidateGlobalSectionsCache();
+  invalidateOfficialHomeCache();
+  invalidateTenantSlugCache();
+  try {
+    revalidatePath("/");
+    revalidatePath("/demonstracao");
+  } catch {
+    // revalidatePath é best-effort; não bloqueia resposta.
+  }
 }
 
 export async function POST(request: Request) {
@@ -86,6 +108,7 @@ export async function POST(request: Request) {
       .single();
 
     if (error) return NextResponse.json({ error: "Erro ao criar seção" }, { status: 500 });
+    afterModelMutation();
     return NextResponse.json({ success: true, section: data });
   }
 
@@ -115,6 +138,7 @@ export async function POST(request: Request) {
 
     const { error } = await admin.from("site_sections").update(payload).eq("id", id);
     if (error) return NextResponse.json({ error: "Erro ao atualizar seção" }, { status: 500 });
+    afterModelMutation();
     return NextResponse.json({ success: true });
   }
 
@@ -127,6 +151,7 @@ export async function POST(request: Request) {
     }
     const { error } = await admin.from("site_sections").delete().eq("id", id);
     if (error) return NextResponse.json({ error: "Erro ao excluir seção" }, { status: 500 });
+    afterModelMutation();
     return NextResponse.json({ success: true });
   }
 
@@ -158,6 +183,7 @@ export async function POST(request: Request) {
       .select()
       .single();
     if (error) return NextResponse.json({ error: "Erro ao duplicar seção" }, { status: 500 });
+    afterModelMutation();
     return NextResponse.json({ success: true, section: dup });
   }
 
@@ -170,6 +196,7 @@ export async function POST(request: Request) {
         .update({ sort_order: (i + 1) * 10 })
         .eq("id", ids[i]);
     }
+    afterModelMutation();
     return NextResponse.json({ success: true });
   }
 
@@ -183,6 +210,7 @@ export async function POST(request: Request) {
     }
     const { error } = await admin.from("site_sections").update({ enabled }).eq("id", id);
     if (error) return NextResponse.json({ error: "Erro ao atualizar seção" }, { status: 500 });
+    afterModelMutation();
     return NextResponse.json({ success: true });
   }
 

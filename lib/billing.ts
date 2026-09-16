@@ -227,10 +227,16 @@ export async function activateTenant(tenantId: string, userId?: string) {
   // FOTOGRAFIA NA ATIVAÇÃO: o site recebe como padrão a HOME definida pelo
   // admin NESTE momento e, a partir daqui, edições do /admin/editor-home não
   // propagam mais para ele (só o painel individual do dono altera o site).
-  // Best-effort: nunca quebra a ativação.
+  // Reativações NÃO copiam nada (a HOME própria é restaurada exatamente como
+  // estava). O tenant oficial (domínio principal, sempre vivo no modelo) não
+  // é fotografado. Best-effort: nunca quebra a ativação.
   try {
-    const { snapshotTenantSections } = await import("@/lib/home");
-    await snapshotTenantSections(tenantId);
+    const { isOfficialHomeTenantById } = await import("@/lib/site-official");
+    const official = await isOfficialHomeTenantById(tenantId).catch(() => false);
+    if (!official) {
+      const { snapshotTenantSections } = await import("@/lib/home");
+      await snapshotTenantSections(tenantId);
+    }
   } catch (e) {
     console.warn("[billing] snapshot de seções na ativação falhou", (e as Error)?.message);
   }
