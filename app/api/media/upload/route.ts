@@ -80,12 +80,24 @@ export async function POST(request: Request) {
   // Otimização server-side (rede de segurança): o caminho principal já chega
   // otimizado do browser, mas uploads vindos de outros clientes passam pelo
   // sharp aqui (WebP q80 / PNG otimizado, máx. 1600px, sem EXIF).
+  // SVG é vetorial: NÃO passa pelo sharp — é sanitizado (anti-XSS) e sobe
+  // intacto para preservar nitidez infinita do logo.
   let outBuffer: Buffer = buffer;
   let outMime = file.type || "application/octet-stream";
   let outExt = validation.extension;
   let optimized = false;
   let savedBytes = 0;
-  if (outMime.toLowerCase().startsWith("image/")) {
+  const isSvg = outMime.toLowerCase() === "image/svg+xml" || outExt === "svg";
+  if (isSvg) {
+    const { sanitizeSvg } = await import("@/lib/media/sanitize-svg");
+    const clean = sanitizeSvg(buffer);
+    if (!clean.ok) {
+      return NextResponse.json({ error: "Arquivo SVG inválido ou com conteúdo não permitido." }, { status: 400 });
+    }
+    outBuffer = Buffer.from(clean.svg, "utf8");
+    outMime = "image/svg+xml";
+    outExt = "svg";
+  } else if (outMime.toLowerCase().startsWith("image/")) {
     try {
       const { optimizeImage } = await import("@/lib/media/optimize-image");
       const opt = await optimizeImage(buffer);

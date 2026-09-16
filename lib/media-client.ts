@@ -140,6 +140,21 @@ export async function uploadMedia(args: {
   const prepared = await prepareFileForUpload(args.file, { onStage: args.onStage });
   args.onStage?.("uploading");
 
+  const isSvg =
+    prepared.mimeType.toLowerCase() === "image/svg+xml" || /\.svg$/i.test(prepared.fileName || "");
+  // SVG sobe SEMPRE pelo servidor (/api/media/upload), onde é sanitizado
+  // (anti-XSS) antes do PUT no R2 — o PUT direto (presign) é recusado p/ SVG.
+  if (isSvg) {
+    const form = new FormData();
+    form.append("file", prepared.blob, prepared.fileName);
+    form.append("category", args.category);
+    form.append("scope", scope);
+    const { res, data } = await json("/api/media/upload", { method: "POST", body: form });
+    if (!res.ok) throw new Error(data?.error || "Falha no envio do SVG.");
+    if (args.onProgress) args.onProgress(100);
+    return data.media as MediaFile;
+  }
+
   try {
     return await uploadPreparedBlob({
       blob: prepared.blob,

@@ -326,6 +326,16 @@ export async function prepareFileForUpload(
     optimized: false,
   };
 
+  const isSvg = mime === "image/svg+xml" || /\.svg$/i.test(file.name || "");
+  // SVG é vetorial: viaja INTACTO (sem rasterizar no canvas) para preservar
+  // nitidez infinita — e sobe pelo servidor, que sanitiza antes do R2.
+  if (isSvg) {
+    if (file.size > 1024 * 1024) {
+      throw new Error("SVG muito grande (máximo 1 MB). Otimize o vetor e tente de novo.");
+    }
+    return { ...plain, kind: "image" as const };
+  }
+
   if (isImage) {
     if (file.size > cfg.maxImageInputBytes) {
       throw new Error("Imagem muito grande (máximo 20 MB). Reduza o arquivo e tente de novo.");

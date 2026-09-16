@@ -10,6 +10,7 @@ import {
   getTenantStorageUsed,
   sanitizeOriginalName,
   getMediaCategory,
+  isSvgUpload,
 } from "@/lib/media";
 
 export const runtime = "nodejs";
@@ -70,6 +71,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: err.message }, { status: err.status });
     }
     return NextResponse.json({ error: "Arquivo inválido" }, { status: 400 });
+  }
+
+  // SVG sobe SOMENTE pelo /api/media/upload (server-side), onde os bytes são
+  // sanitizados (anti-XSS) antes do PUT no R2 — o PUT direto não passa pelo
+  // servidor, então é recusado aqui. O client já roteia SVG para lá sozinho.
+  if (isSvgUpload(body.mimeType, body.fileName)) {
+    return NextResponse.json(
+      { error: "SVG é enviado pelo upload padrão (com verificação de segurança). Tente novamente." },
+      { status: 400 }
+    );
   }
 
   const fileSize = Number(body.fileSize);

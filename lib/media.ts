@@ -37,7 +37,9 @@ export function getMediaCategory(code?: string | null): MediaCategory {
   return MEDIA_CATEGORIES.find((c) => c.code === code) || MEDIA_CATEGORIES[0];
 }
 
-/** Formatos de imagem aceitos (sem SVG — risco de XSS). Preferir WEBP. */
+/** Formatos de imagem aceitos. SVG é vetorial (ideal p/ logo) e passa intacto
+ * (sem conversão p/ WebP), SOMENTE nas categorias `logo` e `general`, com
+ * teto próprio de 1 MB e sanitização anti-XSS no servidor. */
 const ALLOWED_IMAGE_MIME_TYPES = new Set([
   "image/jpeg",
   "image/pjpeg",
@@ -46,6 +48,11 @@ const ALLOWED_IMAGE_MIME_TYPES = new Set([
 ]);
 
 const ALLOWED_IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp"]);
+
+/** SVG: só onde faz sentido (logotipo e uploads gerais da biblioteca). */
+export const SVG_MIME_TYPE = "image/svg+xml";
+const SVG_ALLOWED_CATEGORIES = new Set(["logo", "general"]);
+export const MAX_SVG_BYTES = 1 * 1024 * 1024; // 1 MB (vetor não precisa de mais)
 
 /** Formatos de vídeo aceitos (o browser comprime p/ MP4/H.264 antes de subir). */
 const ALLOWED_VIDEO_MIME_TYPES = new Set([
@@ -91,6 +98,14 @@ export function extFromName(name: string): string | null {
   return m ? m[1] : null;
 }
 
+/** Detecta SVG pelo MIME ou pela extensão (alguns navegadores mandam MIME vazio). */
+export function isSvgUpload(mimeType?: string | null, fileName?: string | null): boolean {
+  const mime = (mimeType || "").toLowerCase();
+  if (mime === SVG_MIME_TYPE) return true;
+  const ext = fileName ? extFromName(sanitizeOriginalName(fileName)) : null;
+  return ext === "svg";
+}
+
 /** Valida categoria + MIME + extensão + tamanho. Devolve erro tipado quando inválido. */
 export function validateUpload(args: {
   category?: string | null;
@@ -124,18 +139,29 @@ export function validateUpload(args: {
     return { category, extension: ext, cleanName: name };
   }
 
-  if (!ALLOWED_IMAGE_MIME_TYPES.has(mime)) {
-    throw new MediaError(400, "Formato não permitido. Use JPEG, PNG ou WEBP (imagens de até " + (category.maxBytes / 1024 / 1024).toFixed(0) + " MB).");
+  if (!ALLOWED_IMAGE_MIME_TYPES.has(mime) && !isSvgUpload(mime, name)) {
+    throw new MediaError(400, "Formato não permitido. Use JPEG, PNG, WEBP ou SVG (imagens de até " + (category.maxBytes / 1024 / 1024).toFixed(0) + " MB).");
   }
 
   const ext = extFromName(name) || mime.split("/")[1];
-  if (!ext || !ALLOWED_IMAGE_EXTENSIONS.has(ext)) {
-    throw new MediaError(400, `Extensão "${ext || "desconhecida"}" não permitida. Use .jpg, .jpeg, .png ou .webp`);
+  const isSvg = mime === SVG_MIME_TYPE || ext === "svg";
+  if (isSvg) {
+    if (!SVG_ALLOWED_CATEGORIES.has(category.code)) {
+      throw new MediaError(400, "SVG é permitido apenas para Logo. Use JPEG, PNG ou WEBP nesta categoria.");
+    }
+    if (ext !== "svg") {
+      throw new MediaError(400, `Extensão "${ext || "desconhecida"}" não permitida para SVG. Use um arquivo .svg`);
+    }
+  } else if (!ext || !ALLOWED_IMAGE_EXTENSIONS.has(ext)) {
+    throw new MediaError(400, `Extensão "${ext || "desconhecida"}" não permitida. Use .jpg, .jpeg, .png, .webp ou .svg`);
   }
 
   const size = Number(args.fileSize);
   if (!(size > 0) || Number.isNaN(size)) {
     throw new MediaError(400, "Tamanho do arquivo inválido.");
+  }
+  if (isSvg && size > MAX_SVG_BYTES) {
+    throw new MediaError(400, "SVG muito grande. O limite para SVG é 1 MB.");
   }
   if (size > category.maxBytes) {
     throw new MediaError(

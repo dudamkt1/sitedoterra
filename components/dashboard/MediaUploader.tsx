@@ -46,9 +46,14 @@ export function MediaUploader({
   const cat = MEDIA_CATEGORIES_CLIENT.find((c) => c.code === category);
   const catLimitMb =
     category === "video" ? 100 : category === "banner" ? 15 : category === "logo" || category === "avatar" ? 5 : 10;
+  // SVG (vetor, ideal p/ logo) é aceito nas categorias "logo" e "general" —
+  // sobe intacto pelo servidor (com sanitização anti-XSS) e tem teto de 1 MB.
+  const svgAllowed = category === "logo" || category === "general";
   const accept = acceptVideo || category === "video"
     ? "image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime"
-    : "image/jpeg,image/png,image/webp";
+    : svgAllowed
+      ? "image/jpeg,image/png,image/webp,image/svg+xml"
+      : "image/jpeg,image/png,image/webp";
 
   function handleStage(s: "optimizing" | "uploading", detail?: string) {
     setStage(s);
@@ -137,7 +142,9 @@ export function MediaUploader({
         {cat?.label || "Geral"} ·{" "}
         {acceptVideo || category === "video"
           ? "JPEG, PNG, WEBP, MP4 ou WebM · até 100 MB (vídeo sai em 720p otimizado)"
-          : `JPEG, PNG ou WEBP · até ${catLimitMb} MB (imagem sai otimizada em WebP)`}
+          : svgAllowed
+            ? `JPEG, PNG, WEBP ou SVG · até ${catLimitMb} MB (SVG: até 1 MB, vetor nítido em qualquer tamanho)`
+            : `JPEG, PNG ou WEBP · até ${catLimitMb} MB (imagem sai otimizada em WebP)`}
       </p>
     </div>
   );
