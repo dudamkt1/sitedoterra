@@ -16,6 +16,14 @@ import type { PublicTenant, ResolvedHomeSection, SiteSection, TenantSection } fr
  *        ↓
  *   HOME PÚBLICA
  *
+ * REGRA DE ISOLAMENTO (sites de tenants ativos):
+ * o site é FOTOGRAFADO na ativação (cópia integral do template global em
+ * `tenant_sections` + carimbo `_sections_snapshot_at` em site_settings) e,
+ * a partir daí, NUNCA mais segue edições do /admin/editor-home — só o
+ * painel individual do dono (`tenant_sections` + `site_settings`) altera o
+ * site. Somente os FUTUROS tenants recebem o template vigente ao ativar.
+ * A HOME oficial `/` (domínio principal) continua sempre viva no global.
+ *
  * A sobreposição do usuário vence; se não houver, usa o global.
  */
 
@@ -87,6 +95,79 @@ export async function getTenantSections(tenantId: string): Promise<Map<string, T
     map.set(row.section_id, row);
   }
   return map;
+}
+
+/**
+ * Carimbo em `site_settings.data` que marca o congelamento do site: a partir
+ * deste momento o template global vigente foi fotografado em
+ * `tenant_sections` e edições do admin NÃO propagam mais para este tenant.
+ */
+export const SECTIONS_SNAPSHOT_MARKER = "_sections_snapshot_at";
+
+/**
+ * FOTOGRAFIA NA ATIVAÇÃO: copia o template global vigente (`site_sections`)
+ * para `tenant_sections` do tenant — SOMENTE as seções que ele ainda não tem
+ * (nunca sobrescreve personalização existente; idempotente e seguro para
+ * repetir). Ao final, carimba `site_settings.data._sections_snapshot_at`.
+ *
+ * Usado em:
+ *  - ativação do tenant (`activateTenant` — futuros usuários recebem a HOME
+ *    definida pelo admin como padrão);
+ *  - primeira resolução pós-deploy (tenants antigos: congela o estado atual
+ *    uma única vez; daí em diante o admin não os altera mais).
+ *
+ * Retorna quantas linhas foram criadas. Nunca lança (best-effort).
+ */
+export async function snapshotTenantSections(tenantId: string): Promise<number> {
+  if (!hasSupabaseEnv() || !tenantId) return 0;
+  try {
+    const admin = createAdminClient();
+    const [{ data: globals }, { data: existing }] = await Promise.all([
+      admin.from("site_sections").select("id, enabled, content, settings"),
+      admin.from("tenant_sections").select("section_id").eq("tenant_id", tenantId),
+    ]);
+    const globalRows = (globals as { id: string; enabled: boolean; content: unknown; settings: unknown }[] | null) || [];
+    // Sem template global no banco não há o que fotografar (a renderização
+    // usa os padrões estáticos em memória, igual a hoje).
+    if (globalRows.length === 0) return 0;
+    const have = new Set(((existing as { section_id: string }[] | null) || []).map((r) => r.section_id));
+    const missing = globalRows.filter((s) => !have.has(s.id));
+    if (missing.length > 0) {
+      const rows = missing.map((s) => ({
+        tenant_id: tenantId,
+        section_id: s.id,
+        enabled: s.enabled !== false,
+        content: (s.content as Record<string, unknown>) || {},
+        settings: (s.settings as Record<string, unknown>) || {},
+      }));
+      const { error } = await admin
+        .from("tenant_sections")
+        .upsert(rows, { onConflict: "tenant_id,section_id", ignoreDuplicates: true });
+      if (error) {
+        console.warn("[home] snapshot de seções falhou", error.message);
+        return 0;
+      }
+    }
+    // Carimba o congelamento (cria site_settings se ainda não existir).
+    try {
+      const { data: settingsRow } = await admin
+        .from("site_settings")
+        .select("data")
+        .eq("tenant_id", tenantId)
+        .maybeSingle();
+      const data = {
+        ...((settingsRow?.data as Record<string, unknown>) || {}),
+        [SECTIONS_SNAPSHOT_MARKER]: new Date().toISOString(),
+      };
+      await admin.from("site_settings").upsert({ tenant_id: tenantId, data }, { onConflict: "tenant_id" });
+    } catch (e) {
+      console.warn("[home] carimbo de snapshot falhou", (e as Error)?.message);
+    }
+    return missing.length;
+  } catch (e) {
+    console.warn("[home] snapshotTenantSections falhou", (e as Error)?.message);
+    return 0;
+  }
 }
 
 /** Mapeia os campos legados de site_settings.data para o conteúdo da seção. */
@@ -197,6 +278,20 @@ export interface ResolveOptions {
    * banco, só não são aplicadas aqui).
    */
   ignoreTenantOverrides?: boolean;
+  /**
+   * CONGELAMENTO (sites de tenants ativos em `/[slug]` e no painel do dono):
+   * o conteúdo editorial é lido da FOTOGRAFIA do tenant (`tenant_sections`,
+   * feita na ativação) e o template global vigente é IGNORADO — edições do
+   * /admin/editor-home (logo, textos, imagens) NÃO propagam para sites já
+   * ativos. Seções criadas pelo admin DEPOIS do congelamento nem aparecem
+   * nesses sites (só futuros tenants as recebem ao ativar).
+   *
+   * Continuam vivos (não congelam): dados do próprio tenant
+   * (`site_settings` — o painel individual segue alterando o site) e dados
+   * comerciais vigentes (preços/condições da oferta — `pricingOverlay`).
+   * Nunca usar junto com `ignoreTenantOverrides` nem para o tenant oficial.
+   */
+  frozenTenantContent?: boolean;
 }
 
 /**
@@ -219,7 +314,21 @@ export async function resolveHomeSections(opts: ResolveOptions): Promise<Resolve
   ]);
   const globalSections = global as SiteSection[];
   const siteData = (opts.tenant?.site_data || {}) as Record<string, unknown>;
-  const tenantMap: Map<string, TenantSection> = (tenantMapRaw as Map<string, TenantSection>) || new Map();
+  let tenantMap: Map<string, TenantSection> = (tenantMapRaw as Map<string, TenantSection>) || new Map();
+
+  // Congelamento: sites ativos não seguem mais o template global. Se o
+  // tenant ainda não foi fotografado (tenants antigos ou ativação recente),
+  // fotografa AGORA o template vigente — uma única vez (carimbo em
+  // site_settings) — e usa a fotografia nesta renderização.
+  const tenantId = opts.tenant?.tenant_id;
+  const frozenTenant = opts.frozenTenantContent === true && !!tenantId && hasSupabaseEnv();
+  if (frozenTenant && tenantId) {
+    const marked = typeof siteData[SECTIONS_SNAPSHOT_MARKER] === "string";
+    if (!marked || tenantMap.size === 0) {
+      const created = await snapshotTenantSections(tenantId);
+      if (created > 0) tenantMap = await getTenantSections(tenantId);
+    }
+  }
 
   // Fonte de verdade comercial: a seção "Planos / Oferta" exibe os dados
   // cadastrados pelo Super Admin (tabela plans), nunca valores em código.
@@ -268,9 +377,17 @@ export async function resolveHomeSections(opts: ResolveOptions): Promise<Resolve
     const override = tenantMap.get(section.id);
     const canToggle = perms.can_toggle !== false && !section.is_required;
 
-    // Visibilidade: global ativo E (se o usuário pode desativar) usuário ativo
+    // Congelado e sem fotografia desta seção = seção criada pelo admin DEPOIS
+    // da ativação: não entra em sites já ativos (só futuros tenants a terão).
+    if (frozenTenant && !override) continue;
+
+    // Visibilidade: global ativo E (se o usuário pode desativar) usuário ativo.
+    // No modo congelado, quem manda é a fotografia do tenant — o admin não
+    // liga/desliga seções de sites ativos pelo editor global.
     let enabled = section.enabled !== false;
-    if (enabled && canToggle && override) {
+    if (frozenTenant) {
+      enabled = override ? override.enabled !== false : false;
+    } else if (enabled && canToggle && override) {
       enabled = override.enabled !== false;
     }
 
@@ -282,7 +399,19 @@ export async function resolveHomeSections(opts: ResolveOptions): Promise<Resolve
     //   de perfil que não fazem parte dos editores de seção; campos que o
     //   usuário personalizou ficam congelados nele mesmo — intenção dele.
     //   Na HOME global ("/"), o conteúdo global vence.
-    const merged = opts.tenantDataOverridesGlobal
+    //   No MODO CONGELADO, o conteúdo global vigente é excluído da mescla: a
+    //   base é a fotografia da ativação + dados do próprio tenant. (Preços e
+    //   condições da oferta vigente continuam vivos — são dados comerciais da
+    //   plataforma, não conteúdo editorial.)
+    const merged = frozenTenant
+      ? deepMerge(
+          DEFAULT_SECTION_CONTENT[section.type] || {},
+          legacy,
+          override?.content || {},
+          section.type === "pricing" ? pricingOverlay : {},
+          section.type === "pricing" && paymentConditions ? { paymentConditions } : {}
+        )
+      : opts.tenantDataOverridesGlobal
       ? deepMerge(
           DEFAULT_SECTION_CONTENT[section.type] || {},
           globalContent,

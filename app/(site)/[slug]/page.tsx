@@ -193,7 +193,10 @@ export default async function TenantSitePage({
 
     // tenantDataOverridesGlobal=true: os dados do próprio tenant (site_settings,
     // editados em /painel/meu-site) têm prioridade sobre o template global.
-    const sections = await resolveHomeSections({ tenant, tenantDataOverridesGlobal: true });
+    // frozenTenantContent (exceto tenant oficial = HOME viva): o site foi
+    // fotografado na ativação e edições do /admin/editor-home NÃO propagam
+    // para sites já ativos — só o painel individual do dono os altera.
+    const sections = await resolveHomeSections({ tenant, tenantDataOverridesGlobal: true, frozenTenantContent: !isOfficial });
     const siteData = (tenant.site_data || {}) as Record<string, unknown>;
     const theme = (siteData.theme as SiteThemeConfig | undefined) || null;
     const pwaEnabled = Boolean(pwa?.settings.enabled);

@@ -223,6 +223,17 @@ export async function activateTenant(tenantId: string, userId?: string) {
       cancelled_at: null,
     }).eq("user_id", targetUserId);
   }
+
+  // FOTOGRAFIA NA ATIVAÇÃO: o site recebe como padrão a HOME definida pelo
+  // admin NESTE momento e, a partir daqui, edições do /admin/editor-home não
+  // propagam mais para ele (só o painel individual do dono altera o site).
+  // Best-effort: nunca quebra a ativação.
+  try {
+    const { snapshotTenantSections } = await import("@/lib/home");
+    await snapshotTenantSections(tenantId);
+  } catch (e) {
+    console.warn("[billing] snapshot de seções na ativação falhou", (e as Error)?.message);
+  }
 }
 
 /**

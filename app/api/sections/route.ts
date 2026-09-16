@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser, getProfile } from "@/lib/auth";
 import { ensureTenantForUser } from "@/lib/onboarding";
-import { invalidateOfficialHomeCache } from "@/lib/site-official";
+import { invalidateOfficialHomeCache, isOfficialHomeTenantById } from "@/lib/site-official";
 import { invalidateTenantSlugCache } from "@/lib/tenant";
 import { invalidateGlobalSectionsCache } from "@/lib/home";
 import { blockIfDemo } from "@/lib/demo/auth";
@@ -73,6 +73,9 @@ export async function GET() {
   const sections = await resolveHomeSections({
     tenant: { tenant_id: tenant.id, slug: tenant.slug, site_data: siteData } as never,
     tenantDataOverridesGlobal: true,
+    // Painel do dono mostra o CONTEÚDO CONGELADO do próprio site (igual ao
+    // público em /[slug]); o tenant oficial (HOME viva) segue o global.
+    frozenTenantContent: !(await isOfficialHomeTenantById(tenant.id)),
   });
 
   const { data: tenantRows } = await admin
