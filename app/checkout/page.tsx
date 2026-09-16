@@ -8,6 +8,7 @@ import { Footer } from "@/components/site/sections/Footer";
 import { SiteEffects } from "@/components/site/sections/SiteEffects";
 import { themeStyleTag, type SiteThemeConfig } from "@/lib/site-theme";
 import { DEFAULT_SITE_DATA } from "@/lib/site-data";
+import { resolveModelLogo } from "@/lib/site-data";
 import { resolveHomeSections } from "@/lib/home";
 import { getPublicTenantBySlug } from "@/lib/tenant";
 import type { PublicTenant } from "@/types";
@@ -66,12 +67,10 @@ export default async function CheckoutPage({
   const visible = sections.filter((s) => s.enabled);
   const headerSection = visible.find((s) => s.type === "header");
   const headerContent = (headerSection?.content || {}) as Record<string, unknown>;
-  const logoText = (siteData.logoText as string) || (headerContent.logoText as string) || (headerSection?.label as string) || tenant.profile_name || tenant.site_name || "Logo";
-  const logoUrl =
-    (siteData.logoMode as string) === "text"
-      ? undefined
-      : (siteData.logoUrl as string) || (headerContent.logoUrl as string) || undefined;
-  const logoLightUrl = (siteData.logoLightUrl as string) || (headerContent.logoLightUrl as string) || undefined;
+  const logo = resolveModelLogo(headerContent, siteData, (headerSection?.label as string) || tenant.profile_name || tenant.site_name || undefined);
+  const logoText = logo.text;
+  const logoUrl = logo.url;
+  const logoLightUrl = logo.lightUrl;
 
   // Nav da HOME (mesma ordem/labels) — no checkout prefixa "/" para navegar de volta à HOME
   const homeNavItems = visible

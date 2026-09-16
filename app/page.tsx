@@ -5,6 +5,7 @@ import { LoggedInNotice } from "@/components/site/LoggedInNotice";
 import { SiteUnprepared } from "@/components/site/SiteUnprepared";
 import { PwaRegister } from "@/components/site/PwaRegister";
 import { DEFAULT_SITE_DATA } from "@/lib/site-data";
+import { resolveModelLogo } from "@/lib/site-data";
 import { resolveHomeSections } from "@/lib/home";
 import { getPublicTenantBySlug } from "@/lib/tenant";
 import { getOfficialHomeTenant } from "@/lib/site-official";
@@ -155,6 +156,11 @@ export default async function HomePage() {
 
   const destination = resolveAffiliateDestination({ sections, access: "available" });
 
+  // Logo 100% do modelo (/admin/editor-home → Cabeçalho/Menu); o tenant
+  // oficial só complementa quando o modelo ainda não tem logo.
+  const headerContent = ((sections.find((s) => s.type === "header")?.content || {}) as Record<string, unknown>) || {};
+  const modelLogo = resolveModelLogo(headerContent, siteData, tenant.profile_name || tenant.site_name || undefined);
+
   return (
     <>
       <link rel="canonical" href={canonicalUrl} />
@@ -173,10 +179,10 @@ export default async function HomePage() {
           profileName: tenant.profile_name || undefined,
         }}
         logo={{
-          mode: (siteData.logoMode as "image" | "text") || undefined,
-          url: (siteData.logoUrl as string) || undefined,
-          lightUrl: (siteData.logoLightUrl as string) || undefined,
-          text: (siteData.logoText as string) || undefined,
+          mode: modelLogo.mode,
+          url: modelLogo.url,
+          lightUrl: modelLogo.lightUrl,
+          text: modelLogo.text,
         }}
         extraNav={[{ label: "Painel", href: user ? "/painel" : "/login" }]}
       />

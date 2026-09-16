@@ -8,6 +8,7 @@ import { DemoPublicSite } from "@/components/demo/DemoPublicSite";
 import { PwaRegister } from "@/components/site/PwaRegister";
 import { resolveTenantAccess } from "@/lib/tenant";
 import { resolveHomeSections } from "@/lib/home";
+import { resolveModelLogo } from "@/lib/site-data";
 import { getCurrentUser } from "@/lib/auth";
 import { getOfficialHomeTenant, isOfficialHomeTenantById } from "@/lib/site-official";
 import { resolvePwaForRequest } from "@/lib/pwa/resolver";
@@ -155,8 +156,18 @@ export default async function TenantSitePage({
         tenantDataOverridesGlobal: true,
         ignoreTenantOverrides: true,
       });
+      // Logo da demo segue a mesma regra da HOME: modelo primeiro — sem isso,
+      // um logo antigo do tenant oficial sombreava o logo novo do editor.
+      const demoHeader = ((modelSections.find((s) => s.type === "header")?.content || {}) as Record<string, unknown>) || {};
+      const demoLogo = resolveModelLogo(demoHeader, ((official.site_data || {}) as Record<string, unknown>) || {});
       demoModel = {
-        site: ((official.site_data || {}) as Record<string, unknown>) || {},
+        site: {
+          ...((official.site_data || {}) as Record<string, unknown>),
+          logoMode: demoLogo.mode,
+          logoUrl: demoLogo.url ?? "",
+          logoLightUrl: demoLogo.lightUrl ?? "",
+          logoText: demoLogo.text,
+        },
         sections: modelSections.map((s) => ({
           type: s.type,
           enabled: s.enabled,

@@ -7,6 +7,7 @@ import { Footer } from "@/components/site/sections/Footer";
 import { SiteEffects } from "@/components/site/sections/SiteEffects";
 import { themeStyleTag, type SiteThemeConfig } from "@/lib/site-theme";
 import { DEFAULT_SITE_DATA } from "@/lib/site-data";
+import { resolveModelLogo } from "@/lib/site-data";
 import { resolveHomeSections } from "@/lib/home";
 import { getPublicTenantBySlug } from "@/lib/tenant";
 import { getPublicAffiliateConfig } from "@/lib/affiliate-public";
@@ -74,12 +75,10 @@ export default async function AfiliadosPage({
   const visible = sections.filter((s) => s.enabled);
   const headerSection = visible.find((s) => s.type === "header");
   const headerContent = (headerSection?.content || {}) as Record<string, unknown>;
-  const logoText = (siteData.logoText as string) || (headerContent.logoText as string) || (headerSection?.label as string) || tenant.profile_name || tenant.site_name || "Logo";
-  const logoUrl =
-    (siteData.logoMode as string) === "text"
-      ? undefined
-      : (siteData.logoUrl as string) || (headerContent.logoUrl as string) || undefined;
-  const logoLightUrl = (siteData.logoLightUrl as string) || (headerContent.logoLightUrl as string) || undefined;
+  const logo = resolveModelLogo(headerContent, siteData, (headerSection?.label as string) || tenant.profile_name || tenant.site_name || undefined);
+  const logoText = logo.text;
+  const logoUrl = logo.url;
+  const logoLightUrl = logo.lightUrl;
 
   const homeNavItems = visible
     .filter((s) => s.settings?.showInNav !== false && s.type !== "header" && s.type !== "footer" && s.type !== "affiliates")

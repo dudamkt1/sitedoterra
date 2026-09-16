@@ -192,3 +192,30 @@ export const DEFAULT_SITE_DATA: SiteData = {
     youtube: { enabled: false, url: "" },
   },
 };
+
+/**
+ * Logo da HOME MODELO (domínio principal e páginas da plataforma).
+ *
+ * O `/admin/editor-home` (seção global "Cabeçalho/Menu") é a FONTE OFICIAL:
+ * os dados do tenant oficial (`site_settings`) valem só como fallback para
+ * quando o modelo ainda não tem logo. Sem essa ordem, um logo antigo salvo
+ * no tenant oficial sombreava o logo novo do editor e a HOME principal
+ * "não atualizava" mesmo com o salvamento correto.
+ */
+export function resolveModelLogo(
+  headerContent: Record<string, unknown>,
+  siteData: Record<string, unknown>,
+  fallbackLabel?: string
+): { mode: "image" | "text"; url?: string; lightUrl?: string; text: string } {
+  const str = (v: unknown): string | undefined => {
+    const s = typeof v === "string" ? v.trim() : "";
+    return s || undefined;
+  };
+  const url = str(headerContent.logoUrl) || str(siteData.logoUrl);
+  return {
+    mode: url ? "image" : "text",
+    url,
+    lightUrl: str(headerContent.logoLightUrl) || str(siteData.logoLightUrl),
+    text: str(headerContent.logoText) || str(siteData.logoText) || fallbackLabel || "Logo",
+  };
+}
