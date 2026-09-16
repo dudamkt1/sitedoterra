@@ -120,6 +120,8 @@ export default async function LoginPage() {
         contactEmail={email}
         contactInstagram={instagram}
         profileName={profileName}
+        ownerName={(siteData.fullName as string) || ([siteData.name, siteData.surname].filter(Boolean).join(" ") as string) || undefined}
+        aboutDescription={(siteData.description as string) || undefined}
       />
       </div>
     </div>

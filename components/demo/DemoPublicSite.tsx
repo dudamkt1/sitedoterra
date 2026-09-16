@@ -213,6 +213,8 @@ export function DemoPublicSite({ model }: { model?: { site: Record<string, unkno
           lightUrl: site.logoLightUrl || undefined,
           text: site.logoText || undefined,
         }}
+        ownerName={site.fullName || undefined}
+        aboutDescription={site.description || undefined}
         extraNav={[{ label: "Quero meu site", href: "/cadastro" }]}
       />
     </div>

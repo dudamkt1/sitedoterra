@@ -42,6 +42,16 @@ interface SiteHomeProps {
   contact?: SiteContact;
   logo?: SiteLogo;
   extraNav?: { label: string; href: string; className?: string }[];
+  /**
+   * Nome do consultor vindo de "Informações do site" (meu site) — 1ª coluna
+   * do rodapé e linha final. Cai para o nome do perfil quando ausente.
+   */
+  ownerName?: string;
+  /**
+   * "Descrição principal" de "Informações do site" (meu site) — abaixo do
+   * nome na 1ª coluna do rodapé. Cai para o texto da seção quando vazia.
+   */
+  aboutDescription?: string;
   /** Tema de cores definido pelo dono em /painel/meu-site (site_settings.theme). */
   theme?: SiteThemeConfig | null;
   /** ID do usuário afiliado (dono do site) para rastreamento de cliques */
@@ -66,7 +76,7 @@ interface SiteHomeProps {
  * renderiza cada uma como componente independente, na ordem correta.
  * Seções desativadas são simplesmente ignoradas.
  */
-export function SiteHome({ slug, sections, contact, logo, extraNav = [], theme, affiliateUserId, destination, tenantSite = false }: SiteHomeProps) {
+export function SiteHome({ slug, sections, contact, logo, extraNav = [], ownerName, aboutDescription, theme, affiliateUserId, destination, tenantSite = false }: SiteHomeProps) {
   const visible = sections.filter((s) => s.enabled);
 
   const headerSection = visible.find((s) => s.type === "header");
@@ -168,6 +178,8 @@ export function SiteHome({ slug, sections, contact, logo, extraNav = [], theme, 
         contactEmail={email}
         contactInstagram={instagram}
         profileName={profileName}
+        ownerName={ownerName}
+        aboutDescription={aboutDescription}
       />
 
       {/* Botão flutuante do WhatsApp */}

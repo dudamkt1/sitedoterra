@@ -231,10 +231,15 @@ export default async function TenantSitePage({
     // frozenTenantContent (exceto tenant oficial = HOME viva): o site foi
     // fotografado na ativação e edições do /admin/editor-home NÃO propagam
     // para sites já ativos — só o painel individual do dono os altera.
-    const sections = await resolveHomeSections({ tenant, tenantDataOverridesGlobal: true, frozenTenantContent: !isOfficial });
+        const sections = await resolveHomeSections({ tenant, tenantDataOverridesGlobal: true, frozenTenantContent: !isOfficial });
     const siteData = (tenant.site_data || {}) as Record<string, unknown>;
     const theme = (siteData.theme as SiteThemeConfig | undefined) || null;
-    const pwaEnabled = Boolean(pwa?.settings.enabled);
+    // Rodapé 1ª coluna: nome + descrição de "Informações do site" (meu site).
+    const ownerName =
+      (siteData.fullName as string) ||
+      ([siteData.name, siteData.surname].filter(Boolean).join(" ") as string) ||
+      undefined;
+    const aboutDescription = (siteData.description as string) || undefined;    const pwaEnabled = Boolean(pwa?.settings.enabled);
     const { manifestUrl, swUrl } = pwaUrls(pwa?.basePath || `/${params.slug}/`);
     // Fallback inteligente: o AffiliateAttribution recebe o destino
     // (anchor "planos" ou outro) resolvido pelo servidor a partir da
@@ -287,6 +292,8 @@ export default async function TenantSitePage({
             lightUrl: (siteData.logoLightUrl as string) || undefined,
             text: (siteData.logoText as string) || undefined,
           }}
+          ownerName={ownerName}
+          aboutDescription={aboutDescription}
           extraNav={[{ label: "Painel", href: user ? "/painel" : "/login" }]}
         />
         <PwaRegister

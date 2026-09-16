@@ -154,6 +154,13 @@ export default async function HomePage() {
     );
   }
 
+  // Rodapé 1ª coluna: nome + descrição de "Informações do site".
+  const ownerName =
+    (siteData.fullName as string) ||
+    ([siteData.name, siteData.surname].filter(Boolean).join(" ") as string) ||
+    undefined;
+  const aboutDescription = (siteData.description as string) || undefined;
+
   const destination = resolveAffiliateDestination({ sections, access: "available" });
 
   // Logo 100% do modelo (/admin/editor-home → Cabeçalho/Menu); o tenant
@@ -184,6 +191,8 @@ export default async function HomePage() {
           lightUrl: modelLogo.lightUrl,
           text: modelLogo.text,
         }}
+        ownerName={ownerName}
+        aboutDescription={aboutDescription}
         extraNav={[{ label: "Painel", href: user ? "/painel" : "/login" }]}
       />
       <PwaRegister

@@ -2854,6 +2854,13 @@
 #tenant-site .footer-copy a:hover { color: var(--verde-claro); }
 
 
+#tenant-site .footer-empty {
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  color: rgba(255,255,255,0.35);
+}
+
+
 
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(24px); }
@@ -3260,4 +3267,186 @@
   }
   #tenant-site .tema-swatch { padding: 1rem 0.25rem; }
   #tenant-site .tema-desc { display: none; }
+}
+
+/* ============================================================================
+   VÍDEO — lightbox centralizado (mobile e desktop)
+   O quadro vira botão; ao tocar, o vídeo abre CENTRALIZADO na janela, com
+   ações de tela cheia e "ver no YouTube". Ao fechar, o scroll é restaurado.
+   ============================================================================ */
+
+#tenant-site .video-frame-wrap {
+  max-width: 880px;
+  margin: 0 auto;
+}
+
+#tenant-site button.video-frame {
+  display: block;
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 1px solid rgba(255,255,255,0.1);
+  padding: 0;
+  text-align: inherit;
+}
+
+#tenant-site button.video-frame:disabled {
+  cursor: default;
+}
+
+#tenant-site .video-hint {
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  color: rgba(255,255,255,0.55);
+  letter-spacing: 0.08em;
+}
+
+#tenant-site .video-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  background: rgba(5, 20, 13, 0.88);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  overscroll-behavior: contain;
+}
+
+#tenant-site .video-modal-box {
+  width: 100%;
+  max-width: 880px;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #0d3320;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.5);
+}
+
+#tenant-site .video-modal-box:fullscreen {
+  max-width: none;
+  border-radius: 0;
+  border: none;
+}
+
+#tenant-site .video-modal-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+}
+
+#tenant-site .video-modal-title {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#tenant-site .video-modal-btn {
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.16);
+  border-radius: 999px;
+  padding: 0.55rem 1.1rem;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.2s ease;
+  white-space: nowrap;
+}
+
+#tenant-site .video-modal-btn:hover {
+  background: rgba(255,255,255,0.2);
+}
+
+#tenant-site .video-modal-player {
+  aspect-ratio: 16/9;
+  background: #000;
+}
+
+#tenant-site .video-modal-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 12px 16px 16px;
+}
+
+@media (max-width: 768px) {
+  #tenant-site .video-frame-wrap {
+    max-width: 100%;
+  }
+  #tenant-site .video-modal {
+    padding: 12px;
+  }
+  #tenant-site .video-modal-actions .video-modal-btn {
+    flex: 1 1 auto;
+    text-align: center;
+  }
+}
+
+/* ============================================================================
+   DICAS / ROTINAS — carrossel horizontal no mobile/tablet com TODAS as imagens
+   (substitui o grade que escondia publicações com display:none).
+   ============================================================================ */
+
+@media (max-width: 1024px) {
+  #tenant-site .insta-grid {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 12px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    padding-bottom: 14px;
+    margin: 0 -4%;
+    padding-left: 4%;
+    padding-right: 4%;
+    scrollbar-width: thin;
+    scrollbar-color: var(--ouro) rgba(29,92,58,0.12);
+  }
+  #tenant-site .insta-grid::-webkit-scrollbar {
+    height: 8px;
+  }
+  #tenant-site .insta-grid::-webkit-scrollbar-track {
+    background: rgba(29,92,58,0.12);
+    border-radius: 999px;
+  }
+  #tenant-site .insta-grid::-webkit-scrollbar-thumb {
+    background: var(--ouro);
+    border-radius: 999px;
+  }
+  #tenant-site .insta-item {
+    flex: 0 0 31%;
+    min-width: 0;
+    scroll-snap-align: start;
+  }
+  #tenant-site .insta-item:nth-child(n+4) {
+    display: block;
+  }
+}
+
+@media (max-width: 768px) {
+  #tenant-site .insta-grid {
+    gap: 10px;
+  }
+  #tenant-site .insta-item {
+    flex-basis: 68%;
+  }
+  #tenant-site .insta-item:nth-child(n+3) {
+    display: block;
+  }
 }
