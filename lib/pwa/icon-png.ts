@@ -14,7 +14,12 @@ import type { PwaSettings } from "./config";
 // As rotas `/pwa/*.png` (raiz e `/{slug}/pwa/*.png`) servem este buffer no
 // MESMO domínio do site → o manifest nunca quebra por CORS do R2/CDN.
 
-const FETCH_TIMEOUT_MS = 12_000;
+// Fail-fast: cada fonte tem poucos segundos. Timeout longo × N candidatos
+// estourava o limite de execução serverless (a rota caía antes de responder
+// e o celular recebia erro em vez do PNG) quando a origem pendurava a
+// conexão (ex.: WAF/bloqueio no domínio de mídia). R2/CDN saudável responde
+// em <1s; 6s é folga de sobra.
+const FETCH_TIMEOUT_MS = 6_000;
 const MAX_SOURCE_BYTES = 10 * 1024 * 1024;
 
 export type PwaPngKind = "apple" | "icon192" | "icon512" | "maskable";
@@ -83,7 +88,19 @@ async function fetchSource(url: string): Promise<Buffer | null> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(url, { signal: ctrl.signal, redirect: "follow" });
+    // UA de navegador + Accept explícito: alguns WAFs/CDNs na frente do
+    // domínio de mídia barram fetch server-side sem UA (a prévia <img> no
+    // painel funcionava, mas o servidor caía no fallback genérico).
+    const res = await fetch(url, {
+      signal: ctrl.signal,
+      redirect: "follow",
+      cache: "no-store",
+      headers: {
+        Accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+        "User-Agent":
+          "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Mobile Safari/537.36 (PWA-Icon-Renderer)",
+      },
+    });
     if (!res.ok) {
       console.error(`[pwa/icon] fetchSource falhou: url=${url} status=${res.status}`);
       return null;

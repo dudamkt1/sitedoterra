@@ -383,9 +383,13 @@ export function PwaManager() {
         out.push({ ok: false, label: "Manifest acessível", detail: "Falha de rede ao buscar o manifest." });
       }
 
-      // Ícones do manifest
+      // Ícones do manifest — distingue LOGO REAL de FALLBACK GENÉRICO via
+      // header X-PWA-Icon-Source (mesma origem). Antes, ambos eram 200
+      // image/png e o check "batia ok" mesmo com o servidor servindo o tile
+      // genérico — o usuário só descobria no celular já instalado.
       if (manifest && Array.isArray(manifest.icons) && manifest.icons.length > 0) {
         let okCount = 0;
+        let fallbackCount = 0;
         let firstErr = "";
         for (const ic of manifest.icons.slice(0, 8)) {
           try {
@@ -393,17 +397,44 @@ export function PwaManager() {
             const r = await fetch(String(ic.src), { cache: "no-store", signal: t.signal });
             t.done();
             const ct = (r.headers.get("content-type") || "").toLowerCase();
-            if (r.ok && (ct.includes("image/") || ct.includes("svg"))) okCount += 1;
-            else if (!firstErr) firstErr = `${ic.sizes || "?"} → HTTP ${r.status}`;
+            const src = (r.headers.get("x-pwa-icon-source") || "").toLowerCase();
+            if (src === "generated") {
+              fallbackCount += 1;
+              if (!firstErr) firstErr = `${ic.sizes || "?"} → ícone GENÉRICO (upload não encontrado no servidor)`;
+            } else if (r.ok && (ct.includes("image/") || ct.includes("svg"))) {
+              okCount += 1;
+            } else if (!firstErr) {
+              firstErr = `${ic.sizes || "?"} → HTTP ${r.status}`;
+            }
           } catch {
             if (!firstErr) firstErr = `${ic.sizes || "?"} → falha de rede`;
           }
         }
-        out.push({
-          ok: okCount > 0,
-          label: `Ícones acessíveis (${okCount}/${Math.min(manifest.icons.length, 8)} testados)`,
-          detail: okCount > 0 ? "O celular consegue baixar o logotipo." : `Nenhum ícone abriu. Ex.: ${firstErr}. Reenvie o logo e salve.`,
-        });
+        if (okCount > 0 && fallbackCount === 0) {
+          out.push({
+            ok: true,
+            label: `Ícones acessíveis (${okCount}/${Math.min(manifest.icons.length, 8)} testados)`,
+            detail: "O servidor está servindo seu logotipo real. O celular consegue baixar.",
+          });
+        } else if (okCount > 0 && fallbackCount > 0) {
+          out.push({
+            ok: false,
+            label: `Ícones parcialmente genéricos (${fallbackCount} em fallback)`,
+            detail: `Ex.: ${firstErr}. Reenvie o logotipo, SALVE as configurações e reinstale o app no celular.`,
+          });
+        } else if (fallbackCount > 0) {
+          out.push({
+            ok: false,
+            label: "Servidor servindo ícone GENÉRICO",
+            detail: `Nenhum upload foi encontrado pelo servidor. Ex.: ${firstErr}. Reenvie o logotipo e SALVE.`,
+          });
+        } else {
+          out.push({
+            ok: false,
+            label: "Ícones inacessíveis",
+            detail: `Nenhum ícone abriu. Ex.: ${firstErr}. Reenvie o logo e salve.`,
+          });
+        }
       } else if (manifest) {
         out.push({ ok: false, label: "Ícones no manifest", detail: "Manifest sem lista de ícones." });
       }
@@ -447,7 +478,6 @@ export function PwaManager() {
 
   const statusStyle = status ? LEVEL_STYLES[status.level] : "";
   const currentIcon = form.icon_512_url || form.icon_192_url;
-  const iconesIgualados = status?.checks?.iconesIgualados || false;
 
   return (
     <div className="space-y-6">
@@ -622,13 +652,15 @@ export function PwaManager() {
                   <input className="input flex-1" value={form.icon_512_url || ""} placeholder="https://…/logo.png"
                     onChange={(e) => {
                       const url = e.target.value;
-                      // Colar URL manualmente: assume que o usuário já tem um PNG pronto
-                      // e usa o MESMO URL em todos os tamanhos. O sistema NÃO re-processa
-                      // (processAndUploadIconVariants só roda no upload de arquivo).
+                      // Colar URL manualmente: UMA fonte basta — as rotas
+                      // /pwa/*.png (same-origin) baixam essa fonte e geram os
+                      // 4 tamanhos no servidor. Não é preciso re-processar aqui.
                       patch({ icon_192_url: url, icon_512_url: url, icon_180_url: url, icon_maskable_512_url: url });
                     }} />
                   <MediaPicker scope="tenant" value={form.icon_512_url || undefined}
                     onChange={(url) => patch({ icon_192_url: url, icon_512_url: url, icon_180_url: url, icon_maskable_512_url: url })} />
+                  {/* Uma única URL nos 4 campos é VÁLIDA (o servidor redimensiona).
+                      Não exibir aviso de "mesmo arquivo": era falso-positivo. */}
                 </div>
                 <p className="text-xs text-gray-400 mt-1">
                   Ao <b>enviar um arquivo</b>, o sistema gera automaticamente: 180×180 (iOS), 192×192, 512×512 e 512×512 maskable.
@@ -866,12 +898,6 @@ export function PwaManager() {
             {msg.text}
           </p>
         )}
-        {iconesIgualados && (
-          <p className="mt-2 text-sm text-red-600">
-            ⚠️ Todos os ícones do PWA estão apontando para o mesmo arquivo. O ícone instalado pode não aparecer corretamente. Clique aqui para conferir ou faça upload de um novo logotipo.
-          </p>
-        )}
-
         <div className="mt-5 flex items-center gap-3 flex-wrap">
           <button type="button" onClick={save} disabled={saving} className="btn btn-primary">
             {saving ? "Salvando..." : "Salvar configurações"}

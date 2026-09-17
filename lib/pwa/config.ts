@@ -228,7 +228,6 @@ export interface PwaChecklist {
   manifest: boolean;
   serviceWorker: boolean;
   ativa: boolean;
-  iconesIgualados: boolean;
 }
 
 export interface PwaStatus {
@@ -238,15 +237,14 @@ export interface PwaStatus {
 }
 
 export function computePwaStatus(s: PwaSettings): PwaStatus {
-  const iconUrls = [
-    s.icon_180_url,
-    s.icon_192_url,
-    s.icon_512_url,
-    s.icon_maskable_512_url,
-  ];
-  const iconesIgualados = iconUrls.filter(
-    (u, i) => u && iconUrls.every((v) => v === u)
-  ).length > 0;
+  // NOTA: NÃO existe mais checagem de "ícones apontando para o mesmo arquivo".
+  // Era um falso-positivo: o manifest referencia SEMPRE os proxies same-origin
+  // (/pwa/*.png), que buscam UMA fonte qualquer (512 → maskable → 192 → 180 →
+  // logo) e redimensionam no servidor. Uma única URL válida (ex.: escolhida na
+  // biblioteca ou colada manualmente) atende os 4 tamanhos perfeitamente — o
+  // aviso antigo mandava o usuário reenviar o logo à toa e tinha CTA morto
+  // ("Clique aqui" sem link). A saúde real de cada URL é verificada por
+  // /api/pwa/validate-icon e pelo header X-PWA-Icon-Source no diagnóstico.
   const checks: PwaChecklist = {
     nome: Boolean(s.app_name && s.short_name),
     logo: Boolean(s.logo_url),
@@ -255,7 +253,6 @@ export function computePwaStatus(s: PwaSettings): PwaStatus {
     manifest: Boolean(s.app_name),
     serviceWorker: true, // servido automaticamente quando a PWA está ativa
     ativa: s.enabled,
-    iconesIgualados,
   };
   const essentials =
     checks.nome && checks.cores && checks.manifest && checks.ativa;
