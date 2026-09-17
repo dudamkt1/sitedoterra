@@ -1,5 +1,6 @@
 import sharp from "sharp";
 import type { PwaSettings } from "./config";
+import { r2Env } from "@/lib/r2";
 
 // Renderização GARANTIDA do ícone PNG do PWA (server-side).
 //
@@ -14,13 +15,11 @@ import type { PwaSettings } from "./config";
 // As rotas `/pwa/*.png` (raiz e `/{slug}/pwa/*.png`) servem este buffer no
 // MESMO domínio do site → o manifest nunca quebra por CORS do R2/CDN.
 
-// Fail-fast: cada fonte tem poucos segundos. Timeout longo × N candidatos
-// estourava o limite de execução serverless (a rota caía antes de responder
-// e o celular recebia erro em vez do PNG) quando a origem pendurava a
-// conexão (ex.: WAF/bloqueio no domínio de mídia). R2/CDN saudável responde
-// em <1s; 6s é folga de sobra.
-const FETCH_TIMEOUT_MS = 6_000;
+// Fail-fast com retry: timeout por tentativa + backoff. R2/CDN saudável
+// responde em <1s; 15s total com 3 tentativas cobre latência + retry.
+const FETCH_TIMEOUT_MS = 15_000;
 const MAX_SOURCE_BYTES = 10 * 1024 * 1024;
+const MAX_FETCH_RETRIES = 3;
 
 export type PwaPngKind = "apple" | "icon192" | "icon512" | "maskable";
 
@@ -84,49 +83,91 @@ function absolutize(url: string, origin: string): string {
   return `${origin.replace(/\/$/, "")}${url.startsWith("/") ? url : `/${url}`}`;
 }
 
+/**
+ * Tenta buscar a imagem com retry e fallback de URL.
+ * - Timeout por tentativa: FETCH_TIMEOUT_MS
+ * - Retry com backoff exponencial: MAX_FETCH_RETRIES tentativas
+ * - Se URL usa domínio customizado (R2_PUBLIC_URL), tenta fallback para .r2.dev
+ */
 async function fetchSource(url: string): Promise<Buffer | null> {
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
-  try {
-    // UA de navegador + Accept explícito: alguns WAFs/CDNs na frente do
-    // domínio de mídia barram fetch server-side sem UA (a prévia <img> no
-    // painel funcionava, mas o servidor caía no fallback genérico).
-    const res = await fetch(url, {
-      signal: ctrl.signal,
-      redirect: "follow",
-      cache: "no-store",
-      headers: {
-        Accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
-        "User-Agent":
-          "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Mobile Safari/537.36 (PWA-Icon-Renderer)",
-      },
-    });
-    if (!res.ok) {
-      console.error(`[pwa/icon] fetchSource falhou: url=${url} status=${res.status}`);
-      return null;
+  // Gera URLs alternativas: se é domínio customizado, tenta .r2.dev como fallback
+  const urlsToTry = getAlternativeUrls(url);
+
+  for (let attempt = 0; attempt < urlsToTry.length; attempt++) {
+    const currentUrl = urlsToTry[attempt];
+    const isFallback = attempt > 0;
+    const maxRetries = isFallback ? 1 : MAX_FETCH_RETRIES; // fallback URL tenta só 1x
+
+    for (let retry = 0; retry < maxRetries; retry++) {
+      const ctrl = new AbortController();
+      const timeout = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+      try {
+        const res = await fetch(currentUrl, {
+          signal: ctrl.signal,
+          redirect: "follow",
+          cache: "no-store",
+          headers: {
+            Accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+            "User-Agent":
+              "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Mobile Safari/537.36 (PWA-Icon-Renderer)",
+          },
+        });
+        if (!res.ok) {
+          const errMsg = `HTTP ${res.status}`;
+          if (retry === maxRetries - 1 && attempt === urlsToTry.length - 1) {
+            console.error(`[pwa/icon] fetchSource falhou após ${maxRetries} tentativas: url=${currentUrl} ${errMsg}`);
+          } else {
+            console.warn(`[pwa/icon] fetchSource ${errMsg} (tentativa ${retry + 1}/${maxRetries}): url=${currentUrl}`);
+          }
+          continue; // retry
+        }
+        const ct = (res.headers.get("content-type") || "").toLowerCase();
+        if (!ct.startsWith("image/") && !/\.svg($|\?)/i.test(currentUrl)) {
+          console.warn(`[pwa/icon] fetchSource content-type inesperado (aceitando): url=${currentUrl} ct=${ct || "(ausente)"}`);
+        }
+        const buf = Buffer.from(await res.arrayBuffer());
+        if (!buf.length || buf.length > MAX_SOURCE_BYTES) {
+          console.error(
+            `[pwa/icon] fetchSource tamanho inválido: url=${currentUrl} bytes=${buf.length} max=${MAX_SOURCE_BYTES}`
+          );
+          continue; // retry next URL
+        }
+        if (isFallback) {
+          console.log(`[pwa/icon] fetchSource SUCESSO via fallback .r2.dev: url=${currentUrl}`);
+        }
+        return buf;
+      } catch (err) {
+        const isLastAttempt = retry === maxRetries - 1 && attempt === urlsToTry.length - 1;
+        const msg = isLastAttempt ? "FALHA FINAL" : `tentativa ${retry + 1}/${maxRetries}`;
+        console.error(`[pwa/icon] fetchSource ${msg}: url=${currentUrl}`, err);
+        if (!isLastAttempt) {
+          // Backoff exponencial: 500ms, 1s, 2s...
+          await new Promise((r) => setTimeout(r, 500 * 2 ** retry));
+        }
+      } finally {
+        clearTimeout(timeout);
+      }
     }
-    // NÃO rejeitar por Content-Type: origens (R2/CDN) podem servir a imagem
-    // com header ausente ou genérico ("application/octet-stream"). O próprio
-    // sharp valida o conteúdo em renderPwaPng() e lança se não for imagem.
-    // Mantemos só o log do header recebido para diagnóstico futuro.
-    const ct = (res.headers.get("content-type") || "").toLowerCase();
-    if (!ct.startsWith("image/") && !/\.svg($|\?)/i.test(url)) {
-      console.error(`[pwa/icon] fetchSource content-type inesperado (aceitando mesmo assim): url=${url} content-type=${ct || "(ausente)"}`);
-    }
-    const buf = Buffer.from(await res.arrayBuffer());
-    if (!buf.length || buf.length > MAX_SOURCE_BYTES) {
-      console.error(
-        `[pwa/icon] fetchSource tamanho inválido: url=${url} bytes=${buf.length} max=${MAX_SOURCE_BYTES}`
-      );
-      return null;
-    }
-    return buf;
-  } catch (err) {
-    console.error(`[pwa/icon] fetchSource erro de rede/timeout: url=${url}`, err);
-    return null;
-  } finally {
-    clearTimeout(t);
   }
+  return null;
+}
+
+function getAlternativeUrls(url: string): string[] {
+  const urls = [url];
+  try {
+    const u = new URL(url);
+    const host = u.hostname;
+    const isR2Native = host.endsWith(".r2.dev") || host.endsWith(".cloudflarestorage.com");
+    if (!isR2Native) {
+      const env = r2Env();
+      const bucket = env.bucket || "site-doterra-media";
+      const fallbackUrl = `https://${bucket}.r2.dev${u.pathname}${u.search}`;
+      if (fallbackUrl !== url) urls.push(fallbackUrl);
+    }
+  } catch {
+    // URL inválida, usa só a original
+  }
+  return urls;
 }
 
 /**
