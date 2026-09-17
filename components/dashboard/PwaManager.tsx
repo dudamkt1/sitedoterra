@@ -56,6 +56,8 @@ export function PwaManager() {
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [diagnosing, setDiagnosing] = useState(false);
+  const [diag, setDiag] = useState<{ ok: boolean; label: string; detail?: string }[] | null>(null);
   const [iconInfo, setIconInfo] = useState<{ width: number; height: number; isSquare: boolean; isPngLike: boolean } | null>(null);
   const [urlProbe, setUrlProbe] = useState<Record<string, UrlProbe>>({});
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -323,6 +325,121 @@ export function PwaManager() {
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
     } catch {}
+  }
+
+  /**
+   * Diagnóstico de instalação: verifica na hora, do próprio navegador, tudo
+   * que o celular exige para instalar com nome + logotipo (manifest 200 com
+   * nome, ícones acessíveis, SW ativo, PWA habilitada). Aponta EXATAMENTE o
+   * que está bloqueando, em vez de "não instala" genérico.
+   */
+  async function runInstallDiagnostics() {
+    if (!data?.slug) {
+      setDiag([{ ok: false, label: "Site sem slug", detail: "Ative seu site para testar a instalação." }]);
+      return;
+    }
+    setDiagnosing(true);
+    setDiag(null);
+    const out: { ok: boolean; label: string; detail?: string }[] = [];
+    try {
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      const scope = `/${data.slug}/`;
+      const withTimeout = (ms: number) => {
+        const c = new AbortController();
+        const t = setTimeout(() => c.abort(), ms);
+        return { signal: c.signal, done: () => clearTimeout(t) };
+      };
+
+      out.push({
+        ok: form?.enabled === true,
+        label: "PWA ativa e salva",
+        detail: form?.enabled
+          ? "A chave geral está ligada."
+          : "Ligue “PWA ativa” e clique em Salvar configurações — sem isso o celular nem oferece instalar.",
+      });
+      out.push({
+        ok: Boolean(form?.app_name?.trim()),
+        label: "Nome do aplicativo preenchido",
+        detail: form?.app_name?.trim() ? `“${form.app_name.trim()}”` : "Preencha o nome e salve.",
+      });
+
+      // Manifest
+      let manifest: any = null;
+      try {
+        const t = withTimeout(15000);
+        const res = await fetch(`${origin}${scope}manifest.webmanifest`, { cache: "no-store", signal: t.signal });
+        t.done();
+        if (res.ok) {
+          manifest = await res.json().catch(() => null);
+          out.push({
+            ok: Boolean(manifest?.name),
+            label: "Manifest acessível com nome",
+            detail: manifest?.name ? `Nome no manifest: “${manifest.name}”.` : "Manifest sem nome.",
+          });
+        } else {
+          out.push({ ok: false, label: "Manifest acessível", detail: `HTTP ${res.status} — confira se a PWA está ativa e salva.` });
+        }
+      } catch {
+        out.push({ ok: false, label: "Manifest acessível", detail: "Falha de rede ao buscar o manifest." });
+      }
+
+      // Ícones do manifest
+      if (manifest && Array.isArray(manifest.icons) && manifest.icons.length > 0) {
+        let okCount = 0;
+        let firstErr = "";
+        for (const ic of manifest.icons.slice(0, 8)) {
+          try {
+            const t = withTimeout(15000);
+            const r = await fetch(String(ic.src), { cache: "no-store", signal: t.signal });
+            t.done();
+            const ct = (r.headers.get("content-type") || "").toLowerCase();
+            if (r.ok && (ct.includes("image/") || ct.includes("svg"))) okCount += 1;
+            else if (!firstErr) firstErr = `${ic.sizes || "?"} → HTTP ${r.status}`;
+          } catch {
+            if (!firstErr) firstErr = `${ic.sizes || "?"} → falha de rede`;
+          }
+        }
+        out.push({
+          ok: okCount > 0,
+          label: `Ícones acessíveis (${okCount}/${Math.min(manifest.icons.length, 8)} testados)`,
+          detail: okCount > 0 ? "O celular consegue baixar o logotipo." : `Nenhum ícone abriu. Ex.: ${firstErr}. Reenvie o logo e salve.`,
+        });
+      } else if (manifest) {
+        out.push({ ok: false, label: "Ícones no manifest", detail: "Manifest sem lista de ícones." });
+      }
+
+      // Service Worker
+      try {
+        const t = withTimeout(15000);
+        const res = await fetch(`${origin}${scope}sw.js`, { cache: "no-store", signal: t.signal });
+        t.done();
+        const ct = (res.headers.get("content-type") || "").toLowerCase();
+        out.push({
+          ok: res.ok && ct.includes("javascript"),
+          label: "Service Worker ativo",
+          detail: res.ok ? "Exigido pelo Chrome para oferecer Instalar." : `SW retornou HTTP ${res.status}.`,
+        });
+      } catch {
+        out.push({ ok: false, label: "Service Worker ativo", detail: "Falha de rede ao buscar o SW." });
+      }
+
+      // Navegador atual
+      const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
+      const isIOS = /iPad|iPhone|iPod/.test(ua);
+      const isChromium = /Chrome|Chromium|Edg|OPR|SamsungBrowser/i.test(ua) && !isIOS;
+      out.push({
+        ok: true,
+        label: "Instalação neste aparelho",
+        detail: isIOS
+          ? "No iPhone não existe instalar em 1 toque (limite da Apple): use Compartilhar → Adicionar à Tela de Início. O nome segue o título da página."
+          : isChromium
+            ? "Neste navegador (Chromium), com tudo acima ✓, o botão Instalar instala em 1 toque com logo + nome."
+            : "Neste navegador a instalação é manual pelo menu (Firefox etc. não têm instalação em 1 toque). Teste no Chrome para o fluxo automático.",
+      });
+    } finally {
+      setDiag(out);
+      setDiagnosing(false);
+    }
   }
 
   if (loading) return <p className="text-sm text-gray-400">Carregando configurações...</p>;
@@ -687,6 +804,35 @@ export function PwaManager() {
         <p className="text-[11px] text-center text-slate-400 mt-2">
           Aparência ilustrativa. O Android aplica máscara automática (squircle/círculo) no ícone.
         </p>
+      </div>
+
+      {/* ---------- Diagnóstico de instalação ---------- */}
+      <div className="card">
+        <h2 className="card-title mb-1">🔍 Verificar instalação no celular</h2>
+        <p className="text-sm text-gray-500 mb-4">
+          Testa na hora tudo que o celular exige para instalar com logotipo e nome: PWA ativa, manifest, ícones e Service Worker.
+        </p>
+        <button
+          type="button"
+          onClick={runInstallDiagnostics}
+          disabled={diagnosing}
+          className="btn btn-outline !py-2 !px-4 text-xs"
+        >
+          {diagnosing ? "Verificando..." : "🔍 Verificar se instala no celular"}
+        </button>
+        {diag && (
+          <ul className="mt-4 space-y-2">
+            {diag.map((d, i) => (
+              <li
+                key={i}
+                className={`rounded-lg border px-3 py-2 text-sm ${d.ok ? "border-green-200 bg-green-50 text-green-800" : "border-red-200 bg-red-50 text-red-800"}`}
+              >
+                <span className="font-semibold">{d.ok ? "✓" : "✗"} {d.label}</span>
+                {d.detail && <span className="block text-xs mt-0.5 opacity-90">{d.detail}</span>}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       {/* ---------- Ativação + salvar ---------- */}

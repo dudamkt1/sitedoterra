@@ -193,6 +193,15 @@ export function PwaRegister(props: PwaRegisterProps) {
     try {
       (window.navigator as Navigator & { vibrate?: (p: number) => boolean }).vibrate?.(15);
     } catch {}
+    // O evento nativo pode ter chegado depois da montagem: tenta o guardado
+    // de novo na hora do toque antes de desistir para o passo a passo.
+    try {
+      const stashed = window.__pwaBIP;
+      if (stashed && !deferredPrompt.current) {
+        deferredPrompt.current = stashed as BeforeInstallPromptEvent;
+        setCanNativeInstall(true);
+      }
+    } catch {}
     const p = deferredPrompt.current;
     if (!p) {
       // Sem prompt nativo (iPhone sempre; Android sem evento ou WebView):

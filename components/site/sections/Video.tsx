@@ -52,6 +52,62 @@ function requestContainerFullscreen(el: HTMLElement | null) {
 }
 
 /**
+ * Capa do vídeo = PRIMEIRO FRAME como fundo:
+ * - YouTube: thumbnail oficial em alta (maxres → hq como fallback);
+ * - Vimeo: thumbnail via oEmbed (best-effort, cai no degradê);
+ * - Arquivo direto (MP4): o próprio <video> com preload de metadados exibe
+ *   o primeiro frame nativamente.
+ * Ao centro, nítido: selo opcional + botão de play + "REPRODUZIR VÍDEO".
+ */
+function VideoPoster({ src }: { src: NonNullable<ReturnType<typeof parseSource>> }) {
+  const [ytFallback, setYtFallback] = useState(false);
+  const [vimeoThumb, setVimeoThumb] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (src.provider !== "vimeo") return;
+    let alive = true;
+    fetch(`https://vimeo.com/api/oembed.json?url=${encodeURIComponent(src.watch)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        const thumb = j?.thumbnail_url ? String(j.thumbnail_url) : null;
+        if (alive && thumb) setVimeoThumb(thumb);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [src]);
+
+  if (src.provider === "youtube") {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        className="video-poster"
+        src={ytFallback ? `https://i.ytimg.com/vi/${src.id}/hqdefault.jpg` : `https://i.ytimg.com/vi/${src.id}/maxresdefault.jpg`}
+        alt=""
+        aria-hidden
+        loading="lazy"
+        referrerPolicy="no-referrer"
+        onError={() => setYtFallback(true)}
+      />
+    );
+  }
+  if (src.provider === "vimeo" && vimeoThumb) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img className="video-poster" src={vimeoThumb} alt="" aria-hidden loading="lazy" referrerPolicy="no-referrer" />
+    );
+  }
+  if (src.provider === "file") {
+    return (
+      // eslint-disable-next-line jsx-a11y/media-has-caption
+      <video className="video-poster" src={src.embed} muted playsInline preload="metadata" aria-hidden tabIndex={-1} />
+    );
+  }
+  return null;
+}
+
+/**
  * Seção de vídeo com lightbox: o quadro exibe a capa com botão de play;
  * ao tocar, o vídeo abre CENTRALIZADO na janela (inclusive no mobile), com
  * ações de tela cheia e "ver no YouTube". Ao fechar, a página volta
@@ -128,11 +184,13 @@ export function Video({ content }: { content: VideoContent }) {
           aria-label={src ? `Assistir: ${content.title || "vídeo"}` : content.thumbLabel || "Vídeo em breve"}
         >
           <span className="video-thumb">
-            <span className="video-play-btn"><span className="video-play-icon" /></span>
-            {(content.playLabel || content.thumbLabel) && (
-              <span className="video-label">{content.playLabel || content.thumbLabel}</span>
-            )}
-            {src && <span className="video-hint">Toque para assistir</span>}
+            {src && <VideoPoster src={src} />}
+            <span className="video-scrim" aria-hidden />
+            <span className="video-cta">
+              {content.thumbLabel && <span className="video-kicker">{content.thumbLabel}</span>}
+              <span className="video-play-btn"><span className="video-play-icon" /></span>
+              <span className="video-cta-label">{content.playLabel || "REPRODUZIR VÍDEO"}</span>
+            </span>
           </span>
         </button>
       </div>
