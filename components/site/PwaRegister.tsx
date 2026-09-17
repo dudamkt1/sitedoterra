@@ -23,6 +23,17 @@ export interface PwaRegisterProps {
 type Platform = "ios" | "android" | "outro";
 
 /**
+ * Como instalar neste aparelho:
+ * - "native": Chrome/Android com prompt nativo → instala em 1 toque;
+ * - "installed": app já instalado (detectado) → abre direto / orienta reinstalar;
+ * - "system-browser": WebView de outro app (Instagram/WhatsApp) → abre no Chrome;
+ * - "ios": iPhone (a Apple não permite instalar por botão) → guia de 3 toques;
+ * - "manual": navegador sem instalação automática → passo a passo;
+ * - "pending": ainda avaliando (vira native/manual em segundos).
+ */
+type InstallMode = "pending" | "native" | "installed" | "system-browser" | "ios" | "manual";
+
+/**
  * Convite de instalação no MOBILE:
  * - aparece em TODO novo acesso ao site (enquanto o app não estiver instalado);
  * - quem não quiser pode fechar e seguir navegando sem ser incomodado
@@ -73,6 +84,7 @@ export function PwaRegister(props: PwaRegisterProps) {
   const [stepsPulse, setStepsPulse] = useState(false);
   // Navegador dentro de outro app (Instagram/WhatsApp): sem API de instalação.
   const [inAppBrowser, setInAppBrowser] = useState(false);
+  const [installMode, setInstallMode] = useState<InstallMode>("pending");
   const deferredPrompt = useRef<BeforeInstallPromptEvent | null>(null);
   const stepsRef = useRef<HTMLOListElement | null>(null);
 
@@ -118,18 +130,68 @@ export function PwaRegister(props: PwaRegisterProps) {
 
     setPlatform(detectPlatform());
     setInAppBrowser(isInAppBrowser());
+    const deviceInApp = isInAppBrowser();
+    const deviceIos = detectPlatform() === "ios";
+    const deviceAndroid = /Android/i.test(window.navigator.userAgent || "");
+
+    // Detecta o modo de instalação deste aparelho (uma vez por visita).
+    let modeCancelled = false;
+    async function detectInstallMode() {
+      // WebView de outro app no Android → sair para o Chrome (1 toque).
+      if (deviceInApp && deviceAndroid && !deviceIos) {
+        if (!modeCancelled) setInstallMode("system-browser");
+        return;
+      }
+      // iPhone: a Apple não permite instalar por botão — só o guia manual.
+      if (deviceIos) {
+        if (!modeCancelled) setInstallMode("ios");
+        return;
+      }
+      // App já instalado? Abre direto em vez de fingir instalar de novo
+      // (o Chrome não dispara o prompt para app instalado — era isso que
+      // caía no passo a passo sem instalar nada).
+      try {
+        const nav = window.navigator as Navigator & {
+          getInstalledRelatedApps?: () => Promise<{ id?: string; url?: string }[]>;
+        };
+        if (typeof nav.getInstalledRelatedApps === "function") {
+          const related = await nav.getInstalledRelatedApps().catch(() => []);
+          if (!modeCancelled && related && related.length > 0) {
+            setInstallMode("installed");
+            return;
+          }
+        }
+      } catch {}
+      if (!modeCancelled) {
+        if (deferredPrompt.current) {
+          setInstallMode("native");
+        } else {
+          // Aguarda o prompt nativo; sem ele, cai no passo a passo.
+          window.setTimeout(() => {
+            if (!modeCancelled) {
+              setInstallMode(deferredPrompt.current ? "native" : "manual");
+            }
+          }, 6000);
+        }
+      }
+    }
+    void detectInstallMode();
 
     // 5) Evento nativo (Android/Chrome) guarda o prompt para o botão instalar.
     //    Quando ele chega, o botão vira instalação em 1 toque de verdade.
     //    O PwaPromptCapture (beforeInteractive) pode já ter guardado o evento
     //    em window.__pwaBIP antes da hidratação — consome aqui para nunca
     //    perder a instalação automática.
+    function promoteNative() {
+      setInstallMode((m) => (m === "pending" || m === "manual" ? "native" : m));
+    }
     function takeStashedPrompt(): boolean {
       try {
         const stashed = window.__pwaBIP;
         if (stashed) {
           deferredPrompt.current = stashed as BeforeInstallPromptEvent;
           setCanNativeInstall(true);
+          promoteNative();
           return true;
         }
       } catch {}
@@ -139,6 +201,7 @@ export function PwaRegister(props: PwaRegisterProps) {
       e.preventDefault();
       deferredPrompt.current = e as BeforeInstallPromptEvent;
       setCanNativeInstall(true);
+      promoteNative();
     }
     function onStashedReady() {
       takeStashedPrompt();
@@ -148,6 +211,7 @@ export function PwaRegister(props: PwaRegisterProps) {
       setCanNativeInstall(false);
       setVisible(false);
       setManualSteps(false);
+      setInstallMode("installed");
       try {
         sessionStorage.setItem(DISMISS_KEY(slug), "1");
       } catch {}
@@ -161,11 +225,13 @@ export function PwaRegister(props: PwaRegisterProps) {
     // 6) Mostra em todo acesso mobile — mesmo antes do evento nativo chegar.
     const t = setTimeout(() => {
       setVisible(true);
-      // iOS nunca dispara beforeinstallprompt → passos manuais diretos.
-      if (detectPlatform() === "ios") setManualSteps(true);
+      // iOS no Safari: nunca há prompt nativo → passos manuais diretos.
+      // (Em WebView, o guia certo aparece ao tocar no botão.)
+      if (deviceIos && !deviceInApp) setManualSteps(true);
     }, SHOW_DELAY_MS);
 
     return () => {
+      modeCancelled = true;
       clearTimeout(t);
       window.removeEventListener("beforeinstallprompt", onPrompt);
       window.removeEventListener("pwa:bip-ready", onStashedReady as EventListener);
@@ -189,10 +255,52 @@ export function PwaRegister(props: PwaRegisterProps) {
     }, 60);
   }
 
+  function appStartUrl(): string {
+    try {
+      return new URL(scope, window.location.origin).href;
+    } catch {
+      return window.location.href;
+    }
+  }
+
+  function openApp() {
+    try {
+      (window.navigator as Navigator & { vibrate?: (p: number) => boolean }).vibrate?.(15);
+    } catch {}
+    window.location.href = appStartUrl();
+  }
+
+  /** Sai da WebView (Instagram/WhatsApp) direto para o Chrome — 1 toque. */
+  function openInSystemBrowser() {
+    try {
+      (window.navigator as Navigator & { vibrate?: (p: number) => boolean }).vibrate?.(15);
+    } catch {}
+    try {
+      const pageUrl = window.location.href;
+      const u = new URL(pageUrl);
+      window.location.href =
+        `intent://${u.host}${u.pathname}${u.search}` +
+        `#Intent;scheme=https;package=com.android.chrome;` +
+        `S.browser_fallback_url=${encodeURIComponent(pageUrl)};end`;
+    } catch {
+      void copyAppLink();
+    }
+  }
+
   async function installNow() {
     try {
       (window.navigator as Navigator & { vibrate?: (p: number) => boolean }).vibrate?.(15);
     } catch {}
+    // App já instalado → abre direto (o Chrome não oferece instalar de novo).
+    if (installMode === "installed") {
+      openApp();
+      return;
+    }
+    // WebView de outro app → abre no Chrome (só lá instala em 1 toque).
+    if (installMode === "system-browser") {
+      openInSystemBrowser();
+      return;
+    }
     // O evento nativo pode ter chegado depois da montagem: tenta o guardado
     // de novo na hora do toque antes de desistir para o passo a passo.
     try {
@@ -369,7 +477,11 @@ export function PwaRegister(props: PwaRegisterProps) {
                 className="flex-1 rounded-lg px-4 py-3 text-xs font-bold uppercase tracking-wide text-white hover:opacity-90 active:scale-[0.98] transition-all"
                 style={{ background: props.themeColor }}
               >
-                ⚡ Instalar
+                {installMode === "installed"
+                  ? "📲 Abrir o app"
+                  : installMode === "system-browser"
+                    ? "🌐 Abrir no Chrome"
+                    : "⚡ Instalar"}
               </button>
               <button
                 type="button"
@@ -379,7 +491,22 @@ export function PwaRegister(props: PwaRegisterProps) {
                 Agora não
               </button>
             </div>
-            {!canNativeInstall && !manualSteps && (
+            {installMode === "installed" && (
+              <p className="mt-2 text-[0.65rem] text-gray-500 text-center leading-relaxed">
+                Já instalado neste aparelho — abrindo direto. Trocou logo ou nome? Remova o app e instale de novo.
+              </p>
+            )}
+            {installMode === "system-browser" && (
+              <p className="mt-2 text-[0.65rem] text-gray-500 text-center leading-relaxed">
+                Você está no navegador do Instagram/WhatsApp — abra no Chrome para instalar em 1 toque.
+              </p>
+            )}
+            {installMode === "manual" && (
+              <p className="mt-2 text-[0.65rem] text-gray-500 text-center leading-relaxed">
+                Seu navegador não instala automaticamente — toque em Instalar e siga o passo a passo, ou abra no Chrome.
+              </p>
+            )}
+            {(installMode === "pending" || installMode === "native") && !canNativeInstall && !manualSteps && (
               <p className="mt-2 text-[0.65rem] text-gray-400 text-center">
                 Toque em Instalar e siga o passo a passo de 10 segundos
               </p>
