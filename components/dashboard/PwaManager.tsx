@@ -266,8 +266,6 @@ export function PwaManager() {
       const urlMap = Object.fromEntries(uploadedUrls.map(({ key, url }) => [key, url]));
       patch({
         icon_192_url: urlMap.icon_192,
-        icon_256_url: urlMap.icon_256,
-        icon_384_url: urlMap.icon_384,
         icon_512_url: urlMap.icon_512,
         icon_180_url: urlMap.icon_180,
         icon_maskable_512_url: urlMap.icon_maskable_512,
@@ -736,6 +734,12 @@ export function PwaManager() {
             Após salvar, o novo ícone aparece no app instalado na próxima abertura (cache invalidado automaticamente).
           </p>
         </div>
+        <p className="mt-3 rounded-lg bg-blue-50 border border-blue-200 px-3 py-2 text-xs text-blue-900">
+          📲 <strong>Trocou o nome ou o logotipo e não mudou no celular?</strong> O sistema operacional
+          congela esses dados na hora da instalação — <strong>remova o app da tela inicial e instale
+          novamente</strong> pelo convite do site para ver na hora. No iPhone, o nome exibido segue o
+          título da página e o ícone é atualizado ao adicionar de novo à Tela de Início.
+        </p>
       </div>
     </div>
   );

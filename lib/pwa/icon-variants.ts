@@ -32,8 +32,6 @@ const DEFAULT_OPTIONS: Required<Pick<IconVariantsOptions, "themeColor" | "backgr
 export interface IconVariantsResult {
   icon_180: Blob;
   icon_192: Blob;
-  icon_256: Blob;
-  icon_384: Blob;
   icon_512: Blob;
   icon_maskable_512: Blob;
 }
@@ -183,18 +181,15 @@ export async function generateIconVariants(
 
   const anyBg = opts.anyMode === "solid" ? opts.backgroundColor : opts.themeColor;
 
-  // Gera 7 tamanhos de ícone: 180 (iOS), 192/128 (Android legacy), 256/384 (mdpi/hdpi),
-  // 512 (splash/home), 512 maskable
-  const sizes = [180, 192, 256, 384, 512] as const;
-
-  const [icon_180, icon_192, icon_256, icon_384, icon_512, icon_maskable_512] = await Promise.all([
-    drawComposedSquare(img, sizes[0], anyBg, "opaque"),
-    drawComposedSquare(img, sizes[1], anyBg, "opaque"),
-    drawComposedSquare(img, sizes[2], anyBg, "opaque"),
-    drawComposedSquare(img, sizes[3], anyBg, "opaque"),
-    drawComposedSquare(img, sizes[4], anyBg, "opaque"),
+  // Gera as 4 variantes oficiais: 180 (iOS), 192 (Android legacy),
+  // 512 (splash/home) e 512 maskable. O manifest usa exatamente estes
+  // tamanhos (192 mínimo exigido + 512) — sem variantes intermediárias.
+  const [icon_180, icon_192, icon_512, icon_maskable_512] = await Promise.all([
+    drawComposedSquare(img, 180, anyBg, "opaque"),
+    drawComposedSquare(img, 192, anyBg, "opaque"),
+    drawComposedSquare(img, 512, anyBg, "opaque"),
     drawMaskable(img, 512, opts.themeColor),
   ]);
 
-  return { icon_180, icon_192, icon_256, icon_384, icon_512, icon_maskable_512 };
+  return { icon_180, icon_192, icon_512, icon_maskable_512 };
 }

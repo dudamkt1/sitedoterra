@@ -1325,12 +1325,22 @@
 
 
 #tenant-site #video {
-  padding: 80px 8%;
-  background: var(--verde);
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 5rem;
+  padding: 88px 5%;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(196,150,58,0.14) 0%, transparent 55%),
+    var(--verde);
+  display: flex;
+  flex-direction: column;
   align-items: center;
+  text-align: center;
+}
+
+#tenant-site #video .section-eyebrow { justify-content: center; }
+
+#tenant-site #video .section-sub {
+  max-width: 640px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 
@@ -1347,11 +1357,12 @@
 
 #tenant-site .video-frame {
   aspect-ratio: 16/9;
-  border-radius: 12px;
-  background: rgba(0,0,0,0.3);
+  border-radius: 20px;
+  background: rgba(0,0,0,0.35);
   overflow: hidden;
   position: relative;
-  border: 1px solid rgba(255,255,255,0.1);
+  border: 1px solid rgba(196,150,58,0.35);
+  box-shadow: 0 24px 70px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.08);
   cursor: pointer;
 }
 
@@ -3276,8 +3287,9 @@
    ============================================================================ */
 
 #tenant-site .video-frame-wrap {
-  max-width: 880px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: 1080px;
+  margin: 2.75rem auto 0;
 }
 
 #tenant-site button.video-frame {
@@ -3318,7 +3330,7 @@
 
 #tenant-site .video-modal-box {
   width: 100%;
-  max-width: 880px;
+  max-width: 1080px;
   max-height: 100%;
   display: flex;
   flex-direction: column;

@@ -10,8 +10,6 @@ export interface PwaSettings {
   description: string;
   logo_url: string | null;
   icon_192_url: string | null;
-  icon_256_url: string | null;
-  icon_384_url: string | null;
   icon_512_url: string | null;
   icon_180_url: string | null;
   icon_maskable_512_url: string | null;
@@ -31,8 +29,6 @@ export function defaultPwaSettings(tenantId = "", userId = ""): PwaSettings {
     description: "",
     logo_url: null,
     icon_192_url: null,
-    icon_256_url: null,
-    icon_384_url: null,
     icon_512_url: null,
     icon_180_url: null,
     icon_maskable_512_url: null,
@@ -52,8 +48,6 @@ export const DEMO_PWA_SETTINGS: PwaSettings = {
   description: "App da consultora Demonstração — óleos essenciais e bem-estar.",
   logo_url: null,
   icon_192_url: null,
-  icon_256_url: null,
-  icon_384_url: null,
   icon_512_url: null,
   icon_180_url: null,
   icon_maskable_512_url: null,
@@ -145,11 +139,11 @@ function joinOrigin(origin: string, path: string) {
  *   um tile PNG com a identidade do app quando não há upload.
  * - Manifest e <head> referenciam SEMPRE essas URLs same-origin → zero CORS,
  *   zero URL quebrada, tamanho exato garantido no Android e no iOS.
+ * - São exatamente os tamanhos que o Android exige (192 mínimo + 512 para
+ *   splash/home); sem variantes intermediárias fantasmas.
  */
 export function pwaIconPaths(basePath: string): {
   icon192: string;
-  icon256: string;
-  icon384: string;
   icon512: string;
   maskable: string;
   apple: string;
@@ -157,8 +151,6 @@ export function pwaIconPaths(basePath: string): {
   const base = basePath.endsWith("/") ? basePath : `${basePath}/`;
   return {
     icon192: `${base}pwa/icon-192.png`,
-    icon256: `${base}pwa/icon-256.png`,
-    icon384: `${base}pwa/icon-384.png`,
     icon512: `${base}pwa/icon-512.png`,
     maskable: `${base}pwa/icon-maskable-512.png`,
     apple: `${base}pwa/apple-touch-icon.png`,
@@ -187,12 +179,8 @@ export function buildManifest(
   const icons: Record<string, unknown>[] = [
     // iOS também lê o manifest em alguns fluxos — 180 first.
     { src: absV(paths.apple), sizes: "180x180", type: "image/png", purpose: "any" },
-    // Android: 192×192 (mínimo histórico, manifest spec)
+    // Android: 192×192 (mínimo exigido pela spec do manifest)
     { src: absV(paths.icon192), sizes: "192x192", type: "image/png", purpose: "any" },
-    // Android: 256×256 (mdpi / tela média alta)
-    { src: absV(paths.icon256), sizes: "256x256", type: "image/png", purpose: "any" },
-    // Android: 384×384 (hdpi / tela alta)
-    { src: absV(paths.icon384), sizes: "384x384", type: "image/png", purpose: "any" },
     // Android: 512×512 (splash + home screen em alta densidade)
     { src: absV(paths.icon512), sizes: "512x512", type: "image/png", purpose: "any" },
     // Android: 512×512 maskable — safe zone de 80% gerada no servidor.
@@ -253,8 +241,6 @@ export function computePwaStatus(s: PwaSettings): PwaStatus {
   const iconUrls = [
     s.icon_180_url,
     s.icon_192_url,
-    s.icon_256_url,
-    s.icon_384_url,
     s.icon_512_url,
     s.icon_maskable_512_url,
   ];
