@@ -100,11 +100,15 @@ export async function POST(request: Request) {
   } else if (outMime.toLowerCase().startsWith("image/")) {
     try {
       const { optimizeImage } = await import("@/lib/media/optimize-image");
-      const opt = await optimizeImage(buffer);
+      const opt = await optimizeImage(buffer, outMime);
       outBuffer = opt.buffer;
       optimized = !opt.skipped;
       savedBytes = Math.max(0, opt.originalBytes - opt.outputBytes);
-      if (opt.extension) {
+      // Só adota o MIME otimizado se for um image/* real. O optimizeImage
+      // devolve "application/octet-stream" nos caminhos passthrough (animado,
+      // formato não listado ou falha) — nesses casos preservamos o file.type
+      // original para o R2 nunca servir a imagem com Content-Type genérico.
+      if (opt.extension && opt.mimeType.toLowerCase().startsWith("image/")) {
         outExt = opt.extension;
         outMime = opt.mimeType;
       }

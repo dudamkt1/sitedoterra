@@ -84,14 +84,28 @@ async function fetchSource(url: string): Promise<Buffer | null> {
   const t = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
   try {
     const res = await fetch(url, { signal: ctrl.signal, redirect: "follow" });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.error(`[pwa/icon] fetchSource falhou: url=${url} status=${res.status}`);
+      return null;
+    }
+    // NÃO rejeitar por Content-Type: origens (R2/CDN) podem servir a imagem
+    // com header ausente ou genérico ("application/octet-stream"). O próprio
+    // sharp valida o conteúdo em renderPwaPng() e lança se não for imagem.
+    // Mantemos só o log do header recebido para diagnóstico futuro.
     const ct = (res.headers.get("content-type") || "").toLowerCase();
-    // SVG como fonte também vale (sharp rasteriza via librsvg).
-    if (!ct.startsWith("image/") && !/\.svg($|\?)/i.test(url)) return null;
+    if (!ct.startsWith("image/") && !/\.svg($|\?)/i.test(url)) {
+      console.error(`[pwa/icon] fetchSource content-type inesperado (aceitando mesmo assim): url=${url} content-type=${ct || "(ausente)"}`);
+    }
     const buf = Buffer.from(await res.arrayBuffer());
-    if (!buf.length || buf.length > MAX_SOURCE_BYTES) return null;
+    if (!buf.length || buf.length > MAX_SOURCE_BYTES) {
+      console.error(
+        `[pwa/icon] fetchSource tamanho inválido: url=${url} bytes=${buf.length} max=${MAX_SOURCE_BYTES}`
+      );
+      return null;
+    }
     return buf;
-  } catch {
+  } catch (err) {
+    console.error(`[pwa/icon] fetchSource erro de rede/timeout: url=${url}`, err);
     return null;
   } finally {
     clearTimeout(t);
@@ -135,8 +149,9 @@ export async function renderPwaPng(
         .resize(size, size, { fit: "contain", background: theme });
       const buffer = await pipeline.png({ compressionLevel: 9 }).toBuffer();
       return { buffer, generated: false };
-    } catch {
-      // Fonte corrompida? Tenta a próxima.
+    } catch (err) {
+      // Fonte corrompida ou formato não suportado? Loga e tenta a próxima.
+      console.error(`[pwa/icon] renderPwaPng sharp falhou: url=${absolute} kind=${kind}`, err);
       continue;
     }
   }

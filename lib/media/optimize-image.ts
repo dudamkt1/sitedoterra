@@ -25,14 +25,18 @@ export interface OptimizedImage {
   outputBytes: number;
 }
 
-export async function optimizeImage(input: Buffer): Promise<OptimizedImage> {
+export async function optimizeImage(input: Buffer, fallbackMime = ""): Promise<OptimizedImage> {
   const originalBytes = input.length;
+  // Passthrough preserva o MIME original quando conhecido: nunca devolve
+  // "application/octet-stream" para uma imagem válida — isso faria o R2
+  // servir o objeto com Content-Type genérico e quebraria consumidores que
+  // validam o header (ex.: ícones do PWA).
   const passthrough = (
     width: number | null = null,
     height: number | null = null
   ): OptimizedImage => ({
     buffer: input,
-    mimeType: "application/octet-stream",
+    mimeType: fallbackMime.toLowerCase().startsWith("image/") ? fallbackMime : "application/octet-stream",
     extension: "",
     width,
     height,
