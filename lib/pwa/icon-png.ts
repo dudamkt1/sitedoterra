@@ -6,9 +6,11 @@ import { r2Env } from "@/lib/r2";
 //
 // O celular (Android/iOS) só mostra o logotipo se receber um PNG válido,
 // quadrado, opaco e acessível sem CORS. Esta função garante isso:
-//  1. Usa o melhor upload do usuário (512 → maskable → 192 → 180 → logo),
+//  1. Tenta servir a variante pré-gerada correspondente (já enviada pelo
+//     cliente com o tamanho exato) via proxy direto do R2 — sem Sharp.
+//  2. Usa o melhor upload do usuário (512 → maskable → 192 → 180 → logo),
 //     normalizado para o tamanho exato com fundo da cor do tema.
-//  2. Se não houver upload (ou o download falhar), gera um tile PNG com a
+//  3. Se não houver upload (ou o download falhar), gera um tile PNG com a
 //     identidade do app (gradiente + gota, SEM fontes — funciona em
 //     qualquer ambiente, inclusive Vercel/Lambda sem fontes do sistema).
 //
@@ -28,6 +30,13 @@ const KIND_SIZE: Record<PwaPngKind, number> = {
   icon192: 192,
   icon512: 512,
   maskable: 512,
+};
+
+const KIND_URL_FIELD: Record<PwaPngKind, keyof PwaSettings> = {
+  apple: "icon_180_url",
+  icon192: "icon_192_url",
+  icon512: "icon_512_url",
+  maskable: "icon_maskable_512_url",
 };
 
 function escapeXml(s: string): string {
@@ -171,6 +180,88 @@ function getAlternativeUrls(url: string): string[] {
 }
 
 /**
+ * Tenta servir a variante pré-gerada diretamente do R2 via proxy.
+ * Retorna o buffer se bem-sucedido, null caso contrário.
+ */
+async function tryProxyPreGeneratedVariant(
+  settings: PwaSettings,
+  kind: PwaPngKind
+): Promise<Buffer | null> {
+  const urlField = KIND_URL_FIELD[kind];
+  const variantUrl = settings[urlField];
+  if (!variantUrl || typeof variantUrl !== "string" || !variantUrl.trim()) {
+    return null;
+  }
+
+  const urlsToTry = getAlternativeUrls(variantUrl);
+
+  for (let attempt = 0; attempt < urlsToTry.length; attempt++) {
+    const currentUrl = urlsToTry[attempt];
+    const isFallback = attempt > 0;
+    const maxRetries = isFallback ? 1 : MAX_FETCH_RETRIES;
+
+    for (let retry = 0; retry < maxRetries; retry++) {
+      const ctrl = new AbortController();
+      const timeout = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+      try {
+        const res = await fetch(currentUrl, {
+          signal: ctrl.signal,
+          redirect: "follow",
+          cache: "no-store",
+          headers: {
+            Accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+            "User-Agent":
+              "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Mobile Safari/537.36 (PWA-Icon-Renderer)",
+          },
+        });
+        if (!res.ok) {
+          const errMsg = `HTTP ${res.status}`;
+          if (retry === maxRetries - 1 && attempt === urlsToTry.length - 1) {
+            console.warn(
+              `[pwa/icon] proxy pré-gerado falhou após ${maxRetries} tentativas: url=${currentUrl} ${errMsg}`
+            );
+          } else {
+            console.warn(
+              `[pwa/icon] proxy pré-gerado ${errMsg} (tentativa ${retry + 1}/${maxRetries}): url=${currentUrl}`
+            );
+          }
+          continue;
+        }
+        const ct = (res.headers.get("content-type") || "").toLowerCase();
+        if (!ct.startsWith("image/")) {
+          console.warn(
+            `[pwa/icon] proxy pré-gerado content-type inesperado: url=${currentUrl} ct=${ct || "(ausente)"}`
+          );
+        }
+        const buf = Buffer.from(await res.arrayBuffer());
+        if (!buf.length || buf.length > MAX_SOURCE_BYTES) {
+          console.error(
+            `[pwa/icon] proxy pré-gerado tamanho inválido: url=${currentUrl} bytes=${buf.length} max=${MAX_SOURCE_BYTES}`
+          );
+          continue;
+        }
+        if (isFallback) {
+          console.log(
+            `[pwa/icon] proxy pré-gerado SUCESSO via fallback .r2.dev: url=${currentUrl}`
+          );
+        }
+        return buf;
+      } catch (err) {
+        const isLastAttempt = retry === maxRetries - 1 && attempt === urlsToTry.length - 1;
+        const msg = isLastAttempt ? "FALHA FINAL" : `tentativa ${retry + 1}/${maxRetries}`;
+        console.error(`[pwa/icon] proxy pré-gerado ${msg}: url=${currentUrl}`, err);
+        if (!isLastAttempt) {
+          await new Promise((r) => setTimeout(r, 500 * 2 ** retry));
+        }
+      } finally {
+        clearTimeout(timeout);
+      }
+    }
+  }
+  return null;
+}
+
+/**
  * Renderiza o PNG final do ícone.
  * Sempre devolve um PNG válido — nunca lança para o chamador tratar como
  * "sem ícone" (em último caso, o tile de fallback).
@@ -185,7 +276,16 @@ export async function renderPwaPng(
     ? settings.theme_color
     : "#1d5c3a";
 
-  // 1) Tenta os uploads do usuário (maior resolução primeiro).
+  // 1) PRIMEIRO: tenta servir a variante pré-gerada correspondente
+  // (ex.: icon_512_url para kind=icon512). Isso evita re-processamento
+  // desnecessário e garante que o ícone exato enviado pelo usuário seja servido.
+  const preGenerated = await tryProxyPreGeneratedVariant(settings, kind);
+  if (preGenerated) {
+    return { buffer: preGenerated, generated: false };
+  }
+
+  // 2) FALLBACK: tenta os uploads do usuário (maior resolução primeiro)
+  // e re-processa com Sharp para o tamanho exato.
   for (const src of sourceCandidates(settings)) {
     const absolute = absolutize(src, origin);
     // Evita loop: nunca busca de si mesma (rotas /pwa/*.png).
@@ -214,7 +314,7 @@ export async function renderPwaPng(
     }
   }
 
-  // 2) Fallback: tile gerado com a identidade do app (sempre funciona).
+  // 3) Fallback final: tile gerado com a identidade do app (sempre funciona).
   const svg = fallbackSvg(settings);
   const buffer = await sharp(Buffer.from(svg))
     .resize(size, size, { fit: "cover" })
