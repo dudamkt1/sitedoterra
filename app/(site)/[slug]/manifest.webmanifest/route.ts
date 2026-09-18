@@ -31,6 +31,8 @@ export async function GET(
       // As URLs dos ícones já carregam ?v=<token> para cache-busting no cliente.
       "Cache-Control": "no-cache, no-store, must-revalidate",
       "Service-Worker-Allowed": resolved.basePath,
+      // Permite que o Google WebAPK fetcher (servidor) baixe o manifest sem CORS issues
+      "Access-Control-Allow-Origin": "*",
     },
   });
 }

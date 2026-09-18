@@ -87,7 +87,7 @@ export async function generateMetadata(): Promise<Metadata> {
       iconList.push({ url: withV(paths.icon512), type: "image/png", sizes: "512x512" });
 
       return {
-        manifest: manifestUrl,
+        manifest: { url: manifestUrl, crossOrigin: "anonymous" } as any,
         icons: iconList.length ? iconList : undefined,
         appleWebApp: {
           capable: true,

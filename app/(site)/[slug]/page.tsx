@@ -39,7 +39,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
       const v = pwaVersionToken(pwa.settings);
       const paths = pwaIconPaths(pwa.basePath);
       const withV = (rel: string) => `${rel}?v=${v}`;
-      meta.manifest = manifestUrl;
+      meta.manifest = { url: manifestUrl, crossOrigin: "anonymous" } as any;
       meta.icons = [
         { url: withV(paths.apple), type: "image/png", sizes: "180x180", rel: "apple-touch-icon" },
         { url: withV(paths.icon192), type: "image/png", sizes: "192x192" },
@@ -103,7 +103,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
 
   if (pwa?.settings.enabled) {
     const { manifestUrl } = pwaUrls(pwa.basePath);
-    meta.manifest = manifestUrl;
+    meta.manifest = { url: manifestUrl, crossOrigin: "anonymous" } as any;
     // Não adiciona SVG ao HTML — favicon PNG transparente já é o correto; SVG fica só no manifest como fallback maskable
     meta.appleWebApp = {
       capable: true,

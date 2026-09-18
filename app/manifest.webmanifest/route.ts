@@ -31,6 +31,8 @@ export async function GET() {
       // carregam ?v=<token> para cache-busting no cliente.
       "Cache-Control": "no-cache, no-store, must-revalidate",
       "Service-Worker-Allowed": "/",
+      // Permite que o Google WebAPK fetcher (servidor) baixe o manifest sem CORS issues
+      "Access-Control-Allow-Origin": "*",
     },
   });
 }
