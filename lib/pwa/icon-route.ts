@@ -1,5 +1,6 @@
 import { resolvePwaForRequest } from "./resolver";
 import { renderPwaPng, type PwaPngKind } from "./icon-png";
+import { pwaVersionToken } from "./config";
 
 // Handler compartilhado das rotas `/pwa/*.png` (raiz e `/{slug}/pwa/*.png`).
 // Serve o PNG garantido (proxy do upload normalizado ou tile gerado) no
@@ -12,11 +13,15 @@ export async function servePwaPng(
   if (!resolved || !resolved.settings.enabled) {
     return new Response("Not Found", { status: 404 });
   }
+  const tenantId = resolved.settings.tenant_id;
+  const versionToken = pwaVersionToken(resolved.settings);
   try {
     const { buffer, generated } = await renderPwaPng(
       resolved.settings,
       kind,
-      resolved.ref.origin
+      resolved.ref.origin,
+      tenantId,
+      versionToken
     );
     if (generated) {
       // Sinal vital de diagnóstico: nenhum upload pôde ser usado e o tile

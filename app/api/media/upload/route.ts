@@ -82,12 +82,17 @@ export async function POST(request: Request) {
   // sharp aqui (WebP q80 / PNG otimizado, máx. 1600px, sem EXIF).
   // SVG é vetorial: NÃO passa pelo sharp — é sanitizado (anti-XSS) e sobe
   // intacto para preservar nitidez infinita do logo.
+  // IMPORTANTE: categoria "logo" (ícones PWA) NÃO é otimizada — o browser já
+  // gerou PNGs exatos (180/192/512/maskable) via canvas.toBlob("image/png").
+  // Reprocessar no servidor só aumentaria latência e poderia converter para WebP,
+  // quebrando a garantia de Content-Type image/png que o Android WebAPK espera.
   let outBuffer: Buffer = buffer;
   let outMime = file.type || "application/octet-stream";
   let outExt = validation.extension;
   let optimized = false;
   let savedBytes = 0;
   const isSvg = outMime.toLowerCase() === "image/svg+xml" || outExt === "svg";
+  const isLogoCategory = validation.category.code === "logo";
   if (isSvg) {
     const { sanitizeSvg } = await import("@/lib/media/sanitize-svg");
     const clean = sanitizeSvg(buffer);
@@ -97,7 +102,7 @@ export async function POST(request: Request) {
     outBuffer = Buffer.from(clean.svg, "utf8");
     outMime = "image/svg+xml";
     outExt = "svg";
-  } else if (outMime.toLowerCase().startsWith("image/")) {
+  } else if (outMime.toLowerCase().startsWith("image/") && !isLogoCategory) {
     try {
       const { optimizeImage } = await import("@/lib/media/optimize-image");
       const opt = await optimizeImage(buffer, outMime);
@@ -115,6 +120,16 @@ export async function POST(request: Request) {
     } catch (e) {
       console.warn("[media/upload] otimização sharp falhou — enviando original", e);
     }
+  } else if (isLogoCategory) {
+    // Categoria "logo": força Content-Type image/png explícito (browser já
+    // enviou PNG). Garante que R2 sirva como image/png para Android WebAPK.
+    if (!outMime.toLowerCase().startsWith("image/")) {
+      outMime = "image/png";
+    }
+    if (!outExt || !["png", "jpg", "jpeg", "webp"].includes(outExt)) {
+      outExt = "png";
+    }
+    console.log("[media/upload] logo category: pulando otimização, contentType=image/png");
   }
   const outSize = outBuffer.length;
 

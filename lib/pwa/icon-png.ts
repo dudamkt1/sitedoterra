@@ -1,4 +1,5 @@
 import sharp from "sharp";
+import { unstable_cache } from "next/cache";
 import type { PwaSettings } from "./config";
 import { r2Env } from "@/lib/r2";
 
@@ -85,6 +86,36 @@ function sourceCandidates(s: PwaSettings): string[] {
     s.icon_180_url,
     s.logo_url,
   ].filter((u): u is string => typeof u === "string" && u.trim().length > 0);
+}
+
+/**
+ * Processa uma imagem fonte com Sharp (flatten + resize) para o tamanho alvo.
+ * Versão com cache: chaveada por tenant_id + pwaVersionToken + kind + source URL.
+ * Só roda sharp uma vez por versão de configuração por fonte.
+ */
+async function processWithSharpCached(
+  input: Buffer,
+  size: number,
+  theme: string,
+  tenantId: string,
+  versionToken: string,
+  kind: PwaPngKind,
+  sourceUrl: string
+): Promise<Buffer> {
+  const cacheKey = `pwa-icon-sharp:${tenantId}:${versionToken}:${kind}:${sourceUrl}`;
+  return unstable_cache(
+    async () => {
+      const start = Date.now();
+      const pipeline = sharp(input, { failOn: "none" })
+        .flatten({ background: theme })
+        .resize(size, size, { fit: "contain", background: theme });
+      const buffer = await pipeline.png({ compressionLevel: 9 }).toBuffer();
+      console.log(`[pwa/icon] sharp process: kind=${kind} size=${size} source=${sourceUrl} took=${Date.now() - start}ms`);
+      return buffer;
+    },
+    [cacheKey],
+    { revalidate: 86400, tags: [`pwa-icon:${tenantId}:${versionToken}`] }
+  )();
 }
 
 function absolutize(url: string, origin: string): string {
@@ -269,8 +300,11 @@ async function tryProxyPreGeneratedVariant(
 export async function renderPwaPng(
   settings: PwaSettings,
   kind: PwaPngKind,
-  origin: string
+  origin: string,
+  tenantId: string,
+  versionToken: string
 ): Promise<{ buffer: Buffer; generated: boolean }> {
+  const totalStart = Date.now();
   const size = KIND_SIZE[kind];
   const theme = /^#[0-9a-fA-F]{6}$/.test(settings.theme_color)
     ? settings.theme_color
@@ -279,20 +313,25 @@ export async function renderPwaPng(
   // 1) PRIMEIRO: tenta servir a variante pré-gerada correspondente
   // (ex.: icon_512_url para kind=icon512). Isso evita re-processamento
   // desnecessário e garante que o ícone exato enviado pelo usuário seja servido.
+  const proxyStart = Date.now();
   const preGenerated = await tryProxyPreGeneratedVariant(settings, kind);
+  const proxyTime = Date.now() - proxyStart;
   if (preGenerated) {
+    console.log(`[pwa/icon] renderPwaPng: kind=${kind} proxy_hit=true took=${Date.now() - totalStart}ms (fetch=${proxyTime}ms)`);
     return { buffer: preGenerated, generated: false };
   }
 
   // 2) FALLBACK: tenta os uploads do usuário (maior resolução primeiro)
-  // e re-processa com Sharp para o tamanho exato.
+  // e re-processa com Sharp para o tamanho exato (com cache).
   for (const src of sourceCandidates(settings)) {
     const absolute = absolutize(src, origin);
     // Evita loop: nunca busca de si mesma (rotas /pwa/*.png).
     if (/\/pwa\/(icon-192\.png|icon-512\.png|icon-maskable-512\.png|apple-touch-icon\.png)/.test(absolute)) {
       continue;
     }
+    const fetchStart = Date.now();
     const input = await fetchSource(absolute);
+    const fetchTime = Date.now() - fetchStart;
     if (!input) continue;
     try {
       // Full-bleed INTENCIONAL (inclusive maskable): a arte enviada pelo
@@ -302,10 +341,10 @@ export async function renderPwaPng(
       // Bordas full-bleed têm a cor do próprio fundo do logo → o recorte do
       // launcher (círculo/squircle) fica invisível e o ícone é IDÊNTICO ao
       // enviado em todos os tamanhos e launchers.
-      const pipeline = sharp(input, { failOn: "none" })
-        .flatten({ background: theme })
-        .resize(size, size, { fit: "contain", background: theme });
-      const buffer = await pipeline.png({ compressionLevel: 9 }).toBuffer();
+      const sharpStart = Date.now();
+      const buffer = await processWithSharpCached(input, size, theme, tenantId, versionToken, kind, absolute);
+      const sharpTime = Date.now() - sharpStart;
+      console.log(`[pwa/icon] renderPwaPng: kind=${kind} fallback_hit=true took=${Date.now() - totalStart}ms (fetch=${fetchTime}ms sharp=${sharpTime}ms source=${absolute})`);
       return { buffer, generated: false };
     } catch (err) {
       // Fonte corrompida ou formato não suportado? Loga e tenta a próxima.
@@ -315,10 +354,13 @@ export async function renderPwaPng(
   }
 
   // 3) Fallback final: tile gerado com a identidade do app (sempre funciona).
+  const fallbackStart = Date.now();
   const svg = fallbackSvg(settings);
   const buffer = await sharp(Buffer.from(svg))
     .resize(size, size, { fit: "cover" })
     .png({ compressionLevel: 9 })
     .toBuffer();
+  const fallbackTime = Date.now() - fallbackStart;
+  console.log(`[pwa/icon] renderPwaPng: kind=${kind} fallback_generated=true took=${Date.now() - totalStart}ms (svg_render=${fallbackTime}ms)`);
   return { buffer, generated: true };
 }
