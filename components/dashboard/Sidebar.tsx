@@ -24,31 +24,32 @@ import {
   LogOut,
   ExternalLink,
   ChevronRight,
+  Lock,
 } from "lucide-react";
 
 const USER_LINKS = [
-  { href: "/painel", label: "Visão geral", icon: LayoutDashboard },
-  { href: "/painel/meu-site", label: "Meu Site", icon: Globe },
-  { href: "/painel/checklist", label: "Meu Checklist", icon: ListChecks },
-  { href: "/painel/agendamentos", label: "Agendamentos", icon: CalendarDays },
-  { href: "/painel/midias", label: "Mídias", icon: FolderOpen },
-  { href: "/painel/crm", label: "CRM", icon: ContactRound },
-  { href: "/painel/ia", label: "IA do site", icon: Bot },
-  { href: "/painel/ia/treinamento", label: "Treinar IA", icon: Brain },
-  { href: "/painel/assinatura", label: "Assinatura", icon: CreditCard },
-  { href: "/painel/dominio", label: "Domínio", icon: Link2 },
-  { href: "/painel/pwa", label: "Aplicativo", icon: Smartphone },
-  { href: "/painel/pagamentos", label: "Pagamentos", icon: ReceiptText },
-  { href: "/painel/afiliados", label: "Afiliados", icon: Handshake },
-  { href: "/painel/conta", label: "Minha Conta", icon: UserRound },
+  { href: "/painel", label: "Visão geral", icon: LayoutDashboard, requiresActiveSite: false },
+  { href: "/painel/meu-site", label: "Meu Site", icon: Globe, requiresActiveSite: true },
+  { href: "/painel/checklist", label: "Meu Checklist", icon: ListChecks, requiresActiveSite: true },
+  { href: "/painel/agendamentos", label: "Agendamentos", icon: CalendarDays, requiresActiveSite: true },
+  { href: "/painel/midias", label: "Mídias", icon: FolderOpen, requiresActiveSite: true },
+  { href: "/painel/crm", label: "CRM", icon: ContactRound, requiresActiveSite: true },
+  { href: "/painel/ia", label: "IA do site", icon: Bot, requiresActiveSite: true },
+  { href: "/painel/ia/treinamento", label: "Treinar IA", icon: Brain, requiresActiveSite: true },
+  { href: "/painel/assinatura", label: "Assinatura", icon: CreditCard, requiresActiveSite: false },
+  { href: "/painel/dominio", label: "Domínio", icon: Link2, requiresActiveSite: true },
+  { href: "/painel/pwa", label: "Aplicativo", icon: Smartphone, requiresActiveSite: true },
+  { href: "/painel/pagamentos", label: "Pagamentos", icon: ReceiptText, requiresActiveSite: true },
+  { href: "/painel/afiliados", label: "Afiliados", icon: Handshake, requiresActiveSite: false },
+  { href: "/painel/conta", label: "Minha Conta", icon: UserRound, requiresActiveSite: false },
 ];
 
 const TABS = [
-  { href: "/painel", label: "Início", icon: LayoutDashboard },
-  { href: "/painel/meu-site", label: "Site", icon: Globe },
-  { href: "/painel/crm", label: "CRM", icon: ContactRound },
-  { href: "/painel/ia", label: "IA", icon: Bot },
-  { href: "/painel/conta", label: "Conta", icon: UserRound },
+  { href: "/painel", label: "Início", icon: LayoutDashboard, requiresActiveSite: false },
+  { href: "/painel/meu-site", label: "Site", icon: Globe, requiresActiveSite: true },
+  { href: "/painel/crm", label: "CRM", icon: ContactRound, requiresActiveSite: true },
+  { href: "/painel/ia", label: "IA", icon: Bot, requiresActiveSite: true },
+  { href: "/painel/conta", label: "Conta", icon: UserRound, requiresActiveSite: false },
 ];
 
 function isActive(pathname: string, href: string) {
@@ -64,12 +65,14 @@ export default function DashboardSidebar({
   isSuperAdmin,
   siteSlug,
   isDemo,
+  siteActivated = true,
 }: {
   name: string;
   email: string;
   isSuperAdmin: boolean;
   siteSlug: string | null;
   isDemo?: boolean;
+  siteActivated?: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -114,11 +117,23 @@ export default function DashboardSidebar({
   }
 
   function NavLinks({ onNavigate, compact = false }: { onNavigate?: () => void; compact?: boolean }) {
+    // Filtra links baseado no status do site
+    const filteredLinks = USER_LINKS.filter((l) => {
+      // Demo e Super Admin veem tudo
+      if (isDemo) return true;
+      if (isSuperAdmin) return true;
+      // Se site não ativado, só mostra links que não requerem site ativo
+      if (!siteActivated && l.requiresActiveSite) return false;
+      return true;
+    });
+
     return (
       <>
-        {USER_LINKS.map((l) => {
+        {filteredLinks.map((l) => {
           const active = isActive(pathname, l.href);
           const Icon = l.icon;
+          const isLocked = !siteActivated && l.requiresActiveSite && !isDemo && !isSuperAdmin;
+
           return (
             <Link
               key={l.href}
@@ -128,20 +143,36 @@ export default function DashboardSidebar({
               className={`group flex items-center gap-3 rounded-xl transition-all ${
                 compact ? "px-3 py-3 text-sm" : "px-3 py-2.5 text-[13.5px]"
               } font-medium ${
-                active
+                isLocked
+                  ? "text-gray-300 bg-gray-50 cursor-not-allowed"
+                  : active
                   ? "bg-gradient-to-r from-[#1d5c3a] to-[#2d7a4f] text-white shadow-[0_8px_20px_rgba(29,92,58,0.3)]"
                   : "text-gray-600 hover:bg-emerald-50/80 hover:text-[#1d5c3a] active:bg-emerald-100"
               }`}
             >
               <span
-                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors ${
-                  active ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500 group-hover:bg-emerald-100 group-hover:text-[#1d5c3a]"
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors relative ${
+                  active
+                    ? "bg-white/20 text-white"
+                    : isLocked
+                    ? "bg-gray-100 text-gray-300"
+                    : "bg-gray-100 text-gray-500 group-hover:bg-emerald-100 group-hover:text-[#1d5c3a]"
                 }`}
               >
                 <Icon className="h-4 w-4" />
+                {isLocked && !compact && (
+                  <span className="absolute -top-1 -right-1 h-4 w-4">
+                    <Lock className="h-4 w-4 text-gray-300" />
+                  </span>
+                )}
               </span>
               <span className="min-w-0 flex-1 truncate">{l.label}</span>
-              {active && !compact && <ChevronRight className="h-4 w-4 shrink-0 opacity-70" />}
+              {active && !compact && !isLocked && <ChevronRight className="h-4 w-4 shrink-0 opacity-70" />}
+              {isLocked && !compact && (
+                <span className="h-4 w-4 shrink-0 opacity-50" title="Requer site ativo">
+                  <Lock className="h-4 w-4 text-gray-300" />
+                </span>
+              )}
             </Link>
           );
         })}
@@ -301,21 +332,38 @@ export default function DashboardSidebar({
         className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-100 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
       >
         <div className="grid grid-cols-5">
-          {TABS.map((t) => {
+          {TABS.filter((t) => {
+            if (isDemo) return true;
+            if (isSuperAdmin) return true;
+            if (!siteActivated && t.requiresActiveSite) return false;
+            return true;
+          }).map((t) => {
             const active = isActive(pathname, t.href);
             const Icon = t.icon;
+            const isLocked = !siteActivated && t.requiresActiveSite && !isDemo && !isSuperAdmin;
+
             return (
               <Link
                 key={t.href}
                 href={t.href}
                 aria-current={active ? "page" : undefined}
                 className={`relative flex min-w-0 flex-col items-center gap-1 px-1 py-2.5 text-[10px] font-semibold ${
-                  active ? "text-[#1d5c3a]" : "text-gray-400"
+                  isLocked
+                    ? "text-gray-300"
+                    : active
+                    ? "text-[#1d5c3a]"
+                    : "text-gray-400"
                 }`}
+                style={{ pointerEvents: isLocked ? "none" : "auto" }}
               >
-                {active && <span className="absolute top-0 h-0.5 w-8 rounded-full bg-[#1d5c3a]" />}
+                {active && !isLocked && <span className="absolute top-0 h-0.5 w-8 rounded-full bg-[#1d5c3a]" />}
                 <Icon className="h-[22px] w-[22px]" />
                 <span className="w-full truncate text-center leading-none">{t.label}</span>
+                {isLocked && (
+                  <span className="absolute top-1 right-1 h-3.5 w-3.5" title="Requer site ativo">
+                    <Lock className="h-3.5 w-3.5 text-gray-300" />
+                  </span>
+                )}
               </Link>
             );
           })}
