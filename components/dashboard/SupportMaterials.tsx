@@ -114,7 +114,8 @@ export function SupportMaterials() {
             Gerencie subcategorias com imagem, título, descrição e link externo.
           </p>
         </div>
-        <Button onClick={openCreateModal} icon={<Plus className="h-4 w-4" />}>
+        <Button onClick={openCreateModal}>
+          <Plus className="h-4 w-4 mr-2" />
           Nova Subcategoria
         </Button>
       </div>
@@ -126,7 +127,8 @@ export function SupportMaterials() {
           <p className="text-gray-400 mb-6">
             Crie subcategorias com imagem, título, descrição e link para organizar seus materiais de apoio.
           </p>
-          <Button onClick={openCreateModal} icon={<Plus className="h-4 w-4" />}>
+          <Button onClick={openCreateModal}>
+            <Plus className="h-4 w-4 mr-2" />
             Criar primeira subcategoria
           </Button>
         </div>
@@ -159,27 +161,29 @@ export function SupportMaterials() {
                       variant="outline"
                       size="sm"
                       onClick={() => handleLinkClick(item.linkUrl)}
-                      icon={<ExternalLink className="h-3.5 w-3.5" />}
                       className="gap-1 px-2 py-1.5"
                     >
+                      <ExternalLink className="h-3.5 w-3.5" />
                       Acessar
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => openEditModal(item)}
-                      icon={<Edit className="h-3.5 w-3.5" />}
                       className="p-1.5"
                       aria-label="Editar"
-                    />
+                    >
+                      <Edit className="h-3.5 w-3.5" />
+                    </Button>
                     <Button
                       variant="destructive"
                       size="sm"
                       onClick={() => handleDelete(item.id)}
-                      icon={<Trash2 className="h-3.5 w-3.5" />}
                       className="p-1.5"
                       aria-label="Excluir"
-                    />
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -244,8 +248,17 @@ export function SupportMaterials() {
             <Button variant="outline" onClick={closeModal} disabled={submitting}>
               Cancelar
             </Button>
-            <Button onClick={handleSubmit} disabled={submitting} icon={submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : undefined}>
-              {editingItem ? "Salvar Alterações" : "Criar Subcategoria"}
+            <Button onClick={handleSubmit} disabled={submitting}>
+              {submitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Salvando...
+                </>
+              ) : editingItem ? (
+                "Salvar Alterações"
+              ) : (
+                "Criar Subcategoria"
+              )}
             </Button>
           </div>
         </div>
