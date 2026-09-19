@@ -24,8 +24,10 @@ export function SupportMaterials() {
 
   const sortedItems = [...items].sort((a, b) => a.order - b.order);
 
-  function handleImageUploaded(media: { url: string }) {
-    setFormData((prev) => ({ ...prev, imageUrl: media.url }));
+  import type { MediaFile } from "@/types";
+
+function handleImageUploaded(media: MediaFile) {
+    setFormData((prev) => ({ ...prev, imageUrl: media.public_url }));
     setImageUploading(false);
   }
 
