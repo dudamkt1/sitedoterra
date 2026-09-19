@@ -379,6 +379,36 @@ export function buildDemoSeed(): DemoData {
 
   const media: DemoData["media"] = [];
 
+  const supportMaterials: DemoData["supportMaterials"] = [
+    {
+      id: "mat_001",
+      title: "Catálogo de Produtos",
+      description: "Catálogo completo com todos os óleos essenciais e blends doTERRA, incluindo preços e descrições detalhadas.",
+      imageUrl: "https://images.unsplash.com/photo-1608248543803-ba4f8c70ae0b?q=80&w=600&auto=format&fit=crop",
+      linkUrl: "https://www.doterra.com/pt_BR/product-catalog",
+      order: 1,
+      createdAt: daysAgo(30),
+    },
+    {
+      id: "mat_002",
+      title: "Guia de Uso dos Óleos",
+      description: "Material educativo com formas de uso, diluições recomendadas e precauções para cada óleo essencial.",
+      imageUrl: "https://images.unsplash.com/photo-1515378791036-0648a3ef77b2?q=80&w=600&auto=format&fit=crop",
+      linkUrl: "https://www.doterra.com/pt_BR/essential-oil-usage-guide",
+      order: 2,
+      createdAt: daysAgo(25),
+    },
+    {
+      id: "mat_003",
+      title: "Apresentação de Oportunidade",
+      description: "Slides profissionais para apresentar o modelo de negócio doTERRA em reuniões e eventos.",
+      imageUrl: "https://images.unsplash.com/photo-1552664730-d307ca884978?q=80&w=600&auto=format&fit=crop",
+      linkUrl: "https://www.doterra.com/pt_BR/business-opportunity",
+      order: 3,
+      createdAt: daysAgo(20),
+    },
+  ];
+
   return {
     clients,
     products,
@@ -443,5 +473,6 @@ export function buildDemoSeed(): DemoData {
         vipThreshold: 300,
       },
     },
+    supportMaterials,
   };
 }

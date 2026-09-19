@@ -25,6 +25,8 @@ import {
   ExternalLink,
   ChevronRight,
   Lock,
+  BookOpen,
+  Sparkles,
 } from "lucide-react";
 
 const USER_LINKS = [
@@ -33,6 +35,7 @@ const USER_LINKS = [
   { href: "/painel/checklist", label: "Meu Checklist", icon: ListChecks, requiresActiveSite: true },
   { href: "/painel/agendamentos", label: "Agendamentos", icon: CalendarDays, requiresActiveSite: true },
   { href: "/painel/midias", label: "Mídias", icon: FolderOpen, requiresActiveSite: true },
+  { href: "/painel/materiais-apoio", label: "Materiais de apoio", icon: BookOpen, requiresActiveSite: true, highlight: true },
   { href: "/painel/crm", label: "CRM", icon: ContactRound, requiresActiveSite: true },
   { href: "/painel/ia", label: "IA do site", icon: Bot, requiresActiveSite: true },
   { href: "/painel/ia/treinamento", label: "Treinar IA", icon: Brain, requiresActiveSite: true },
@@ -134,6 +137,8 @@ export default function DashboardSidebar({
           const Icon = l.icon;
           const isLocked = !siteActivated && l.requiresActiveSite && !isDemo && !isSuperAdmin;
 
+          const isHighlight = l.highlight && !active && !isLocked;
+
           return (
             <Link
               key={l.href}
@@ -147,6 +152,8 @@ export default function DashboardSidebar({
                   ? "text-gray-300 bg-gray-50 cursor-not-allowed"
                   : active
                   ? "bg-gradient-to-r from-[#1d5c3a] to-[#2d7a4f] text-white shadow-[0_8px_20px_rgba(29,92,58,0.3)]"
+                  : isHighlight
+                  ? "text-[#1d5c3a] bg-gradient-to-r from-emerald-50/60 to-amber-50/60 hover:from-emerald-100/80 hover:to-amber-100/80 border border-emerald-200/50 shadow-[0_4px_16px_-8px_rgba(29,92,58,0.25)]"
                   : "text-gray-600 hover:bg-emerald-50/80 hover:text-[#1d5c3a] active:bg-emerald-100"
               }`}
             >
@@ -156,10 +163,17 @@ export default function DashboardSidebar({
                     ? "bg-white/20 text-white"
                     : isLocked
                     ? "bg-gray-100 text-gray-300"
+                    : isHighlight
+                    ? "bg-gradient-to-br from-emerald-100 to-amber-100 text-[#1d5c3a] group-hover:from-emerald-200 group-hover:to-amber-200"
                     : "bg-gray-100 text-gray-500 group-hover:bg-emerald-100 group-hover:text-[#1d5c3a]"
                 }`}
               >
                 <Icon className="h-4 w-4" />
+                {isHighlight && !compact && (
+                  <span className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center">
+                    <Sparkles className="h-3.5 w-3.5 text-amber-500 animate-pulse" />
+                  </span>
+                )}
                 {isLocked && !compact && (
                   <span className="absolute -top-1 -right-1 h-4 w-4">
                     <Lock className="h-4 w-4 text-gray-300" />

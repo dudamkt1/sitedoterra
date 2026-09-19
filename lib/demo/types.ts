@@ -70,6 +70,16 @@ export interface DemoMediaItem {
   createdAt: string;
 }
 
+export interface DemoSupportMaterialCategory {
+  id: string;
+  title: string;
+  description: string;
+  imageUrl: string;
+  linkUrl: string;
+  order: number;
+  createdAt: string;
+}
+
 export interface DemoFinanceEntry {
   id: string;
   type: "receita" | "despesa";
@@ -142,4 +152,5 @@ export interface DemoData {
       vipThreshold: number;
     };
   };
+  supportMaterials: DemoSupportMaterialCategory[];
 }
