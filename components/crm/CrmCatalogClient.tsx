@@ -832,8 +832,8 @@ function PaymentSettingsModal({
             </h4>
             <div className="space-y-1 text-sm text-emerald-700">
               <p>✓ Produtos com preço original e preço com desconto PIX (se habilitado)</p>
-              <p>✓ Botão 'Comprar com PIX' gera QR Code na hora</p>
-              {form.mp_enabled && <p>✓ Botão 'Pagar com Mercado Pago' redireciona para checkout</p>}
+              <p>✓ Botão &#34;Comprar com PIX&#34; gera QR Code na hora</p>
+              {form.mp_enabled && <p>✓ Botão &#34;Pagar com Mercado Pago&#34; redireciona para checkout</p>}
               <p>✓ Após pagamento confirmado, venda é criada automaticamente no CRM</p>
               <p>✓ Cliente recebe e-mail/notificação com detalhes do pedido</p>
             </div>
