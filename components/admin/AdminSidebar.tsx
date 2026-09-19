@@ -24,6 +24,7 @@ import {
   LogOut,
   ShieldCheck,
   ChevronRight,
+  BookOpen,
 } from "lucide-react";
 
 const LINKS = [
@@ -36,6 +37,7 @@ const LINKS = [
   { href: "/admin/afiliados", label: "Afiliados", icon: Handshake },
   { href: "/admin/financeiro", label: "Financeiro", icon: Wallet },
   { href: "/admin/midias", label: "Mídias", icon: ImageIcon },
+  { href: "/admin/materiais-apoio", label: "Materiais de apoio", icon: BookOpen },
   { href: "/admin/dominios", label: "Domínios", icon: Globe },
   { href: "/admin/planos", label: "Planos e Preços", icon: CreditCard },
   { href: "/admin/pagamentos", label: "Pagamentos", icon: ArrowLeftRight },
