@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useDemoStore } from "@/lib/demo/store";
 import type { DemoSupportMaterialCategory } from "@/lib/demo/types";
+import type { MediaFile } from "@/types";
 import { MediaUploader } from "@/components/dashboard/MediaUploader";
 import { Button, Input, Modal } from "@/components/dashboard/ui";
 import { Plus, Trash2, Edit, ExternalLink, Image as ImageIcon, Loader2 } from "lucide-react";
@@ -24,9 +25,7 @@ export function SupportMaterials() {
 
   const sortedItems = [...items].sort((a, b) => a.order - b.order);
 
-  import type { MediaFile } from "@/types";
-
-function handleImageUploaded(media: MediaFile) {
+  function handleImageUploaded(media: MediaFile) {
     setFormData((prev) => ({ ...prev, imageUrl: media.public_url }));
     setImageUploading(false);
   }
