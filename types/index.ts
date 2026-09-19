@@ -870,3 +870,49 @@ export interface AffiliateDashboardSummary {
   pending_balance: number;
   total_paid: number;
 }
+
+export interface CatalogPaymentSettings {
+  id: string;
+  tenant_id: string;
+  // PIX
+  pix_enabled: boolean;
+  pix_discount_percent: number;
+  pix_key: string | null;
+  pix_key_type: "cpf" | "cnpj" | "email" | "phone" | "evp" | null;
+  pix_merchant_name: string | null;
+  pix_merchant_city: string | null;
+  // Mercado Pago
+  mp_enabled: boolean;
+  mp_installments: number;
+  mp_installments_without_interest: boolean;
+  // General
+  requires_contact_info: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CatalogOrder {
+  id: string;
+  tenant_id: string;
+  product_id: string;
+  customer_name: string;
+  customer_email: string | null;
+  customer_phone: string | null;
+  customer_notes: string | null;
+  payment_method: "pix" | "mercadopago" | "manual";
+  payment_status: "pending" | "paid" | "failed" | "refunded" | "cancelled";
+  payment_id: string | null;
+  payment_qr_code: string | null;
+  payment_qr_code_text: string | null;
+  original_price_cents: number;
+  discount_percent: number;
+  discount_cents: number;
+  final_price_cents: number;
+  quantity: number;
+  crm_sale_id: string | null;
+  crm_sale_item_id: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+  paid_at: string | null;
+}

@@ -617,3 +617,136 @@ export async function verifyMpSignature(input: {
 export function computeTrialEnd(months: number): Date {
   return addMonths(new Date(), Math.max(1, months));
 }
+
+// ============================ CATALOG PAYMENTS ============================
+
+export interface CreatePixPaymentInput {
+  accessToken: string;
+  amount: number;
+  description: string;
+  payerEmail: string;
+  payerName: string;
+  externalReference: string;
+  notificationUrl: string;
+}
+
+export interface PixPaymentResult {
+  id: string;
+  qrCode: string;
+  qrCodeBase64: string;
+  expiresAt: string;
+}
+
+/**
+ * Cria um pagamento PIX no Mercado Pago para catálogo público.
+ * Retorna o QR Code (base64) e o código copia-e-cola.
+ */
+export async function createPixPayment(input: CreatePixPaymentInput): Promise<PixPaymentResult> {
+  const appUrl = getPublicBaseUrl();
+  const body = {
+    transaction_amount: input.amount,
+    description: input.description,
+    payment_method_id: "pix",
+    payer: {
+      email: input.payerEmail,
+      first_name: input.payerName.split(" ")[0],
+      last_name: input.payerName.split(" ").slice(1).join(" ") || "Sobrenome",
+    },
+    external_reference: input.externalReference,
+    notification_url: input.notificationUrl,
+    metadata: { catalog_order: true },
+  };
+
+  const res = await fetch(`${MERCADOPAGO_API}/v1/payments`, {
+    method: "POST",
+    cache: "no-store",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${input.accessToken}`,
+      "X-Idempotency-Key": crypto.randomUUID(),
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Mercado Pago PIX falhou (${res.status}): ${text.slice(0, 500)}`);
+  }
+
+  const payment = (await res.json()) as {
+    id: number;
+    point_of_interaction: {
+      transaction_data: {
+        qr_code: string;
+        qr_code_base64: string;
+      };
+    };
+    date_of_expiration: string;
+  };
+
+  return {
+    id: String(payment.id),
+    qrCode: payment.point_of_interaction.transaction_data.qr_code,
+    qrCodeBase64: payment.point_of_interaction.transaction_data.qr_code_base64,
+    expiresAt: payment.date_of_expiration,
+  };
+}
+
+export interface CreateMercadoPagoPreferenceInput {
+  accessToken: string;
+  items: Array<{
+    id: string;
+    title: string;
+    quantity: number;
+    unit_price: number;
+    currency_id: string;
+  }>;
+  payer?: { email: string };
+  externalReference: string;
+  notificationUrl: string;
+  backUrls: {
+    success: string;
+    failure: string;
+    pending: string;
+  };
+}
+
+export interface MercadoPagoPreferenceResult {
+  id: string;
+  init_point: string;
+}
+
+/**
+ * Cria uma preferência de checkout no Mercado Pago para catálogo público.
+ */
+export async function createMercadoPagoPreference(input: CreateMercadoPagoPreferenceInput): Promise<MercadoPagoPreferenceResult> {
+  const appUrl = getPublicBaseUrl();
+  const body = {
+    items: input.items,
+    payer: input.payer,
+    external_reference: input.externalReference,
+    notification_url: input.notificationUrl,
+    back_urls: input.backUrls,
+    auto_return: "approved",
+    metadata: { catalog_order: true },
+    statement_descriptor: "SITE DOTERRA",
+  };
+
+  const res = await fetch(`${MERCADOPAGO_API}/checkout/preferences`, {
+    method: "POST",
+    cache: "no-store",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${input.accessToken}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Mercado Pago Preference falhou (${res.status}): ${text.slice(0, 500)}`);
+  }
+
+  const preference = (await res.json()) as { id: string; init_point: string };
+  return preference;
+}

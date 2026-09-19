@@ -102,6 +102,30 @@ export async function POST(request: Request) {
       // Fonte de verdade: reconsulta o pagamento na API do MP.
       const payment = await getMpPayment(dataId);
       await dispatchMpPayment(payment);
+
+      // Verifica se é um pedido do catálogo
+      if (payment.metadata?.catalog_order && payment.external_reference?.startsWith("CATALOG-")) {
+        const orderId = payment.external_reference.replace("CATALOG-", "");
+        if (payment.status === "approved") {
+          // Atualiza o pedido do catálogo
+          await admin
+            .from("catalog_orders")
+            .update({
+              payment_status: "paid",
+              payment_id: String(payment.id),
+              paid_at: new Date().toISOString(),
+            })
+            .eq("id", orderId);
+
+          // Chama a função para criar venda no CRM
+          await admin.rpc("create_crm_sale_from_catalog_order", { p_order_id: orderId });
+        } else if (["rejected", "cancelled", "refunded"].includes(payment.status)) {
+          await admin
+            .from("catalog_orders")
+            .update({ payment_status: payment.status === "refunded" ? "refunded" : "failed" })
+            .eq("id", orderId);
+        }
+      }
     } else if (type === "subscription") {
       await handleMpSubscriptionUpdate(dataId);
     }

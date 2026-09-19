@@ -6,6 +6,7 @@ import { CrmModal, EmptyState, LoadingState, ErrorState, Toast, Field, apiPost, 
 import { MoneyInput } from "@/components/ui/MoneyInput";
 import { formatBRL } from "@/lib/utils";
 import type { CrmProduct } from "@/types";
+import { CreditCard, QrCode, Settings, Check, AlertCircle } from "lucide-react";
 
 const UNITS = ["un", "cx", "kit", "pct", "kg", "g", "ml", "L", "fr", "mes", "serv"];
 const STATUS_FILTERS = [
@@ -27,7 +28,21 @@ const DEFAULT_FORM = {
   show_publicly: true,
 };
 
+const DEFAULT_PAYMENT_SETTINGS = {
+  pix_enabled: true,
+  pix_discount_percent: 0,
+  pix_key: "",
+  pix_key_type: "",
+  pix_merchant_name: "",
+  pix_merchant_city: "",
+  mp_enabled: false,
+  mp_installments: 1,
+  mp_installments_without_interest: false,
+  requires_contact_info: true,
+};
+
 type FormState = typeof DEFAULT_FORM;
+type PaymentSettingsState = typeof DEFAULT_PAYMENT_SETTINGS;
 
 export default function CrmCatalogClient({ tenantSlug }: { tenantSlug: string | null }) {
   const [products, setProducts] = useState<CrmProduct[]>([]);
@@ -42,6 +57,10 @@ export default function CrmCatalogClient({ tenantSlug }: { tenantSlug: string | 
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [showShare, setShowShare] = useState(false);
+  const [showPaymentSettings, setShowPaymentSettings] = useState(false);
+  const [paymentSettings, setPaymentSettings] = useState<PaymentSettingsState>(DEFAULT_PAYMENT_SETTINGS);
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [paymentSaving, setPaymentSaving] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -59,7 +78,21 @@ export default function CrmCatalogClient({ tenantSlug }: { tenantSlug: string | 
   }
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); loadPaymentSettings(); }, []);
+
+  async function loadPaymentSettings() {
+    setPaymentLoading(true);
+    try {
+      const res = await fetch("/api/crm/catalog-payment", { cache: "no-store" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Erro ao carregar configurações.");
+      setPaymentSettings(json.settings || DEFAULT_PAYMENT_SETTINGS);
+    } catch (e) {
+      console.error("Erro ao carregar configurações de pagamento:", e);
+    } finally {
+      setPaymentLoading(false);
+    }
+  }
 
   const categories = useMemo(() => {
     const set = new Set<string>();
@@ -164,6 +197,32 @@ export default function CrmCatalogClient({ tenantSlug }: { tenantSlug: string | 
     }
   }
 
+  async function savePaymentSettings() {
+    setPaymentSaving(true);
+    try {
+      const body = {
+        pix_enabled: paymentSettings.pix_enabled,
+        pix_discount_percent: paymentSettings.pix_discount_percent,
+        pix_key: paymentSettings.pix_key.trim() || null,
+        pix_key_type: paymentSettings.pix_key_type || null,
+        pix_merchant_name: paymentSettings.pix_merchant_name.trim() || null,
+        pix_merchant_city: paymentSettings.pix_merchant_city.trim() || null,
+        mp_enabled: paymentSettings.mp_enabled,
+        mp_installments: paymentSettings.mp_installments,
+        mp_installments_without_interest: paymentSettings.mp_installments_without_interest,
+        requires_contact_info: paymentSettings.requires_contact_info,
+      };
+      await apiPost("/api/crm/catalog-payment", body);
+      setToast({ ok: true, text: "Configurações de pagamento salvas!" });
+      setShowPaymentSettings(false);
+      loadPaymentSettings();
+    } catch (e) {
+      setToast({ ok: false, text: e instanceof Error ? e.message : "Erro ao salvar configurações." });
+    } finally {
+      setPaymentSaving(false);
+    }
+  }
+
   async function remove(p: CrmProduct) {
     if (!confirmDialog(`Excluir o produto "${p.name}"? Vendas antigas preservam o nome e o valor original (o histórico é mantido).`)) return;
     try {
@@ -204,6 +263,10 @@ export default function CrmCatalogClient({ tenantSlug }: { tenantSlug: string | 
               📤 Compartilhar catálogo
             </button>
           )}
+          <button type="button" className="btn btn-outline !text-sm" onClick={() => setShowPaymentSettings(true)}>
+            <Settings className="h-4 w-4 mr-1" />
+            Config. Pagamento
+          </button>
           <button type="button" className="btn btn-primary" onClick={openCreate}>
             + Adicionar produto
           </button>
@@ -494,6 +557,17 @@ export default function CrmCatalogClient({ tenantSlug }: { tenantSlug: string | 
       {showShare && tenantSlug && publicUrl && (
         <ShareCatalogModal url={publicUrl} onClose={() => setShowShare(false)} productCount={products.filter((p) => p.active && p.show_publicly).length} />
       )}
+
+      {/* Modal de configurações de pagamento */}
+      {showPaymentSettings && (
+        <PaymentSettingsModal
+          settings={paymentSettings}
+          onClose={() => setShowPaymentSettings(false)}
+          onSave={savePaymentSettings}
+          saving={paymentSaving}
+          loading={paymentLoading}
+        />
+      )}
     </div>
   );
 }
@@ -566,6 +640,206 @@ function ShareCatalogModal({ url, onClose, productCount }: { url: string; onClos
           </Link>
         </div>
       </div>
+    </CrmModal>
+  );
+}
+
+function PaymentSettingsModal({
+  settings,
+  onClose,
+  onSave,
+  saving,
+  loading,
+}: {
+  settings: PaymentSettingsState;
+  onClose: () => void;
+  onSave: () => void;
+  saving: boolean;
+  loading: boolean;
+}) {
+  const [form, setForm] = useState<PaymentSettingsState>(settings);
+
+  useEffect(() => {
+    setForm(settings);
+  }, [settings]);
+
+  const pixKeyTypes = [
+    { value: "cpf", label: "CPF" },
+    { value: "cnpj", label: "CNPJ" },
+    { value: "email", label: "E-mail" },
+    { value: "phone", label: "Telefone" },
+    { value: "evp", label: "Chave Aleatória (EVP)" },
+  ];
+
+  return (
+    <CrmModal title="💳 Configurações de Pagamento do Catálogo" onClose={onClose} wide footer={
+      <>
+        <button type="button" className="btn btn-outline" onClick={onClose} disabled={saving}>
+          Cancelar
+        </button>
+        <button type="button" className="btn btn-primary" onClick={onSave} disabled={saving || loading}>
+          {saving ? "Salvando..." : "Salvar configurações"}
+        </button>
+      </>
+    }>
+      {loading ? (
+        <div className="text-center py-8">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-2 border-[#1d5c3a] border-t-transparent" />
+          <p className="mt-2 text-sm text-gray-500">Carregando configurações...</p>
+        </div>
+      ) : (
+        <div className="space-y-5">
+          {/* PIX Section */}
+          <div className="rounded-[12px] border border-[#e2e8e0] bg-white p-4">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <QrCode className="h-5 w-5 text-[#1d5c3a]" />
+                <h3 className="text-lg font-semibold text-[#0d3320]">PIX</h3>
+              </div>
+              <label className="inline-flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.pix_enabled}
+                  onChange={(e) => setForm((f) => ({ ...f, pix_enabled: e.target.checked }))}
+                  className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                />
+                <span className="text-sm text-gray-700">Habilitar PIX</span>
+              </label>
+            </div>
+
+            {form.pix_enabled && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Field label="Chave PIX">
+                  <input
+                    className="input"
+                    value={form.pix_key}
+                    onChange={(e) => setForm((f) => ({ ...f, pix_key: e.target.value }))}
+                    placeholder="Ex: 12.345.678/0001-90 ou email@exemplo.com"
+                    maxLength={200}
+                  />
+                </Field>
+                <Field label="Tipo da chave">
+                  <select
+                    className="input"
+                    value={form.pix_key_type}
+                    onChange={(e) => setForm((f) => ({ ...f, pix_key_type: e.target.value }))}
+                  >
+                    <option value="">Selecione...</option>
+                    {pixKeyTypes.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  </select>
+                </Field>
+                <Field label="Nome do recebedor (merchant)">
+                  <input
+                    className="input"
+                    value={form.pix_merchant_name}
+                    onChange={(e) => setForm((f) => ({ ...f, pix_merchant_name: e.target.value }))}
+                    placeholder="Ex: Maria Silva"
+                    maxLength={100}
+                  />
+                </Field>
+                <Field label="Cidade do recebedor">
+                  <input
+                    className="input"
+                    value={form.pix_merchant_city}
+                    onChange={(e) => setForm((f) => ({ ...f, pix_merchant_city: e.target.value }))}
+                    placeholder="Ex: SAO PAULO"
+                    maxLength={100}
+                  />
+                </Field>
+                <Field label="Desconto PIX (%)">
+                  <input
+                    type="number"
+                    min="0"
+                    max="50"
+                    step="0.5"
+                    className="input"
+                    value={form.pix_discount_percent}
+                    onChange={(e) => setForm((f) => ({ ...f, pix_discount_percent: Math.max(0, Math.min(50, Number(e.target.value) || 0)) }))}
+                    placeholder="0"
+                  />
+                  <p className="text-[11px] text-slate-500 mt-1.5">
+                    Desconto aplicado automaticamente quando cliente escolhe PIX. Máx 50%.
+                  </p>
+                </Field>
+              </div>
+            )}
+          </div>
+
+          {/* Mercado Pago Section */}
+          <div className="rounded-[12px] border border-[#e2e8e0] bg-white p-4">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5 text-[#1d5c3a]" />
+                <h3 className="text-lg font-semibold text-[#0d3320]">Mercado Pago</h3>
+              </div>
+              <label className="inline-flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.mp_enabled}
+                  onChange={(e) => setForm((f) => ({ ...f, mp_enabled: e.target.checked }))}
+                  className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                />
+                <span className="text-sm text-gray-700">Habilitar Mercado Pago</span>
+              </label>
+            </div>
+
+            {form.mp_enabled && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Field label="Parcelas máximas">
+                  <select
+                    className="input"
+                    value={form.mp_installments}
+                    onChange={(e) => setForm((f) => ({ ...f, mp_installments: Number(e.target.value) }))}
+                  >
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => <option key={n} value={n}>{n}x</option>)}
+                  </select>
+                </Field>
+                <Field label="Parcelas sem juros até">
+                  <select
+                    className="input"
+                    value={form.mp_installments_without_interest ? form.mp_installments : 1}
+                    onChange={(e) => setForm((f) => ({ ...f, mp_installments_without_interest: Number(e.target.value) < f.mp_installments }))}
+                  >
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => <option key={n} value={n}>{n}x</option>)}
+                  </select>
+                  <p className="text-[11px] text-slate-500 mt-1.5">
+                    Parcelas sem juros. Requer configuração no painel do Mercado Pago.
+                  </p>
+                </Field>
+              </div>
+            )}
+          </div>
+
+          {/* General Settings */}
+          <div className="rounded-[12px] border border-[#e2e8e0] bg-white p-4">
+            <h3 className="text-lg font-semibold text-[#0d3320] mb-3">Configurações Gerais</h3>
+            <label className="inline-flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.requires_contact_info}
+                onChange={(e) => setForm((f) => ({ ...f, requires_contact_info: e.target.checked }))}
+                className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+              />
+              <span className="text-sm text-gray-700">Exigir dados de contato (nome, e-mail/telefone) no checkout</span>
+            </label>
+          </div>
+
+          {/* Preview */}
+          <div className="rounded-[12px] bg-[#f0fdf4] border border-emerald-200 p-4">
+            <h4 className="font-semibold text-emerald-800 mb-2 flex items-center gap-2">
+              <AlertCircle className="h-4 w-4" />
+              Como aparecerá para o cliente
+            </h4>
+            <div className="space-y-1 text-sm text-emerald-700">
+              <p>✓ Produtos com preço original e preço com desconto PIX (se habilitado)</p>
+              <p>✓ Botão "Comprar com PIX" gera QR Code na hora</p>
+              {form.mp_enabled && <p>✓ Botão "Pagar com Mercado Pago" redireciona para checkout</p>}
+              <p>✓ Após pagamento confirmado, venda é criada automaticamente no CRM</p>
+              <p>✓ Cliente recebe e-mail/notificação com detalhes do pedido</p>
+            </div>
+          </div>
+        </div>
+      )}
     </CrmModal>
   );
 }

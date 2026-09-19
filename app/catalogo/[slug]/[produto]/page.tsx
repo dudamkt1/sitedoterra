@@ -34,6 +34,13 @@ export default async function PublicProductPage({
     .maybeSingle();
   if (error || !product || !product.active || !product.show_publicly) notFound();
 
+  // Busca configurações de pagamento
+  const { data: paymentSettings } = await admin
+    .from("catalog_payment_settings")
+    .select("*")
+    .eq("tenant_id", t.tenant_id)
+    .maybeSingle();
+
   const { data: site } = await admin
     .from("site_settings")
     .select("site_data")
@@ -52,6 +59,7 @@ export default async function PublicProductPage({
       profileName={t.profile_name || t.site_name || "Consultora"}
       product={product as never}
       whatsappLink={whatsappLink}
+      paymentSettings={paymentSettings as any}
     />
   );
 }
