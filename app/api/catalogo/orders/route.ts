@@ -103,7 +103,7 @@ export async function POST(request: Request) {
     // Processa pagamento conforme método
     if (paymentMethod === "pix") {
       // Gera PIX via Mercado Pago (mesmo gateway)
-      const gateways = await resolveGateways(t.tenant_id);
+      const gateways = await resolveGateways();
       if (gateways.mercadopago.accessToken) {
         try {
           const pixData = await createPixPayment({
@@ -137,7 +137,7 @@ export async function POST(request: Request) {
       }
     } else if (paymentMethod === "mercadopago") {
       // Cria preferência Mercado Pago
-      const gateways = await resolveGateways(t.tenant_id);
+      const gateways = await resolveGateways();
       if (gateways.mercadopago.accessToken) {
         try {
           const preference = await createMercadoPagoPreference({
