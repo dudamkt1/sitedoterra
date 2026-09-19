@@ -11,6 +11,7 @@ import {
   formatBytes,
 } from "@/lib/media-client";
 import type { MediaFile } from "@/types";
+import { Check, CheckSquare, Trash2, Square, X } from "lucide-react";
 
 interface MediaLibraryProps {
   scope: "tenant" | "system" | "admin";
@@ -18,6 +19,7 @@ interface MediaLibraryProps {
   selectable?: boolean;
   onSelect?: (media: MediaFile) => void;
   showOwner?: boolean;
+  multiSelect?: boolean;
 }
 
 export function MediaLibrary({
@@ -26,6 +28,7 @@ export function MediaLibrary({
   selectable = false,
   onSelect,
   showOwner = false,
+  multiSelect = false,
 }: MediaLibraryProps) {
   const [items, setItems] = useState<MediaFile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,6 +40,8 @@ export function MediaLibrary({
   const [copied, setCopied] = useState<string | null>(null);
   const [stats, setStats] = useState<{ totalBytes: number; quotaBytes: number; totalFiles: number; byTenant?: any[] } | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -94,7 +99,46 @@ export function MediaLibrary({
     }
   }
 
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (selectedIds.size === items.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(items.map((m) => m.id)));
+    }
+  }
+
+  async function bulkDelete() {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    if (!window.confirm(`Excluir ${ids.length} arquivo(s) selecionado(s)?`)) return;
+    setDeleting(true);
+    try {
+      for (const id of ids) {
+        await deleteMedia(id);
+      }
+      setSelectedIds(new Set());
+      await load();
+    } catch (e: any) {
+      const base = e?.message || "Erro ao excluir.";
+      const refs = (e?.references || []).map((r: string) => `• ${r}`);
+      window.alert(refs.length ? `${base}\n\nUtilizada em:\n${refs.join("\n")}` : base);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   const pct = stats && stats.quotaBytes > 0 ? Math.round((stats.totalBytes / stats.quotaBytes) * 100) : 0;
+  const selectionMode = multiSelect && !selectable;
+  const hasSelection = selectedIds.size > 0;
 
   return (
     <div className="space-y-5">
@@ -164,6 +208,32 @@ export function MediaLibrary({
         </select>
       </div>
 
+      {/* Selection toolbar */}
+      {selectionMode && hasSelection && (
+        <div className="flex items-center gap-3 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+          <span className="text-sm font-medium text-emerald-800">
+            {selectedIds.size} arquivo(s) selecionado(s)
+          </span>
+          <button
+            type="button"
+            onClick={bulkDelete}
+            disabled={deleting}
+            className="btn btn-destructive text-sm gap-1"
+          >
+            <Trash2 className="h-4 w-4" />
+            {deleting ? "Excluindo..." : "Excluir selecionados"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedIds(new Set())}
+            className="btn btn-outline text-sm"
+          >
+            <X className="h-4 w-4 mr-1" />
+            Limpar seleção
+          </button>
+        </div>
+      )}
+
       {error && <p className="rounded-lg bg-red-50 text-red-600 px-4 py-3 text-sm">{error}</p>}
 
       {/* Grid */}
@@ -174,45 +244,80 @@ export function MediaLibrary({
           Nenhum arquivo encontrado. Envie sua primeira imagem ou vídeo para o Cloudflare R2.
         </p>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-          {items.map((m) => {
-            const isVideo = (m.mime_type || "").toLowerCase().startsWith("video/");
-            return (
-            <div key={m.id} className="card !p-0 overflow-hidden">
-              <div className="aspect-video bg-gray-100 relative group">
-                {isVideo ? (
-                  <video
-                    src={m.public_url}
-                    preload="metadata"
-                    playsInline
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img
-                    src={m.public_url}
-                    alt={m.original_name || "imagem"}
-                    loading="lazy"
-                    referrerPolicy="no-referrer"
-                    className="w-full h-full object-cover"
-                  />
-                )}
-                {selectable && (
-                  <button
-                    type="button"
-                    onClick={() => onSelect && onSelect(m)}
-                    className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-[#1d5c3a]/70 text-white text-sm font-semibold flex items-center justify-center"
-                  >
-                    {isVideo ? "Usar este vídeo ✓" : "Usar esta imagem ✓"}
-                  </button>
-                )}
-              </div>
-              <div className="p-3">
-                <p className="text-xs font-medium text-gray-700 truncate" title={m.original_name || ""}>
-                  {m.original_name || "arquivo"}
-                </p>
-                <p className="text-[0.7rem] text-gray-400 mt-0.5">
-                  {isVideo ? "Vídeo" : categoryLabel(m.category)} · {formatBytes(m.file_size)}
+        <>
+          {selectionMode && (
+            <div className="flex items-center gap-2 mb-3 p-2 bg-gray-50 rounded-lg border">
+              <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.size === items.length && items.length > 0}
+                  onChange={toggleSelectAll}
+                  className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                />
+                Selecionar todos ({items.length})
+              </label>
+              <span className="text-xs text-gray-400">Clique nos itens para selecionar múltiplos</span>
+            </div>
+          )}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            {items.map((m) => {
+              const isVideo = (m.mime_type || "").toLowerCase().startsWith("video/");
+              const isSelected = selectedIds.has(m.id);
+              return (
+              <div
+                key={m.id}
+                className={`card !p-0 overflow-hidden transition-all ${selectionMode && isSelected ? "ring-2 ring-emerald-500 bg-emerald-50" : ""}`}
+                onClick={selectionMode ? () => toggleSelect(m.id) : undefined}
+                style={selectionMode ? { cursor: "pointer" } : undefined}
+              >
+                <div className="aspect-video bg-gray-100 relative group">
+                  {isVideo ? (
+                    <video
+                      src={m.public_url}
+                      preload="metadata"
+                      playsInline
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={m.public_url}
+                      alt={m.original_name || "imagem"}
+                      loading="lazy"
+                      referrerPolicy="no-referrer"
+                      className="w-full h-full object-cover"
+                    />
+                  )}
+                  {selectable && !selectionMode && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); onSelect && onSelect(m); }}
+                      className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-[#1d5c3a]/70 text-white text-sm font-semibold flex items-center justify-center"
+                    >
+                      {isVideo ? "Usar este vídeo ✓" : "Usar esta imagem ✓"}
+                    </button>
+                  )}
+                  {selectionMode && (
+                    <div className="absolute top-2 left-2 z-10">
+                      <label className="flex items-center justify-center w-7 h-7 rounded-full bg-white/90 shadow-lg cursor-pointer transition-transform hover:scale-110">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(e) => { e.stopPropagation(); toggleSelect(m.id); }}
+                          className="sr-only peer"
+                        />
+                        <Square className="h-4 w-4 text-gray-400 peer-checked:hidden" />
+                        <CheckSquare className="h-4 w-4 text-emerald-600 hidden peer-checked:block" />
+                      </label>
+                    </div>
+                  )}
+                </div>
+                <div className="p-3">
+                  <p className="text-xs font-medium text-gray-700 truncate" title={m.original_name || ""}>
+                    {m.original_name || "arquivo"}
+                  </p>
+                  <p className="text-[0.7rem] text-gray-400 mt-0.5">
+                    {isVideo ? "Vídeo" : categoryLabel(m.category)} · {formatBytes(m.file_size)}
                 </p>
                 {showOwner && (
                   <p className="text-[0.7rem] text-gray-500 mt-0.5">
