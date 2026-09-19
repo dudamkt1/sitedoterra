@@ -79,7 +79,9 @@ export default function PublicProductClient({
   const totalPixCents = pixPriceCents * quantity;
   const totalOriginalCents = product.price_cents * quantity;
 
-  const availableTabs = [];
+  type PaymentTab = "pix" | "mercadopago" | "whatsapp";
+
+  const availableTabs: PaymentTab[] = [];
   if (settings.pix_enabled) availableTabs.push("pix");
   if (settings.mp_enabled) availableTabs.push("mercadopago");
   availableTabs.push("whatsapp");
