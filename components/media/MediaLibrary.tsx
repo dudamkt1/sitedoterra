@@ -11,7 +11,7 @@ import {
   formatBytes,
 } from "@/lib/media-client";
 import type { MediaFile } from "@/types";
-import { Check, CheckSquare, Trash2, Square, X } from "lucide-react";
+import { CheckSquare, Trash2, Square, X } from "lucide-react";
 
 interface MediaLibraryProps {
   scope: "tenant" | "system" | "admin";
@@ -318,32 +318,33 @@ export function MediaLibrary({
                   </p>
                   <p className="text-[0.7rem] text-gray-400 mt-0.5">
                     {isVideo ? "Vídeo" : categoryLabel(m.category)} · {formatBytes(m.file_size)}
-                </p>
-                {showOwner && (
-                  <p className="text-[0.7rem] text-gray-500 mt-0.5">
-                    {m.tenant_slug === "Sistema"
-                      ? "Sistema"
-                      : `${m.owner_name || m.owner_email || "—"} (${m.tenant_slug || "?"})`}
                   </p>
-                )}
-                <div className="flex gap-2 mt-2">
-                  <button type="button" className="text-xs text-[#1d5c3a] underline" onClick={() => copyUrl(m)}>
-                    {copied === m.id ? "✓ Copiada" : "Copiar URL"}
-                  </button>
-                  <a href={m.public_url} target="_blank" rel="noopener noreferrer" className="text-xs text-gray-400 underline">
-                    Abrir
-                  </a>
-                  {!selectable && (
-                    <button type="button" className="text-xs text-red-600 underline ml-auto" onClick={() => remove(m)}>
-                      Excluir
-                    </button>
+                  {showOwner && (
+                    <p className="text-[0.7rem] text-gray-500 mt-0.5">
+                      {m.tenant_slug === "Sistema"
+                        ? "Sistema"
+                        : `${m.owner_name || m.owner_email || "—"} (${m.tenant_slug || "?"})`}
+                    </p>
                   )}
+                  <div className="flex gap-2 mt-2">
+                    <button type="button" className="text-xs text-[#1d5c3a] underline" onClick={() => copyUrl(m)}>
+                      {copied === m.id ? "✓ Copiada" : "Copiar URL"}
+                    </button>
+                    <a href={m.public_url} target="_blank" rel="noopener noreferrer" className="text-xs text-gray-400 underline">
+                      Abrir
+                    </a>
+                    {!selectable && (
+                      <button type="button" className="text-xs text-red-600 underline ml-auto" onClick={() => remove(m)}>
+                        Excluir
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        </>
       )}
     </div>
   );
