@@ -3,14 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { CreditCard, QrCode, CheckCircle, Loader2, AlertCircle, Copy } from "lucide-react";
-
-type CatalogPaymentSettings = {
-  pix_enabled: boolean;
-  pix_discount_percent: number;
-  mp_enabled: boolean;
-  mp_installments: number;
-  requires_contact_info: boolean;
-} | null;
+import type { CatalogPaymentSettings } from "@/types";
 
 type PublicProduct = {
   id: string;
