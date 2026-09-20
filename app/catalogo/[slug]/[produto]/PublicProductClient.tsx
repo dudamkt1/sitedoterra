@@ -464,7 +464,7 @@ export default function PublicProductClient({
           </a>
         ) : (
           <p className="text-blue-600">Configure o WhatsApp no site para habilitar esta opção.</p>
-        ))
+        )}
       </div>
       <p className="text-sm text-gray-500">
         Enviaremos uma mensagem pré-preenchida com o produto e valor para agilizar o atendimento.
