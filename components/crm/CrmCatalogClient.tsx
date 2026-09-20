@@ -86,7 +86,16 @@ export default function CrmCatalogClient({ tenantSlug }: { tenantSlug: string | 
       const res = await fetch("/api/crm/catalog-payment", { cache: "no-store" });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Erro ao carregar configurações.");
-      setPaymentSettings(json.settings || DEFAULT_PAYMENT_SETTINGS);
+      const s = json.settings || DEFAULT_PAYMENT_SETTINGS;
+      // Normaliza nulls do banco para "" (inputs controlados + trim seguro)
+      setPaymentSettings({
+        ...DEFAULT_PAYMENT_SETTINGS,
+        ...s,
+        pix_key: s.pix_key ?? "",
+        pix_key_type: s.pix_key_type ?? "",
+        pix_merchant_name: s.pix_merchant_name ?? "",
+        pix_merchant_city: s.pix_merchant_city ?? "",
+      });
     } catch (e) {
       console.error("Erro ao carregar configurações de pagamento:", e);
     } finally {
@@ -197,20 +206,21 @@ export default function CrmCatalogClient({ tenantSlug }: { tenantSlug: string | 
     }
   }
 
-  async function savePaymentSettings() {
+  async function savePaymentSettings(values?: PaymentSettingsState) {
     setPaymentSaving(true);
     try {
+      const v = values || paymentSettings;
       const body = {
-        pix_enabled: paymentSettings.pix_enabled,
-        pix_discount_percent: paymentSettings.pix_discount_percent,
-        pix_key: paymentSettings.pix_key.trim() || null,
-        pix_key_type: paymentSettings.pix_key_type || null,
-        pix_merchant_name: paymentSettings.pix_merchant_name.trim() || null,
-        pix_merchant_city: paymentSettings.pix_merchant_city.trim() || null,
-        mp_enabled: paymentSettings.mp_enabled,
-        mp_installments: paymentSettings.mp_installments,
-        mp_installments_without_interest: paymentSettings.mp_installments_without_interest,
-        requires_contact_info: paymentSettings.requires_contact_info,
+        pix_enabled: v.pix_enabled,
+        pix_discount_percent: v.pix_discount_percent,
+        pix_key: (v.pix_key || "").trim() || null,
+        pix_key_type: v.pix_key_type || null,
+        pix_merchant_name: (v.pix_merchant_name || "").trim() || null,
+        pix_merchant_city: (v.pix_merchant_city || "").trim() || null,
+        mp_enabled: v.mp_enabled,
+        mp_installments: v.mp_installments,
+        mp_installments_without_interest: v.mp_installments_without_interest,
+        requires_contact_info: v.requires_contact_info,
       };
       await apiPost("/api/crm/catalog-payment", body);
       setToast({ ok: true, text: "Configurações de pagamento salvas!" });
@@ -653,7 +663,7 @@ function PaymentSettingsModal({
 }: {
   settings: PaymentSettingsState;
   onClose: () => void;
-  onSave: () => void;
+  onSave: (values: PaymentSettingsState) => void;
   saving: boolean;
   loading: boolean;
 }) {
@@ -677,7 +687,7 @@ function PaymentSettingsModal({
         <button type="button" className="btn btn-outline" onClick={onClose} disabled={saving}>
           Cancelar
         </button>
-        <button type="button" className="btn btn-primary" onClick={onSave} disabled={saving || loading}>
+        <button type="button" className="btn btn-primary" onClick={() => onSave(form)} disabled={saving || loading}>
           {saving ? "Salvando..." : "Salvar configurações"}
         </button>
       </>
