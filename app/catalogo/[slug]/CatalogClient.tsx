@@ -21,9 +21,7 @@ export default function CatalogClient({
   slug,
   profileName,
   siteName,
-  logoMode,
-  logoUrl,
-  logoText,
+  logo,
   siteDescription,
   products,
   whatsappLink,
@@ -32,9 +30,7 @@ export default function CatalogClient({
   slug: string;
   profileName: string;
   siteName: string | null;
-  logoMode: "image" | "text";
-  logoUrl: string | null;
-  logoText: string;
+  logo: { mode: "image" | "text"; url?: string; lightUrl?: string; text: string };
   siteDescription: string;
   products: PublicProduct[];
   whatsappLink: string | null;
@@ -67,17 +63,17 @@ export default function CatalogClient({
             <div className="min-w-0">
               <p className="text-[11px] uppercase tracking-[0.2em] text-white/70">Catálogo</p>
               <div className="flex items-center gap-3 mt-2">
-                {logoMode === "image" && logoUrl ? (
+                {logo.mode === "image" && logo.url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={logoUrl}
-                    alt={logoText}
+                    src={logo.url}
+                    alt={logo.text}
                     className="h-12 w-12 sm:h-14 sm:w-14 rounded-full object-cover bg-white/10 border border-white/20 shrink-0"
                     referrerPolicy="no-referrer"
                   />
                 ) : null}
                 <h1 className="text-[26px] sm:text-[34px] font-extrabold tracking-tight leading-tight" style={{ fontFamily: "var(--font-display)" }}>
-                  {logoMode === "image" ? profileName : logoText}
+                  {logo.mode === "image" ? profileName : logo.text}
                 </h1>
               </div>
               {siteName && siteName !== profileName && (
