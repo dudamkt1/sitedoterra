@@ -2,6 +2,10 @@ import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import PublicProductClient from "./PublicProductClient";
 
+function formatBRL(cents: number) {
+  return (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
 export const dynamic = "force-dynamic";
 
 export default async function PublicProductPage({
@@ -50,7 +54,7 @@ export default async function PublicProductPage({
   const whatsappRaw = (siteData.whatsapp as string | undefined) || (siteData._contactWhatsapp as string | undefined);
   const whatsappDigits = (whatsappRaw || "").replace(/\D+/g, "");
   const whatsappLink = whatsappDigits
-    ? `https://wa.me/${whatsappDigits}?text=${encodeURIComponent(`Olá! Tenho interesse no produto "${product.name}".`)}`
+    ? `https://wa.me/${whatsappDigits}?text=${encodeURIComponent(`Olá! Tenho interesse no produto "${product.name}" (${formatBRL(product.price_cents)}). Gostaria de mais informações e finalizar a compra.`)}`
     : null;
 
   return (

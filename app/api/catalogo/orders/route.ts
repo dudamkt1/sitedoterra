@@ -104,77 +104,80 @@ export async function POST(request: Request) {
     if (paymentMethod === "pix") {
       // Gera PIX via Mercado Pago (mesmo gateway)
       const gateways = await resolveGateways();
-      if (gateways.mercadopago.accessToken) {
-        try {
-          const pixData = await createPixPayment({
-            accessToken: gateways.mercadopago.accessToken,
-            amount: totalFinalCents / 100,
-            description: `Pedido catálogo: ${product.name}`,
-            payerEmail: customerEmail || "cliente@catalogo.com",
-            payerName: customerName,
-            externalReference: `CATALOG-${order.id}`,
-            notificationUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://app.topconsultores.com.br"}/api/webhooks/mercadopago`,
-          });
+      if (!gateways.mercadopago.accessToken) {
+        return NextResponse.json({ error: "Mercado Pago não configurado no painel de pagamentos. Configure em /painel/pagamentos." }, { status: 400 });
+      }
+      try {
+        const pixData = await createPixPayment({
+          accessToken: gateways.mercadopago.accessToken,
+          amount: totalFinalCents / 100,
+          description: `Pedido catálogo: ${product.name}`,
+          payerEmail: customerEmail || "cliente@catalogo.com",
+          payerName: customerName,
+          externalReference: `CATALOG-${order.id}`,
+          notificationUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://app.topconsultores.com.br"}/api/webhooks/mercadopago`,
+        });
 
-          // Atualiza pedido com QR Code
-          await admin
-            .from("catalog_orders")
-            .update({
-              payment_id: pixData.id,
-              payment_qr_code: pixData.qrCode,
-              payment_qr_code_text: pixData.qrCodeBase64,
-            })
-            .eq("id", order.id);
+        // Atualiza pedido com QR Code
+        await admin
+          .from("catalog_orders")
+          .update({
+            payment_id: pixData.id,
+            payment_qr_code: pixData.qrCode,
+            payment_qr_code_text: pixData.qrCodeBase64,
+          })
+          .eq("id", order.id);
 
-          return NextResponse.json({
-            order: { ...order, payment_id: pixData.id, payment_qr_code: pixData.qrCode, payment_qr_code_text: pixData.qrCodeBase64 },
-            pix: { qrCode: pixData.qrCode, qrCodeBase64: pixData.qrCodeBase64, expiresAt: pixData.expiresAt },
-          });
-        } catch (e) {
-          console.error("[catalog] erro ao criar PIX:", e);
-          // Continua sem PIX, o cliente tenta novamente
-        }
+        return NextResponse.json({
+          order: { ...order, payment_id: pixData.id, payment_qr_code: pixData.qrCode, payment_qr_code_text: pixData.qrCodeBase64 },
+          pix: { qrCode: pixData.qrCode, qrCodeBase64: pixData.qrCodeBase64, expiresAt: pixData.expiresAt },
+        });
+      } catch (e) {
+        console.error("[catalog] erro ao criar PIX:", e);
+        return NextResponse.json({ error: "Erro ao gerar QR Code PIX. Tente novamente." }, { status: 500 });
       }
     } else if (paymentMethod === "mercadopago") {
       // Cria preferência Mercado Pago
       const gateways = await resolveGateways();
-      if (gateways.mercadopago.accessToken) {
-        try {
-          const preference = await createMercadoPagoPreference({
-            accessToken: gateways.mercadopago.accessToken,
-            items: [{
-              id: productId,
-              title: product.name,
-              quantity: quantity,
-              unit_price: totalFinalCents / 100,
-              currency_id: "BRL",
-            }],
-            payer: customerEmail ? { email: customerEmail } : undefined,
-            externalReference: `CATALOG-${order.id}`,
-            notificationUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://app.topconsultores.com.br"}/api/webhooks/mercadopago`,
-            backUrls: {
-              success: `${process.env.NEXT_PUBLIC_APP_URL || "https://app.topconsultores.com.br"}/catalogo/${slug}/order/success?order_id=${order.id}`,
-              failure: `${process.env.NEXT_PUBLIC_APP_URL || "https://app.topconsultores.com.br"}/catalogo/${slug}/order/failure?order_id=${order.id}`,
-              pending: `${process.env.NEXT_PUBLIC_APP_URL || "https://app.topconsultores.com.br"}/catalogo/${slug}/order/pending?order_id=${order.id}`,
-            },
-          });
+      if (!gateways.mercadopago.accessToken) {
+        return NextResponse.json({ error: "Mercado Pago não configurado no painel de pagamentos. Configure em /painel/pagamentos." }, { status: 400 });
+      }
+      try {
+        const preference = await createMercadoPagoPreference({
+          accessToken: gateways.mercadopago.accessToken,
+          items: [{
+            id: productId,
+            title: product.name,
+            quantity: quantity,
+            unit_price: totalFinalCents / 100,
+            currency_id: "BRL",
+          }],
+          payer: customerEmail ? { email: customerEmail } : undefined,
+          externalReference: `CATALOG-${order.id}`,
+          notificationUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://app.topconsultores.com.br"}/api/webhooks/mercadopago`,
+          backUrls: {
+            success: `${process.env.NEXT_PUBLIC_APP_URL || "https://app.topconsultores.com.br"}/catalogo/${slug}/order/success?order_id=${order.id}`,
+            failure: `${process.env.NEXT_PUBLIC_APP_URL || "https://app.topconsultores.com.br"}/catalogo/${slug}/order/failure?order_id=${order.id}`,
+            pending: `${process.env.NEXT_PUBLIC_APP_URL || "https://app.topconsultores.com.br"}/catalogo/${slug}/order/pending?order_id=${order.id}`,
+          },
+        });
 
-          await admin
-            .from("catalog_orders")
-            .update({ payment_id: preference.id })
-            .eq("id", order.id);
+        await admin
+          .from("catalog_orders")
+          .update({ payment_id: preference.id })
+          .eq("id", order.id);
 
-          return NextResponse.json({
-            order: { ...order, payment_id: preference.id },
-            mercadoPago: { preferenceId: preference.id, initPoint: preference.init_point },
-          });
-        } catch (e) {
-          console.error("[catalog] erro ao criar preferência MP:", e);
-        }
+        return NextResponse.json({
+          order: { ...order, payment_id: preference.id },
+          mercadoPago: { preferenceId: preference.id, initPoint: preference.init_point },
+        });
+      } catch (e) {
+        console.error("[catalog] erro ao criar preferência MP:", e);
+        return NextResponse.json({ error: "Erro ao criar pagamento Mercado Pago. Tente novamente." }, { status: 500 });
       }
     }
 
-    // Para pagamento manual ou se falhou o gateway
+    // Para pagamento manual
     return NextResponse.json({ order });
   } catch (e) {
     console.error("[catalog] erro ao criar pedido:", e);

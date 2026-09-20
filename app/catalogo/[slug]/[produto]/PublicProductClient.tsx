@@ -448,7 +448,7 @@ export default function PublicProductClient({
     </div>
   );
 
-  const whatsappTabContent = (
+const whatsappTabContent = (
     <div className="space-y-4 text-center">
       <div className="rounded-[12px] bg-blue-50 border border-blue-200 p-6">
         <div className="text-5xl mb-3">💬</div>
@@ -467,10 +467,10 @@ export default function PublicProductClient({
           </a>
         ) : (
           <p className="text-blue-600">Configure o WhatsApp no site para habilitar esta opção.</p>
-        )}
+        ))
       </div>
       <p className="text-sm text-gray-500">
-        O pagamento será combinado diretamente com o vendedor.
+        Enviaremos uma mensagem pré-preenchida com o produto e valor para agilizar o atendimento.
       </p>
     </div>
   );
@@ -513,6 +513,35 @@ export default function PublicProductClient({
 
             {/* Payment Tabs */}
             <div className="mt-auto pt-5">
+              {/* Botão de compra principal - destaque */}
+              <div className="mb-4">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("pix")}
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-[12px] bg-[#1d5c3a] hover:bg-[#165030] text-white text-[16px] font-bold px-5 py-4 transition shadow-[0_4px_14px_rgba(29,92,58,0.3)]"
+                >
+                  <CreditCard className="h-5 w-5" />
+                  <span>COMPRAR AGORA</span>
+                </button>
+                <p className="text-center text-xs text-gray-500 mt-2">
+                  Escolha a forma de pagamento na próxima etapa
+                </p>
+              </div>
+
+              {/* Botão WhatsApp direto - contato rápido */}
+              {whatsappLink && (
+                <a
+                  href={whatsappLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-[12px] bg-[#25D366] hover:bg-[#1ebe5b] text-white text-[15px] font-semibold px-5 py-3 transition mb-4"
+                >
+                  <span>💬</span>
+                  <span>Falar no WhatsApp</span>
+                </a>
+              )}
+
+              {/* Tabs de pagamento */}
               <div className="flex gap-1 mb-4 bg-gray-100 rounded-[10px] p-1">
                 {availableTabs.map((tab) => (
                   <button

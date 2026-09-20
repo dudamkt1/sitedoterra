@@ -61,7 +61,10 @@ export async function POST(request: Request) {
     .select()
     .single();
 
-  if (err) return NextResponse.json({ error: "Erro ao salvar configurações." }, { status: 500 });
+  if (err) {
+    console.error("[catalog-payment] erro ao salvar:", err);
+    return NextResponse.json({ error: err.message || "Erro ao salvar configurações." }, { status: 500 });
+  }
 
   return NextResponse.json({ success: true, settings: data });
 }
