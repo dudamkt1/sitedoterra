@@ -79,7 +79,6 @@ export default function PublicProductClient({
   if (settings.mp_enabled) availableTabs.push("mercadopago");
   availableTabs.push("whatsapp");
 
-  // Auto-switch to first available tab
   if (!availableTabs.includes(activeTab)) {
     setActiveTab(availableTabs[0]);
   }
@@ -160,10 +159,8 @@ export default function PublicProductClient({
 
       if (data.mercadoPago?.initPoint) {
         setMpData(data.mercadoPago);
-        // Redireciona para o Mercado Pago
         window.location.href = data.mercadoPago.initPoint;
       } else if (data.order?.payment_id) {
-        // Fallback: tenta buscar a preferência
         setMpError("Preferência criada. Redirecionando...");
       } else {
         setMpError("Não foi possível iniciar o pagamento. Tente novamente.");
@@ -448,7 +445,7 @@ export default function PublicProductClient({
     </div>
   );
 
-const whatsappTabContent = (
+  const whatsappTabContent = (
     <div className="space-y-4 text-center">
       <div className="rounded-[12px] bg-blue-50 border border-blue-200 p-6">
         <div className="text-5xl mb-3">💬</div>
@@ -492,7 +489,6 @@ const whatsappTabContent = (
         <article className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white rounded-[18px] border border-[#e2e8e0] shadow-[0_4px_20px_rgba(0,0,0,0.04)] overflow-hidden">
           <div className="relative aspect-[4/3] bg-gradient-to-br from-[#eaf6ec] to-[#f5f7f4]">
             {product.image_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
               <img src={product.image_url} alt={product.name} className="absolute inset-0 w-full h-full object-cover" referrerPolicy="no-referrer" />
             ) : (
               <div className="absolute inset-0 flex items-center justify-center text-7xl text-[#1d5c3a]/25 select-none">📦</div>
@@ -511,9 +507,7 @@ const whatsappTabContent = (
               <p className="text-[15px] leading-6 text-[#4a5a52] mt-3 whitespace-pre-line">{product.description}</p>
             )}
 
-            {/* Payment Tabs */}
             <div className="mt-auto pt-5">
-              {/* Botão de compra principal - destaque */}
               <div className="mb-4">
                 <button
                   type="button"
@@ -528,7 +522,6 @@ const whatsappTabContent = (
                 </p>
               </div>
 
-              {/* Botão WhatsApp direto - contato rápido */}
               {whatsappLink && (
                 <a
                   href={whatsappLink}
@@ -541,7 +534,6 @@ const whatsappTabContent = (
                 </a>
               )}
 
-              {/* Tabs de pagamento */}
               <div className="flex gap-1 mb-4 bg-gray-100 rounded-[10px] p-1">
                 {availableTabs.map((tab) => (
                   <button
