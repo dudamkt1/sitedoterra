@@ -47,10 +47,10 @@ export default async function PublicProductPage({
 
   const { data: site } = await admin
     .from("site_settings")
-    .select("site_data")
+    .select("data")
     .eq("tenant_id", t.tenant_id)
     .maybeSingle();
-  const siteData = (site?.site_data || {}) as Record<string, unknown>;
+  const siteData = (site?.data || {}) as Record<string, unknown>;
   const whatsappRaw = (siteData.whatsapp as string | undefined) || (siteData._contactWhatsapp as string | undefined);
   const whatsappDigits = (whatsappRaw || "").replace(/\D+/g, "");
   const whatsappLink = whatsappDigits

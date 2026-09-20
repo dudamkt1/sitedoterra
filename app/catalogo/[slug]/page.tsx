@@ -38,15 +38,14 @@ export default async function PublicCatalogPage({
     .order("name", { ascending: true });
   if (pErr) notFound();
 
-  // WhatsApp do tenant: tenta o campo whatsapp do site_data (padrão já existente)
-  // ou cai no email/CRM. Para manter simples, mostramos o link de WhatsApp
-  // somente se houver cadastrado no site_data.
+  // WhatsApp do tenant: campo whatsapp de site_settings.data (mesma coluna
+  // que o painel/meu-site salva via /api/site).
   const { data: site } = await admin
     .from("site_settings")
-    .select("site_data")
+    .select("data")
     .eq("tenant_id", t.tenant_id)
     .maybeSingle();
-  const siteData = (site?.site_data || {}) as Record<string, unknown>;
+  const siteData = (site?.data || {}) as Record<string, unknown>;
   const whatsappRaw = (siteData.whatsapp as string | undefined) || (siteData._contactWhatsapp as string | undefined);
   const whatsappDigits = (whatsappRaw || "").replace(/\D+/g, "");
   const whatsappLink = whatsappDigits
