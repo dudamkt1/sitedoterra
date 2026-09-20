@@ -101,15 +101,18 @@ async function fetchUrl(url: string) {
       ok: res.ok,
       status: res.status,
       headers: res.headers,
-      json: () => res.json(),
-      text: () => res.text(),
-      blob: () => res.blob(),
+      json: async () => res.json(),
+      text: async () => res.text(),
+      blob: async () => res.blob(),
     };
   } catch (e) {
     return {
       ok: false,
       status: 0,
       headers: new Headers(),
+      json: async () => { throw new Error("Fetch failed"); },
+      text: async () => { throw new Error("Fetch failed"); },
+      blob: async () => { throw new Error("Fetch failed"); },
       error: e instanceof Error ? e.message : "Fetch failed",
     };
   }
