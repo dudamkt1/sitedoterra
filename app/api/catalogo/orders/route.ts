@@ -100,16 +100,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Erro ao criar pedido." }, { status: 500 });
     }
 
+    // Token MP: prefere a conta do dono do catálogo, cai para a global da plataforma
+    const tenantMpToken = (settings as Record<string, unknown>).mp_access_token as string | null;
+    const gateways = await resolveGateways();
+    const mpToken = tenantMpToken || gateways.mercadopago.accessToken;
+
     // Processa pagamento conforme método
     if (paymentMethod === "pix") {
       // Gera PIX via Mercado Pago (mesmo gateway)
-      const gateways = await resolveGateways();
-      if (!gateways.mercadopago.accessToken) {
-        return NextResponse.json({ error: "Mercado Pago não configurado no painel de pagamentos. Configure em /painel/pagamentos." }, { status: 400 });
+      if (!mpToken) {
+        return NextResponse.json({ error: "Mercado Pago não configurado. O dono do catálogo precisa vincular a conta em Catálogo → Config. Pagamento." }, { status: 400 });
       }
       try {
         const pixData = await createPixPayment({
-          accessToken: gateways.mercadopago.accessToken,
+          accessToken: mpToken,
           amount: totalFinalCents / 100,
           description: `Pedido catálogo: ${product.name}`,
           payerEmail: customerEmail || "cliente@catalogo.com",
@@ -138,13 +142,12 @@ export async function POST(request: Request) {
       }
     } else if (paymentMethod === "mercadopago") {
       // Cria preferência Mercado Pago
-      const gateways = await resolveGateways();
-      if (!gateways.mercadopago.accessToken) {
-        return NextResponse.json({ error: "Mercado Pago não configurado no painel de pagamentos. Configure em /painel/pagamentos." }, { status: 400 });
+      if (!mpToken) {
+        return NextResponse.json({ error: "Mercado Pago não configurado. O dono do catálogo precisa vincular a conta em Catálogo → Config. Pagamento." }, { status: 400 });
       }
       try {
         const preference = await createMercadoPagoPreference({
-          accessToken: gateways.mercadopago.accessToken,
+          accessToken: mpToken,
           items: [{
             id: productId,
             title: product.name,

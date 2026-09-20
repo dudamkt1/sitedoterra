@@ -750,3 +750,23 @@ export async function createMercadoPagoPreference(input: CreateMercadoPagoPrefer
   const preference = (await res.json()) as { id: string; init_point: string };
   return preference;
 }
+
+/**
+ * Busca um pagamento usando um Access Token explícito (ex: conta MP do dono
+ * do catálogo) em vez do token global da plataforma. Usado pelo webhook para
+ * confirmar pedidos do catálogo pagos na conta do tenant.
+ */
+export async function getMpPaymentWithToken(id: string, accessToken: string): Promise<MpPayment> {
+  const res = await fetch(`${MERCADOPAGO_API}/v1/payments/${id}`, {
+    cache: "no-store",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Mercado Pago GET /v1/payments/${id} falhou (${res.status}): ${text.slice(0, 300)}`);
+  }
+  return (await res.json()) as MpPayment;
+}

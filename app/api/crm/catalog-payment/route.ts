@@ -27,6 +27,8 @@ export async function GET() {
     mp_enabled: false,
     mp_installments: 1,
     mp_installments_without_interest: false,
+    mp_access_token: null,
+    mp_public_key: null,
     requires_contact_info: true,
   };
 
@@ -51,6 +53,8 @@ export async function POST(request: Request) {
     mp_enabled: body.mp_enabled === true,
     mp_installments: Math.max(1, Math.min(12, Number(body.mp_installments) || 1)),
     mp_installments_without_interest: body.mp_installments_without_interest === true,
+    mp_access_token: typeof body.mp_access_token === "string" && body.mp_access_token.trim() ? body.mp_access_token.trim() : null,
+    mp_public_key: typeof body.mp_public_key === "string" && body.mp_public_key.trim() ? body.mp_public_key.trim() : null,
     requires_contact_info: body.requires_contact_info !== false,
     updated_at: new Date().toISOString(),
   };

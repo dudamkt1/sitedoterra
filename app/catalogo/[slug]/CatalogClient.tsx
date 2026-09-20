@@ -21,6 +21,10 @@ export default function CatalogClient({
   slug,
   profileName,
   siteName,
+  logoMode,
+  logoUrl,
+  logoText,
+  siteDescription,
   products,
   whatsappLink,
   initialMessage,
@@ -28,6 +32,10 @@ export default function CatalogClient({
   slug: string;
   profileName: string;
   siteName: string | null;
+  logoMode: "image" | "text";
+  logoUrl: string | null;
+  logoText: string;
+  siteDescription: string;
   products: PublicProduct[];
   whatsappLink: string | null;
   initialMessage: string | null;
@@ -55,16 +63,37 @@ export default function CatalogClient({
     <div className="min-h-screen bg-[#fcf9f5]">
       <header className="bg-gradient-to-br from-[#1d5c3a] to-[#2d7a4f] text-white">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
-          <p className="text-[11px] uppercase tracking-[0.2em] text-white/70">Catálogo</p>
-          <h1 className="text-[26px] sm:text-[34px] font-extrabold tracking-tight mt-1" style={{ fontFamily: "var(--font-display)" }}>
-            {profileName}
-          </h1>
-          {siteName && siteName !== profileName && (
-            <p className="text-[14px] text-white/80 mt-1">{siteName}</p>
-          )}
-          <p className="text-[14px] text-white/80 mt-2 max-w-xl">
-            Conheça nossos produtos e entre em contato para mais informações ou fazer seu pedido.
-          </p>
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-[11px] uppercase tracking-[0.2em] text-white/70">Catálogo</p>
+              <div className="flex items-center gap-3 mt-2">
+                {logoMode === "image" && logoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={logoUrl}
+                    alt={logoText}
+                    className="h-12 w-12 sm:h-14 sm:w-14 rounded-full object-cover bg-white/10 border border-white/20 shrink-0"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : null}
+                <h1 className="text-[26px] sm:text-[34px] font-extrabold tracking-tight leading-tight" style={{ fontFamily: "var(--font-display)" }}>
+                  {logoMode === "image" ? profileName : logoText}
+                </h1>
+              </div>
+              {siteName && siteName !== profileName && (
+                <p className="text-[14px] text-white/80 mt-1">{siteName}</p>
+              )}
+              <p className="text-[14px] text-white/80 mt-2 max-w-xl">
+                {siteDescription || "Conheça nossos produtos e entre em contato para mais informações ou fazer seu pedido."}
+              </p>
+            </div>
+            <Link
+              href={`/${slug}`}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-white/40 bg-white/10 hover:bg-white/20 text-white text-[13px] font-semibold px-4 py-2 transition mt-1"
+            >
+              🌐 Ver Site
+            </Link>
+          </div>
           {whatsappLink && (
             <a
               href={whatsappLink}

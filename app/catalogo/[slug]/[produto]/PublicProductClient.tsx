@@ -530,7 +530,7 @@ export default function PublicProductClient({
                   className="w-full inline-flex items-center justify-center gap-2 rounded-[12px] bg-[#25D366] hover:bg-[#1ebe5b] text-white text-[15px] font-semibold px-5 py-3 transition mb-4"
                 >
                   <span>💬</span>
-                  <span>Falar no WhatsApp</span>
+                  <span>Chamar no WhatsApp</span>
                 </a>
               )}
 

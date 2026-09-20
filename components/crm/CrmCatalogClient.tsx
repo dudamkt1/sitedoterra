@@ -38,6 +38,8 @@ const DEFAULT_PAYMENT_SETTINGS = {
   mp_enabled: false,
   mp_installments: 1,
   mp_installments_without_interest: false,
+  mp_access_token: "",
+  mp_public_key: "",
   requires_contact_info: true,
 };
 
@@ -95,6 +97,8 @@ export default function CrmCatalogClient({ tenantSlug }: { tenantSlug: string | 
         pix_key_type: s.pix_key_type ?? "",
         pix_merchant_name: s.pix_merchant_name ?? "",
         pix_merchant_city: s.pix_merchant_city ?? "",
+        mp_access_token: s.mp_access_token ?? "",
+        mp_public_key: s.mp_public_key ?? "",
       });
     } catch (e) {
       console.error("Erro ao carregar configurações de pagamento:", e);
@@ -220,6 +224,8 @@ export default function CrmCatalogClient({ tenantSlug }: { tenantSlug: string | 
         mp_enabled: v.mp_enabled,
         mp_installments: v.mp_installments,
         mp_installments_without_interest: v.mp_installments_without_interest,
+        mp_access_token: (v.mp_access_token || "").trim() || null,
+        mp_public_key: (v.mp_public_key || "").trim() || null,
         requires_contact_info: v.requires_contact_info,
       };
       await apiPost("/api/crm/catalog-payment", body);
@@ -795,6 +801,40 @@ function PaymentSettingsModal({
 
             {form.mp_enabled && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="md:col-span-2 rounded-[10px] bg-amber-50 border border-amber-200 p-3">
+                  <p className="text-[12px] text-amber-800 leading-5">
+                    <b>Vincule sua conta do Mercado Pago</b> para receber os pagamentos do catálogo direto na sua conta.
+                    Pegue suas credenciais em{" "}
+                    <a href="https://www.mercadopago.com.br/developers/panel/credentials" target="_blank" rel="noopener noreferrer" className="font-semibold underline">
+                      developers → Suas integrações → Credenciais
+                    </a>
+                    . Use as credenciais de <b>produção</b> para vendas reais.
+                  </p>
+                </div>
+                <Field label="Access Token (produção) *">
+                  <input
+                    type="password"
+                    className="input font-mono"
+                    value={form.mp_access_token}
+                    onChange={(e) => setForm((f) => ({ ...f, mp_access_token: e.target.value }))}
+                    placeholder="APP_USR-..."
+                    maxLength={200}
+                    autoComplete="off"
+                  />
+                  <p className="text-[11px] text-slate-500 mt-1.5">
+                    Começa com APP_USR-. Sem ele, o checkout PIX/cartão não funciona.
+                  </p>
+                </Field>
+                <Field label="Public Key (produção)">
+                  <input
+                    className="input font-mono"
+                    value={form.mp_public_key}
+                    onChange={(e) => setForm((f) => ({ ...f, mp_public_key: e.target.value }))}
+                    placeholder="APP_USR-... (chave pública)"
+                    maxLength={200}
+                    autoComplete="off"
+                  />
+                </Field>
                 <Field label="Parcelas máximas">
                   <select
                     className="input"
@@ -813,7 +853,7 @@ function PaymentSettingsModal({
                     {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => <option key={n} value={n}>{n}x</option>)}
                   </select>
                   <p className="text-[11px] text-slate-500 mt-1.5">
-                    Parcelas sem juros. Requer configuração no painel do Mercado Pago.
+                    Configure também o parcelamento sem juros no painel do Mercado Pago da sua conta.
                   </p>
                 </Field>
               </div>

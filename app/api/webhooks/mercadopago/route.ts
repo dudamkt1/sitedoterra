@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isMercadoPagoEnabled, verifyMpSignature, getMpPayment } from "@/lib/mercadopago";
+import { isMercadoPagoEnabled, verifyMpSignature, getMpPayment, getMpPaymentWithToken } from "@/lib/mercadopago";
 import {
   dispatchMpPayment,
   handleMpSubscriptionUpdate,
@@ -63,6 +63,57 @@ export async function POST(request: Request) {
   }
   if (!type || !dataId) {
     return NextResponse.json({ error: "payload inválido" }, { status: 400 });
+  }
+
+  // ---- Pedidos do catálogo pagos na conta MP do dono (token do tenant) ----
+  // A assinatura vem com o segredo da conta do tenant (não o global), então
+  // este caminho NÃO usa verifyMpSignature: a autenticação real é o fetch
+  // server-to-server na API do MP com o token do tenant (fonte de verdade).
+  // IDs de pagamento são imprevisíveis — um webhook forjado falha no fetch.
+  if (type === "payment") {
+    const { data: catalogOrder } = await admin
+      .from("catalog_orders")
+      .select("id, tenant_id, payment_status")
+      .eq("payment_id", dataId)
+      .maybeSingle();
+    if (catalogOrder) {
+      const { data: tenantSettings } = await admin
+        .from("catalog_payment_settings")
+        .select("mp_access_token")
+        .eq("tenant_id", (catalogOrder as { tenant_id: string }).tenant_id)
+        .maybeSingle();
+      const tenantToken = (tenantSettings as { mp_access_token: string | null } | null)?.mp_access_token;
+      if (tenantToken) {
+        // Idempotência: ignora se o pedido já foi confirmado
+        if ((catalogOrder as { payment_status: string }).payment_status === "paid") {
+          return NextResponse.json({ received: true, duplicate: true });
+        }
+        try {
+          const payment = await getMpPaymentWithToken(dataId, tenantToken);
+          if (payment.status === "approved") {
+            await admin
+              .from("catalog_orders")
+              .update({
+                payment_status: "paid",
+                payment_id: String(payment.id),
+                paid_at: new Date().toISOString(),
+              })
+              .eq("id", (catalogOrder as { id: string }).id);
+            await admin.rpc("create_crm_sale_from_catalog_order", { p_order_id: (catalogOrder as { id: string }).id });
+          } else if (["rejected", "cancelled", "refunded"].includes(payment.status)) {
+            await admin
+              .from("catalog_orders")
+              .update({ payment_status: payment.status === "refunded" ? "refunded" : "failed" })
+              .eq("id", (catalogOrder as { id: string }).id);
+          }
+          return NextResponse.json({ received: true });
+        } catch (err) {
+          console.error("Mercado Pago webhook: erro ao confirmar pedido do catálogo (token do tenant)", dataId, err);
+          return NextResponse.json({ error: "processing_error" }, { status: 500 });
+        }
+      }
+      // Sem token do tenant: segue o fluxo global (pagamento na conta da plataforma)
+    }
   }
 
   if (!(await verifyMpSignature({ xSignature, xRequestId, dataId }))) {

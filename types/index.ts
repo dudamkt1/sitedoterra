@@ -885,6 +885,9 @@ export interface CatalogPaymentSettings {
   mp_enabled: boolean;
   mp_installments: number;
   mp_installments_without_interest: boolean;
+  /** Credenciais da conta MP do dono do catálogo (recebe direto na conta dele). */
+  mp_access_token: string | null;
+  mp_public_key: string | null;
   // General
   requires_contact_info: boolean;
   created_at: string;

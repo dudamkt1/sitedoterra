@@ -53,6 +53,12 @@ export default async function PublicCatalogPage({
     ? `https://wa.me/${whatsappDigits}?text=${encodeURIComponent(`Olá! Vi um produto no catálogo e gostaria de mais informações.`)}`
     : null;
 
+  // Identidade do cabeçalho padronizada com o painel/meu-site
+  const logoMode = (siteData.logoMode as string) === "image" ? "image" : "text";
+  const logoUrl = (siteData.logoUrl as string) || null;
+  const logoText = (siteData.logoText as string) || t.profile_name || t.site_name || "Consultora";
+  const siteDescription = (siteData.description as string) || "";
+
   const initialMessage = searchParams?.msg ? decodeURIComponent(String(searchParams.msg)) : null;
 
   return (
@@ -60,6 +66,10 @@ export default async function PublicCatalogPage({
       slug={t.slug}
       profileName={t.profile_name || t.site_name || "Consultora"}
       siteName={t.site_name}
+      logoMode={logoMode}
+      logoUrl={logoUrl}
+      logoText={logoText}
+      siteDescription={siteDescription}
       products={(products as never) || []}
       whatsappLink={whatsappLink}
       initialMessage={initialMessage}
