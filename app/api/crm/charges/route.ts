@@ -86,6 +86,48 @@ export async function POST(request: Request) {
     .single();
   if (err) return NextResponse.json({ error: "Erro ao criar cobrança." }, { status: 500 });
 
+  // Se cobrança já criada como Paga, sincroniza com Financeiro
+  if (status === "Pago") {
+    const financialEntry = {
+      tenant_id: tenant!.id,
+      user_id: user!.id,
+      client_id: body.client_id || null,
+      type: "income" as const,
+      category: "Cobrança quitada",
+      description: `Baixa de cobrança${body.payment_method ? ` (${body.payment_method})` : ""}`,
+      amount_cents: amount,
+      entry_date: new Date().toISOString().slice(0, 10),
+      payment_method: body.payment_method || null,
+      notes: `Origem: cobrança #${data.id.slice(0, 8)}`,
+    };
+    await admin.from("crm_financial_entries").insert(financialEntry);
+
+    if (body.client_id) {
+      await admin.from("crm_client_timeline").insert({
+        tenant_id: tenant!.id,
+        client_id: body.client_id,
+        event_type: "beneficio",
+        title: "Cobrança quitada",
+        description: `Pagamento recebido — ${(amount / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`,
+        event_at: new Date().toISOString(),
+      });
+    }
+
+    if (body.sale_id) {
+      await admin.from("crm_sales").update({ status: "Pago", payment_method: body.payment_method }).eq("id", body.sale_id).eq("tenant_id", tenant!.id);
+      if (body.client_id) {
+        await admin.from("crm_client_timeline").insert({
+          tenant_id: tenant!.id,
+          client_id: body.client_id,
+          event_type: "venda",
+          title: "Venda quitada via cobrança",
+          description: `Pagamento da cobrança #${data.id.slice(0, 8)} vinculado à venda`,
+          event_at: new Date().toISOString(),
+        });
+      }
+    }
+  }
+
   if (body.client_id) {
     await admin.from("crm_client_timeline").insert({
       tenant_id: tenant!.id,
