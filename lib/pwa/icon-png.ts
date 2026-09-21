@@ -19,10 +19,12 @@ import { r2Env } from "@/lib/r2";
 // MESMO domínio do site → o manifest nunca quebra por CORS do R2/CDN.
 
 // Fail-fast com retry: timeout por tentativa + backoff. R2/CDN saudável
-// responde em <1s; 15s total com 3 tentativas cobre latência + retry.
-const FETCH_TIMEOUT_MS = 15_000;
+// responde em <1s; ~6s por tentativa com 2 tentativas (+ fallback de URL)
+// cobre latência + retry SEM travar a checagem de instalação do Chrome
+// (que desiste de oferecer "Instalar app" se os ícones demoram).
+const FETCH_TIMEOUT_MS = 6_000;
 const MAX_SOURCE_BYTES = 10 * 1024 * 1024;
-const MAX_FETCH_RETRIES = 3;
+const MAX_FETCH_RETRIES = 2;
 
 export type PwaPngKind = "apple" | "icon192" | "icon512" | "maskable";
 
@@ -296,8 +298,30 @@ async function tryProxyPreGeneratedVariant(
  * Renderiza o PNG final do ícone.
  * Sempre devolve um PNG válido — nunca lança para o chamador tratar como
  * "sem ícone" (em último caso, o tile de fallback).
+ *
+ * RESULTADO CACHEADO (unstable_cache, chave = tenant + versão da config +
+ * kind): depois do primeiro acesso, o PNG sai em milissegundos SEM refazer
+ * fetch no R2. Sem isso, CADA request (inclusive a checagem de instalação
+ * do Chrome) refazia download+retry do zero — o celular desistia de
+ * oferecer "Instalar app" (caía em "criar atalho") e o logo não aparecia.
  */
 export async function renderPwaPng(
+  settings: PwaSettings,
+  kind: PwaPngKind,
+  origin: string,
+  tenantId: string,
+  versionToken: string
+): Promise<{ buffer: Buffer; generated: boolean }> {
+  const sourcesKey = sourceCandidates(settings).join("|");
+  const cacheKey = `pwa-icon-final:${tenantId}:${versionToken}:${kind}:${sourcesKey}`;
+  return unstable_cache(
+    async () => renderPwaPngUncached(settings, kind, origin, tenantId, versionToken),
+    [cacheKey],
+    { revalidate: 86400, tags: [`pwa-icon:${tenantId}:${versionToken}`] }
+  )();
+}
+
+async function renderPwaPngUncached(
   settings: PwaSettings,
   kind: PwaPngKind,
   origin: string,

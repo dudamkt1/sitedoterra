@@ -50,8 +50,10 @@ const m = buildManifest(settings, {
 
 assert(m.name === "Maria Sucesso", `name = ${m.name}`);
 assert(m.short_name === "Maria", `short_name = ${m.short_name}`);
-assert(m.start_url === "/mariatest/", `start_url = ${m.start_url}`);
-assert(m.scope === "/mariatest/", `scope = ${m.scope}`);
+// start_url/scope/id ABSOLUTOS (mesma origem) — exigência para WebAPK/install 1-toque.
+assert(m.start_url === "https://oleos.topconsultores.com.br/mariatest/", `start_url = ${m.start_url}`);
+assert(m.scope === "https://oleos.topconsultores.com.br/mariatest/", `scope = ${m.scope}`);
+assert(m.id === "https://oleos.topconsultores.com.br/mariatest/", `id = ${m.id}`);
 assert(m.theme_color === "#1d5c3a", `theme_color = ${m.theme_color}`);
 assert(m.background_color === "#faf8f2", `background_color = ${m.background_color}`);
 assert(m.display === "standalone", `display = ${m.display}`);
@@ -100,8 +102,8 @@ const mHome = buildManifest(settings, {
   origin: "https://mariaconsultora.com.br",
   basePath: "/",
 });
-assert(mHome.start_url === "/", `start_url = ${mHome.start_url}`);
-assert(mHome.scope === "/", `scope = ${mHome.scope}`);
+assert(mHome.start_url === "https://mariaconsultora.com.br/", `start_url = ${mHome.start_url}`);
+assert(mHome.scope === "https://mariaconsultora.com.br/", `scope = ${mHome.scope}`);
 
 console.log("\n== fallback (sem upload) ==");
 const empty = defaultPwaSettings("tenant-x", "user-x");
@@ -109,9 +111,10 @@ const mEmpty = buildManifest(empty, {
   origin: "https://oleos.topconsultores.com.br",
   basePath: "/x/",
 });
-// Só deve ter o SVG fallback
-assert(mEmpty.icons.length === 1, `sem PNGs = 1 ícone (SVG)`);
-assert(mEmpty.icons[0].type === "image/svg+xml", `fallback é SVG`);
+// Arquitetura proxy same-origin: os 4 PNGs SEMPRE existem (servem o tile
+// gerado quando não há upload) + 1 SVG fallback.
+assert(mEmpty.icons.length === 5, `sem upload = 5 ícones (4 PNG proxy + SVG, got ${mEmpty.icons.length})`);
+assert(mEmpty.icons[4].type === "image/svg+xml", `último é SVG fallback`);
 
 console.log("\n== done ==");
 if (process.exitCode) {

@@ -175,6 +175,11 @@ export function buildManifest(
   const v = pwaVersionToken(s);
   const paths = pwaIconPaths(scopeBase);
   const absV = (rel: string) => abs(withVersion(rel, v), ctx.origin);
+  // start_url/scope/id ABSOLUTOS (mesma origem do acesso): o Chrome e o
+  // gerador de WebAPK resolvem sem ambiguidade — com relativos, qualquer
+  // divergência de resolução invalida a instalação ("criar atalho" em vez
+  // de "Instalar app").
+  const startUrl = joinOrigin(ctx.origin, scopeBase);
 
   const icons: Record<string, unknown>[] = [
     // iOS também lê o manifest em alguns fluxos — 180 first.
@@ -201,8 +206,8 @@ export function buildManifest(
     name,
     short_name: shortName,
     description: s.description || `Aplicativo ${name}`,
-    start_url: scopeBase,
-    scope: scopeBase,
+    start_url: startUrl,
+    scope: startUrl,
     display: "standalone",
     orientation: "portrait",
     theme_color: s.theme_color,

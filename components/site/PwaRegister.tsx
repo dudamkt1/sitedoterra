@@ -310,7 +310,23 @@ export function PwaRegister(props: PwaRegisterProps) {
         setCanNativeInstall(true);
       }
     } catch {}
-    const p = deferredPrompt.current;
+    let p = deferredPrompt.current;
+    // Sem prompt nativo AINDA: aguarda até 7s com feedback visual — o Chrome
+    // costuma entregar o evento logo após SW + manifest prontos. Só abre o
+    // passo a passo se o navegador realmente não oferecer instalação.
+    if (!p && !preparing) {
+      setPreparing(true);
+      try {
+        const arrived = await waitForNativePrompt(7000);
+        if (arrived) {
+          deferredPrompt.current = arrived;
+          setCanNativeInstall(true);
+          p = arrived;
+        }
+      } finally {
+        setPreparing(false);
+      }
+    }
     if (!p) {
       // Sem prompt nativo (iPhone sempre; Android sem evento ou WebView):
       // abre a tela de instalação visual — o caminho mais curto possível.
@@ -336,6 +352,47 @@ export function PwaRegister(props: PwaRegisterProps) {
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  // Toque no INSTALAR sem prompt nativo ainda: mostra "Preparando..." e dá
+  // uma última chance ao Chrome (o evento pode chegar DEPOIS do toque).
+  const [preparing, setPreparing] = useState(false);
+
+  /**
+   * Aguarda o `beforeinstallprompt` por até `ms` milissegundos.
+   * Resolve com o evento (pronto para `prompt()`) ou null.
+   * O listener principal continua ativo e também recebe o evento — sem
+   * duplicar estado, só garante que o TOQUE atual aproveite o nativo.
+   */
+  function waitForNativePrompt(ms: number): Promise<BeforeInstallPromptEvent | null> {
+    return new Promise((resolve) => {
+      try {
+        if (window.__pwaBIP) return resolve(window.__pwaBIP as BeforeInstallPromptEvent);
+      } catch {}
+      if (deferredPrompt.current) return resolve(deferredPrompt.current);
+      let done = false;
+      const finish = (value: BeforeInstallPromptEvent | null) => {
+        if (done) return;
+        done = true;
+        window.clearTimeout(timer);
+        window.removeEventListener("beforeinstallprompt", onPromptEvent);
+        window.removeEventListener("pwa:bip-ready", onStashedEvent);
+        resolve(value);
+      };
+      function onPromptEvent(e: Event) {
+        try {
+          e.preventDefault();
+        } catch {}
+        finish(e as BeforeInstallPromptEvent);
+      }
+      function onStashedEvent() {
+        try {
+          if (window.__pwaBIP) finish(window.__pwaBIP as BeforeInstallPromptEvent);
+        } catch {}
+      }
+      const timer = window.setTimeout(() => finish(null), ms);
+      window.addEventListener("beforeinstallprompt", onPromptEvent);
+      window.addEventListener("pwa:bip-ready", onStashedEvent as EventListener);
+    });
+  }
 
   function openSheet() {
     try {
@@ -474,14 +531,17 @@ export function PwaRegister(props: PwaRegisterProps) {
               <button
                 type="button"
                 onClick={installNow}
-                className="flex-1 rounded-lg px-4 py-3 text-xs font-bold uppercase tracking-wide text-white hover:opacity-90 active:scale-[0.98] transition-all"
+                disabled={preparing}
+                className="flex-1 rounded-lg px-4 py-3 text-xs font-bold uppercase tracking-wide text-white hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-70"
                 style={{ background: props.themeColor }}
               >
-                {installMode === "installed"
-                  ? "📲 Abrir o app"
-                  : installMode === "system-browser"
-                    ? "🌐 Abrir no Chrome"
-                    : "⚡ Instalar"}
+                {preparing
+                  ? "⏳ Preparando…"
+                  : installMode === "installed"
+                    ? "📲 Abrir o app"
+                    : installMode === "system-browser"
+                      ? "🌐 Abrir no Chrome"
+                      : "⚡ Instalar"}
               </button>
               <button
                 type="button"
