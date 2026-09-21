@@ -27,6 +27,10 @@ import {
   Lock,
   BookOpen,
   Sparkles,
+  Gift,
+  Package,
+  MessageCircle,
+  ClipboardList,
 } from "lucide-react";
 
 const USER_LINKS = [
@@ -37,6 +41,10 @@ const USER_LINKS = [
   { href: "/painel/midias", label: "Mídias", icon: FolderOpen, requiresActiveSite: true },
   { href: "/painel/materiais-apoio", label: "Materiais de apoio", icon: BookOpen, requiresActiveSite: true, highlight: true },
   { href: "/painel/crm", label: "CRM", icon: ContactRound, requiresActiveSite: true },
+  { href: "/painel/crm/fidelidade", label: "Fidelidade", icon: Gift, requiresActiveSite: true },
+  { href: "/painel/crm/catalogo", label: "Catálogo", icon: Package, requiresActiveSite: true },
+  { href: "/painel/crm/whatsapp", label: "WhatsApp", icon: MessageCircle, requiresActiveSite: true },
+  { href: "/painel/crm/tarefas", label: "Tarefas", icon: ClipboardList, requiresActiveSite: true },
   { href: "/painel/ia", label: "IA do site", icon: Bot, requiresActiveSite: true },
   { href: "/painel/ia/treinamento", label: "Treinar IA", icon: Brain, requiresActiveSite: true },
   { href: "/painel/assinatura", label: "Assinatura", icon: CreditCard, requiresActiveSite: false },
@@ -55,9 +63,20 @@ const TABS = [
   { href: "/painel/conta", label: "Conta", icon: UserRound, requiresActiveSite: false },
 ];
 
+const CRM_MOVED_PREFIXES = [
+  "/painel/crm/fidelidade",
+  "/painel/crm/catalogo",
+  "/painel/crm/whatsapp",
+  "/painel/crm/tarefas",
+];
+
 function isActive(pathname: string, href: string) {
   if (href === "/painel") return pathname === "/painel";
-  if (href === "/painel/crm" || href === "/painel/checklist") return pathname === href || pathname.startsWith(href + "/");
+  if (href === "/painel/crm") {
+    if (CRM_MOVED_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"))) return false;
+    return pathname === href || pathname.startsWith(href + "/");
+  }
+  if (href === "/painel/checklist") return pathname === href || pathname.startsWith(href + "/");
   if (href === "/painel/ia") return pathname === "/painel/ia";
   return pathname === href || pathname.startsWith(href + "/");
 }
@@ -94,7 +113,10 @@ export default function DashboardSidebar({
   }, [open ]);
 
   const currentLabel = useMemo(
-    () => USER_LINKS.find((l) => isActive(pathname, l.href))?.label ?? "Painel",
+    () =>
+      [...USER_LINKS]
+        .sort((a, b) => b.href.length - a.href.length)
+        .find((l) => isActive(pathname, l.href))?.label ?? "Painel",
     [pathname]
   );
 

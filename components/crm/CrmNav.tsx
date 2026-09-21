@@ -7,13 +7,9 @@ import type { CrmModuleCode } from "@/types";
 const MODULES: { href: string; label: string; icon: string; code: CrmModuleCode | null }[] = [
   { href: "/painel/crm", label: "Dashboard", icon: "📊", code: null },
   { href: "/painel/crm/clientes", label: "Clientes", icon: "👥", code: null },
-  { href: "/painel/crm/fidelidade", label: "Fidelidade", icon: "🎁", code: "fidelidade" },
-  { href: "/painel/crm/catalogo", label: "Catálogo", icon: "📦", code: null },
   { href: "/painel/crm/vendas", label: "Vendas", icon: "🛒", code: null },
   { href: "/painel/crm/financeiro", label: "Financeiro", icon: "💰", code: "financeiro" },
   { href: "/painel/crm/cobrancas", label: "Cobranças", icon: "🧾", code: "cobrancas" },
-  { href: "/painel/crm/whatsapp", label: "WhatsApp", icon: "💬", code: "whatsapp" },
-  { href: "/painel/crm/tarefas", label: "Tarefas", icon: "✅", code: null },
   { href: "/painel/crm/relatorios", label: "Relatórios", icon: "📈", code: "relatorios" },
   { href: "/painel/crm/configuracoes", label: "Configurações", icon: "⚙️", code: null },
 ];
