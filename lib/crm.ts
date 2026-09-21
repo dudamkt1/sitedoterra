@@ -9,6 +9,8 @@ import {
 import type {
   CrmSettings,
   CrmLoyaltySettings,
+  CrmLoyaltyLevel,
+  CrmLoyaltyRedeemable,
   CrmWhatsAppConfig,
   CrmClient,
   CrmSale,
@@ -56,6 +58,7 @@ export async function upsertCrmSettings(admin: AdminClient, tenantId: string, pa
 
 export async function getLoyaltySettings(admin: AdminClient, tenantId: string): Promise<CrmLoyaltySettings> {
   const { data } = await admin.from("crm_loyalty_settings").select("*").eq("tenant_id", tenantId).maybeSingle();
+  const rawLevels = Array.isArray(data?.levels) && data.levels.length ? data.levels : DEFAULT_LEVELS;
   return {
     tenant_id: tenantId,
     enabled: data?.enabled ?? false,
@@ -67,7 +70,39 @@ export async function getLoyaltySettings(admin: AdminClient, tenantId: string): 
     rules: Array.isArray(data?.rules) ? data.rules : [],
     benefits: Array.isArray(data?.benefits) ? data.benefits : [],
     rewards: Array.isArray(data?.rewards) ? data.rewards : [],
-    levels: Array.isArray(data?.levels) && data.levels.length ? data.levels : DEFAULT_LEVELS,
+    // Normaliza níveis legados ({ name, min_points }) para o formato estendido.
+    levels: (rawLevels as Record<string, unknown>[]).map((l) => normalizeLoyaltyLevel(l)),
+    redeemables: Array.isArray((data as Record<string, unknown> | null)?.redeemables)
+      ? ((data as Record<string, unknown>).redeemables as Record<string, unknown>[]).map((r) => normalizeRedeemable(r))
+      : [],
+  };
+}
+
+/** Nível legado → estendido (campos novos viram listas vazias, sem quebrar nada). */
+export function normalizeLoyaltyLevel(raw: unknown): CrmLoyaltyLevel {
+  const l = (raw || {}) as Record<string, unknown>;
+  const strList = (v: unknown): string[] =>
+    Array.isArray(v) ? v.map((s) => String(s || "").trim()).filter(Boolean).slice(0, 50) : [];
+  const discount = Number(l.discount_percent);
+  return {
+    name: String(l.name || "Nível").slice(0, 40),
+    min_points: Math.max(0, Math.floor(Number(l.min_points) || 0)),
+    benefits: strList(l.benefits),
+    rewards: strList(l.rewards),
+    discount_percent: !Number.isNaN(discount) && discount > 0 ? Math.min(100, Math.round(discount)) : null,
+    gifts: strList(l.gifts),
+    conditions: strList(l.conditions),
+  };
+}
+
+/** Item resgatável vindo do banco → formato da UI. */
+export function normalizeRedeemable(raw: unknown): CrmLoyaltyRedeemable {
+  const r = (raw || {}) as Record<string, unknown>;
+  return {
+    id: typeof r.id === "string" ? r.id : undefined,
+    name: String(r.name || "Benefício").slice(0, 80),
+    cost_points: Math.max(1, Math.floor(Number(r.cost_points) || 0) || 1),
+    description: typeof r.description === "string" ? r.description.slice(0, 200) : null,
   };
 }
 

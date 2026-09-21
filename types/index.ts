@@ -581,6 +581,28 @@ export interface CrmCharge {
   client_name?: string | null;
 }
 
+export interface CrmLoyaltyLevel {
+  name: string;
+  min_points: number;
+  /** Benefícios desbloqueados neste nível (editável por nível). */
+  benefits?: string[];
+  /** Recompensas deste nível (editável por nível). */
+  rewards?: string[];
+  /** Desconto percentual deste nível (0-100), se configurado. */
+  discount_percent?: number | null;
+  /** Brindes deste nível, se configurados. */
+  gifts?: string[];
+  /** Condições/regras específicas deste nível, se configuradas. */
+  conditions?: string[];
+}
+
+export interface CrmLoyaltyRedeemable {
+  id?: string;
+  name: string;
+  cost_points: number;
+  description?: string | null;
+}
+
 export interface CrmLoyaltySettings {
   tenant_id: string;
   enabled: boolean;
@@ -592,7 +614,9 @@ export interface CrmLoyaltySettings {
   rules: string[];
   benefits: string[];
   rewards: string[];
-  levels: { name: string; min_points: number }[];
+  levels: CrmLoyaltyLevel[];
+  /** Catálogo de benefícios resgatáveis (estrutura preparada para resgate). */
+  redeemables?: CrmLoyaltyRedeemable[];
   created_at?: string;
   updated_at?: string;
 }

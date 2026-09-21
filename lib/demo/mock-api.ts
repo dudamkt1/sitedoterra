@@ -726,6 +726,17 @@ function handleCrm(pathname: string, sp: URLSearchParams, method: string, body: 
             id: c.id, name: c.name, category: c.category, is_vip: c.is_vip,
             points: c.points_balance, level: levelOf(c.points_balance),
           })),
+          stats: {
+            participants: db.clients.filter((c) => c.points_balance > 0).length,
+            totalClients: db.clients.length,
+            distributed: db.points.reduce((s, p) => s + (p.amount || 0), 0),
+            unlocked: db.clients.filter((c) => levelOf(c.points_balance) !== (levels[0]?.name || "Bronze")).length,
+            perLevel: levels.map((l) => ({
+              name: l.name,
+              min_points: l.min_points || 0,
+              count: db.clients.filter((c) => levelOf(c.points_balance) === l.name).length,
+            })),
+          },
         },
       };
     }
@@ -741,10 +752,26 @@ function handleCrm(pathname: string, sp: URLSearchParams, method: string, body: 
         benefits: body.benefits ?? db.loyalty.benefits,
         rewards: body.rewards ?? db.loyalty.rewards,
         levels: body.levels ?? db.loyalty.levels,
+        redeemables: body.redeemables ?? db.loyalty.redeemables,
       });
       saveDemoCrm(db);
       return { status: 200, json: {} };
     }
+  }
+
+  if (pathname === "/api/crm/loyalty/history" && method === "GET") {
+    const clientId = sp.get("client_id") || "";
+    const client = db.clients.find((c) => c.id === clientId);
+    if (!client) return { status: 404, json: { error: "Cliente não encontrado." } };
+    const rows = db.points
+      .filter((p) => p.client_id === clientId)
+      .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+    let balance = 0;
+    const history = rows.map((p) => {
+      balance += p.amount || 0;
+      return { ...p, balance_after: balance };
+    });
+    return { status: 200, json: { client: { id: client.id, name: client.name }, history, balance } };
   }
 
   if (pathname === "/api/crm/loyalty/points" && method === "POST") {

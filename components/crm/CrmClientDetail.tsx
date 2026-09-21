@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { CrmModal, EmptyState, LoadingState, ErrorState, Toast, Field, apiPost, apiPut, apiDelete, confirmDialog } from "@/components/crm/crm-ui";
 import { formatBRL } from "@/lib/utils";
 import { CLIENT_CATEGORY_COLORS, TIMELINE_EVENT_TYPES, TIMELINE_EVENT_ICONS } from "@/lib/crm-shared";
+import { levelPosition, levelDiscountLabel } from "@/lib/crm-loyalty";
 import { exportClientPdf } from "@/lib/crm-export";
 import type { CrmClient, CrmSale, CrmTimelineEvent, CrmClientNote, CrmCharge, CrmTask, CrmLoyaltyPoint, CrmSettings } from "@/types";
 
@@ -396,6 +397,37 @@ export default function CrmClientDetail({ clientId }: { clientId: string }) {
               <h2 className="card-title mb-0">Pontos de fidelidade</h2>
               <span className="badge badge-gold">Saldo: {c.points_balance || 0} pts</span>
             </div>
+            {(() => {
+              const pos = levelPosition(data.levels, c.points_balance || 0);
+              const discount = levelDiscountLabel(pos.level);
+              const benefits = pos.level?.benefits || [];
+              return (
+                <div className="rounded-xl border border-gray-200 p-4 mb-4">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Nível atual:</span>
+                    <span className="badge badge-blue">{pos.level?.name || data.level}</span>
+                    <span className="text-sm font-bold text-[#1d5c3a]">{c.points_balance || 0} pontos</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-gray-100 overflow-hidden mt-3">
+                    <div className="h-full rounded-full bg-[#1d5c3a]" style={{ width: `${pos.progress}%` }} />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    {pos.next
+                      ? <>Próximo nível: <strong className="text-gray-700">{pos.next.name} — {(pos.next.min_points || 0).toLocaleString("pt-BR")} pontos</strong> · <strong className="text-gray-700">Faltam {pos.missing} pontos</strong> para desbloquear {pos.next.name}</>
+                      : "Nível máximo alcançado 🏆"}
+                  </p>
+                  {(discount || benefits.length > 0) && (
+                    <div className="mt-3">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-1">Benefícios atuais</p>
+                      <ul className="space-y-0.5 text-sm text-gray-700">
+                        {discount && <li>✓ {discount}</li>}
+                        {benefits.map((b, i) => <li key={i}>✓ {b}</li>)}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
             <form className="grid grid-cols-1 md:grid-cols-[160px_160px_1fr_auto] gap-2 mb-6" onSubmit={(e) => { e.preventDefault(); addPoints(); }}>
               <input type="number" className="input" placeholder="Pontos (+/-)" value={pointsForm.amount} onChange={(e) => setPointsForm((f) => ({ ...f, amount: e.target.value }))} />
               <select className="input" value={pointsForm.type} onChange={(e) => setPointsForm((f) => ({ ...f, type: e.target.value }))}>
@@ -414,17 +446,27 @@ export default function CrmClientDetail({ clientId }: { clientId: string }) {
               <div className="overflow-x-auto">
                 <table className="table-base">
                   <thead>
-                    <tr><th>Data</th><th>Pontos</th><th>Tipo</th><th>Descrição</th></tr>
+                    <tr><th>Data</th><th>Pontos</th><th>Tipo</th><th>Descrição</th><th>Saldo</th></tr>
                   </thead>
                   <tbody>
-                    {data.points.map((p) => (
-                      <tr key={p.id}>
-                        <td>{new Date(p.created_at).toLocaleDateString("pt-BR")}</td>
-                        <td className={`font-medium ${p.amount >= 0 ? "text-green-600" : "text-red-600"}`}>{p.amount >= 0 ? "+" : ""}{p.amount}</td>
-                        <td>{p.type}</td>
-                        <td className="text-sm text-gray-500">{p.description || "—"}</td>
-                      </tr>
-                    ))}
+                    {(() => {
+                      // data.points vem do mais recente ao mais antigo:
+                      // reconstrói o saldo após cada movimentação.
+                      let running = c.points_balance || 0;
+                      return data.points.map((p) => {
+                        const after = running;
+                        running -= (p.amount || 0);
+                        return (
+                          <tr key={p.id}>
+                            <td>{new Date(p.created_at).toLocaleDateString("pt-BR")}</td>
+                            <td className={`font-medium ${p.amount >= 0 ? "text-green-600" : "text-red-600"}`}>{p.amount >= 0 ? "+" : ""}{p.amount}</td>
+                            <td>{p.type}</td>
+                            <td className="text-sm text-gray-500">{p.description || "—"}</td>
+                            <td className="text-gray-500">{after.toLocaleString("pt-BR")}</td>
+                          </tr>
+                        );
+                      });
+                    })()}
                   </tbody>
                 </table>
               </div>

@@ -171,7 +171,8 @@ export interface DemoCrmLoyaltySettings {
   rules: string[];
   benefits: string[];
   rewards: string[];
-  levels: { name: string; min_points: number }[];
+  levels: { name: string; min_points: number; benefits?: string[]; rewards?: string[]; discount_percent?: number | null; gifts?: string[]; conditions?: string[] }[];
+  redeemables?: { id?: string; name: string; cost_points: number; description?: string | null }[];
 }
 
 export interface DemoCrmWhatsAppConfig {
@@ -362,10 +363,34 @@ export function buildDemoCrmSeed(): DemoCrmData {
     benefits: ["Descontos exclusivos", "Brindes surpresa", "Prioridade em lançamentos"],
     rewards: ["Óleo gratuito a cada 500 pontos", "Kit exclusivo a cada 1000 pontos"],
     levels: [
-      { name: "Bronze", min_points: 0 },
-      { name: "Prata", min_points: 300 },
-      { name: "Ouro", min_points: 700 },
-      { name: "Diamante", min_points: 1500 },
+      {
+        name: "Bronze", min_points: 0,
+        benefits: ["Participação no programa", "Acúmulo de pontos"],
+      },
+      {
+        name: "Prata", min_points: 300,
+        benefits: ["5% de desconto", "Brinde especial", "Acesso a promoções exclusivas"],
+        discount_percent: 5,
+        gifts: ["Brinde especial"],
+      },
+      {
+        name: "Ouro", min_points: 700,
+        benefits: ["10% de desconto", "Brinde especial", "Condições especiais"],
+        discount_percent: 10,
+        gifts: ["Brinde especial"],
+        conditions: ["Frete com condição especial"],
+      },
+      {
+        name: "Diamante", min_points: 1500,
+        benefits: ["Maior desconto", "Brindes exclusivos", "Benefícios especiais"],
+        discount_percent: 15,
+        gifts: ["Brindes exclusivos"],
+      },
+    ],
+    redeemables: [
+      { id: "rd_1", name: "10% de desconto", cost_points: 200, description: "Cupom de desconto para a próxima compra" },
+      { id: "rd_2", name: "Brinde especial", cost_points: 300, description: "Retirar com a consultora" },
+      { id: "rd_3", name: "Voucher R$ 50", cost_points: 500, description: "Vale-compras de R$ 50" },
     ],
   };
 

@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { requireTenant } from "@/lib/crm-auth";
-import { getLoyaltySettings } from "@/lib/crm";
+import { getLoyaltySettings, normalizeLoyaltyLevel, normalizeRedeemable } from "@/lib/crm";
+import { sortedLevels } from "@/lib/crm-loyalty";
 
 export const runtime = "nodejs";
 
-/** GET /api/crm/loyalty — configurações + clientes com saldo e nível. */
+/** GET /api/crm/loyalty — configurações + clientes com saldo, nível e estatísticas. */
 export async function GET() {
   const { error, admin, tenant } = await requireTenant();
   if (error) return error;
@@ -17,17 +18,36 @@ export async function GET() {
   const balance = new Map<string, number>();
   for (const p of points || []) balance.set(p.client_id, (balance.get(p.client_id) || 0) + (p.amount || 0));
 
-  const levels = [...settings.levels].sort((a, b) => a.min_points - b.min_points);
+  const levels = sortedLevels(settings.levels);
+  const levelOf = (pts: number) => {
+    let name = levels[0]?.name || "Bronze";
+    for (const l of levels) if (pts >= (l.min_points || 0)) name = l.name;
+    return name;
+  };
   const clientRows = (clients || [])
     .map((c) => {
       const pts = balance.get(c.id) || 0;
-      let level = levels[0]?.name || "Bronze";
-      for (const l of levels) if (pts >= l.min_points) level = l.name;
-      return { id: c.id, name: c.name, category: c.category, is_vip: c.is_vip, points: pts, level };
+      return { id: c.id, name: c.name, category: c.category, is_vip: c.is_vip, points: pts, level: levelOf(pts) };
     })
     .sort((a, b) => b.points - a.points);
 
-  return NextResponse.json({ settings, clients: clientRows });
+  // Estatísticas do programa (dashboard).
+  const perLevel = levels.map((l) => ({ name: l.name, min_points: l.min_points || 0, count: 0 }));
+  let distributed = 0;
+  for (const p of points || []) distributed += (p.amount || 0);
+  for (const row of clientRows) {
+    const idx = perLevel.findIndex((l) => l.name === row.level);
+    if (idx >= 0) perLevel[idx].count += 1;
+  }
+  const stats = {
+    participants: clientRows.filter((r) => r.points > 0).length,
+    totalClients: clientRows.length,
+    distributed,
+    unlocked: perLevel.length > 1 ? clientRows.filter((r) => r.level !== perLevel[0].name).length : 0,
+    perLevel,
+  };
+
+  return NextResponse.json({ settings, clients: clientRows, stats });
 }
 
 /** PUT /api/crm/loyalty — salva configurações do programa. */
@@ -36,6 +56,17 @@ export async function PUT(request: Request) {
   if (error) return error;
   const body = await request.json();
   const { data } = await admin.from("crm_loyalty_settings").select("tenant_id").eq("tenant_id", tenant!.id).maybeSingle();
+
+  // Níveis estendidos (nome, pontos, benefícios, recompensas, desconto,
+  // brindes, condições) — normalizados para o formato canônico.
+  const levels = Array.isArray(body.levels) && body.levels.length
+    ? (body.levels as unknown[]).slice(0, 20).map((l) => normalizeLoyaltyLevel(l))
+    : [];
+
+  // Catálogo de resgatáveis (estrutura preparada para resgate futuro).
+  const redeemables = Array.isArray(body.redeemables)
+    ? (body.redeemables as unknown[]).slice(0, 50).map((r) => normalizeRedeemable(r))
+    : [];
 
   const payload: Record<string, unknown> = {
     enabled: body.enabled !== false,
@@ -47,14 +78,22 @@ export async function PUT(request: Request) {
     rules: Array.isArray(body.rules) ? body.rules.map(String).filter(Boolean) : [],
     benefits: Array.isArray(body.benefits) ? body.benefits.map(String).filter(Boolean) : [],
     rewards: Array.isArray(body.rewards) ? body.rewards.map(String).filter(Boolean) : [],
-    levels: Array.isArray(body.levels) && body.levels.length ? body.levels : [],
+    levels,
+    redeemables,
   };
 
   let err;
-  if (data) {
-    ({ error: err } = await admin.from("crm_loyalty_settings").update(payload).eq("tenant_id", tenant!.id));
-  } else {
-    ({ error: err } = await admin.from("crm_loyalty_settings").insert({ tenant_id: tenant!.id, ...payload }));
+  // Compatibilidade: se a migration 0052 (coluna `redeemables`) ainda não foi
+  // aplicada no banco, salva sem ela em vez de quebrar (o catálogo volta
+  // a funcionar sozinho após a migration, sem perder o resto).
+  const savePayload = async (p: Record<string, unknown>) => {
+    if (data) return (await admin.from("crm_loyalty_settings").update(p).eq("tenant_id", tenant!.id)).error;
+    return (await admin.from("crm_loyalty_settings").insert({ tenant_id: tenant!.id, ...p })).error;
+  };
+  err = await savePayload(payload);
+  if (err && /redeemables/i.test(err.message || "")) {
+    const { redeemables: _dropped, ...withoutRedeemables } = payload;
+    err = await savePayload(withoutRedeemables);
   }
   if (err) return NextResponse.json({ error: "Erro ao salvar configurações de fidelidade." }, { status: 500 });
 
