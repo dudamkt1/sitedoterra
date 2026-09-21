@@ -43,7 +43,7 @@ export default function PublicProductClient({
   whatsappLink: string | null;
   paymentSettings: CatalogPaymentSettings;
 }) {
-  const [activeTab, setActiveTab] = useState<"pix" | "mercadopago" | "whatsapp">("pix");
+  const [activeTab, setActiveTab] = useState<"pix" | "mercadopago">("pix");
   const [quantity, setQuantity] = useState(1);
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
@@ -72,14 +72,15 @@ export default function PublicProductClient({
   const totalPixCents = pixPriceCents * quantity;
   const totalOriginalCents = product.price_cents * quantity;
 
-  type PaymentTab = "pix" | "mercadopago" | "whatsapp";
+  type PaymentTab = "pix" | "mercadopago";
 
+  // Opções de pagamento ativas: somente PIX e Mercado Pago
+  // (conforme configuração do dono do catálogo).
   const availableTabs: PaymentTab[] = [];
   if (settings.pix_enabled) availableTabs.push("pix");
   if (settings.mp_enabled) availableTabs.push("mercadopago");
-  availableTabs.push("whatsapp");
 
-  if (!availableTabs.includes(activeTab)) {
+  if (availableTabs.length > 0 && !availableTabs.includes(activeTab)) {
     setActiveTab(availableTabs[0]);
   }
 
@@ -445,33 +446,6 @@ export default function PublicProductClient({
     </div>
   );
 
-  const whatsappTabContent = (
-    <div className="space-y-4 text-center">
-      <div className="rounded-[12px] bg-blue-50 border border-blue-200 p-6">
-        <div className="text-5xl mb-3">💬</div>
-        <h3 className="text-lg font-semibold text-blue-800 mb-2">Comprar via WhatsApp</h3>
-        <p className="text-blue-700 mb-4">
-          Entre em contato diretamente com {profileName.split(" ")[0]} para tirar dúvidas e finalizar sua compra.
-        </p>
-        {whatsappLink ? (
-          <a
-            href={whatsappLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-[12px] bg-[#25D366] hover:bg-[#1ebe5b] text-white text-[15px] font-semibold px-5 py-3 transition"
-          >
-            Abrir WhatsApp
-          </a>
-        ) : (
-          <p className="text-blue-600">Configure o WhatsApp no site para habilitar esta opção.</p>
-        )}
-      </div>
-      <p className="text-sm text-gray-500">
-        Enviaremos uma mensagem pré-preenchida com o produto e valor para agilizar o atendimento.
-      </p>
-    </div>
-  );
-
   return (
     <div className="min-h-screen bg-[#fcf9f5]">
       <header className="bg-gradient-to-br from-[#1d5c3a] to-[#2d7a4f] text-white">
@@ -534,6 +508,12 @@ export default function PublicProductClient({
                 </a>
               )}
 
+              {availableTabs.length === 0 ? (
+                <p className="text-center text-sm text-gray-500 py-4">
+                  Nenhuma forma de pagamento ativa no momento. Fale no WhatsApp acima. 💬
+                </p>
+              ) : (
+              <>
               <div className="flex gap-1 mb-4 bg-gray-100 rounded-[10px] p-1">
                 {availableTabs.map((tab) => (
                   <button
@@ -547,15 +527,15 @@ export default function PublicProductClient({
                   >
                     {tab === "pix" && <QrCode className="h-4 w-4" />}
                     {tab === "mercadopago" && <CreditCard className="h-4 w-4" />}
-                    {tab === "whatsapp" && <span>💬</span>}
-                    <span>{tab === "pix" ? "PIX" : tab === "mercadopago" ? "Mercado Pago" : "WhatsApp"}</span>
+                    <span>{tab === "pix" ? "PIX" : "Mercado Pago"}</span>
                   </button>
                 ))}
               </div>
 
               {activeTab === "pix" && pixTabContent}
               {activeTab === "mercadopago" && mpTabContent}
-              {activeTab === "whatsapp" && whatsappTabContent}
+              </>
+              )}
             </div>
           </div>
         </article>
