@@ -28,7 +28,11 @@ export function MediaLibrary({
   selectable = false,
   onSelect,
   showOwner = false,
-  multiSelect = false,
+  // Multi-seleção ATIVA por padrão em todas as visões de biblioteca
+  // (Mídias do painel, admin etc.): marcar vários itens e excluir de uma
+  // vez. No modo `selectable` (MediaPicker escolhendo 1 imagem p/ um campo)
+  // a seleção em lote fica desligada automaticamente.
+  multiSelect = true,
 }: MediaLibraryProps) {
   const [items, setItems] = useState<MediaFile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -122,15 +126,37 @@ export function MediaLibrary({
     if (!window.confirm(`Excluir ${ids.length} arquivo(s) selecionado(s)?`)) return;
     setDeleting(true);
     try {
-      for (const id of ids) {
-        await deleteMedia(id);
-      }
-      setSelectedIds(new Set());
+      const names = new Map(items.map((m) => [m.id, m.original_name || m.storage_key || "arquivo"]));
+      // Em paralelo: cada exclusão é independente; quem falhar (ex.: em uso)
+      // não impede as demais — o resumo aparece no final.
+      const results = await Promise.allSettled(ids.map((id) => deleteMedia(id)));
+      const failed: string[] = [];
+      const succeeded = new Set<string>();
+      results.forEach((r, i) => {
+        if (r.status === "fulfilled") {
+          succeeded.add(ids[i]);
+        } else {
+          const e: any = r.reason;
+          const base = e?.message || "Erro ao excluir.";
+          const refs = (e?.references || []).map((ref: string) => `• ${ref}`);
+          failed.push(
+            `${names.get(ids[i]) || ids[i]}: ${base}${refs.length ? ` (utilizada em: ${refs.join(", ")})` : ""}`
+          );
+        }
+      });
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        succeeded.forEach((id) => next.delete(id));
+        return next;
+      });
       await load();
-    } catch (e: any) {
-      const base = e?.message || "Erro ao excluir.";
-      const refs = (e?.references || []).map((r: string) => `• ${r}`);
-      window.alert(refs.length ? `${base}\n\nUtilizada em:\n${refs.join("\n")}` : base);
+      if (failed.length > 0) {
+        window.alert(
+          succeeded.size > 0
+            ? `${succeeded.size} excluído(s). Não foi possível excluir:\n\n${failed.join("\n")}`
+            : `Não foi possível excluir:\n\n${failed.join("\n")}`
+        );
+      }
     } finally {
       setDeleting(false);
     }
@@ -267,7 +293,17 @@ export function MediaLibrary({
               <div
                 key={m.id}
                 className={`card !p-0 overflow-hidden transition-all ${selectionMode && isSelected ? "ring-2 ring-emerald-500 bg-emerald-50" : ""}`}
-                onClick={selectionMode ? () => toggleSelect(m.id) : undefined}
+                onClick={
+                  selectionMode
+                    ? (e) => {
+                        // Cliques em controles internos (checkbox, botões, links)
+                        // já tratam a seleção — evita alternar 2x (liga/desliga).
+                        const t = e.target as HTMLElement | null;
+                        if (t?.closest?.("label,button,a,input")) return;
+                        toggleSelect(m.id);
+                      }
+                    : undefined
+                }
                 style={selectionMode ? { cursor: "pointer" } : undefined}
               >
                 <div className="aspect-video bg-gray-100 relative group">

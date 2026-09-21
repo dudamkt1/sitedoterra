@@ -42,7 +42,7 @@ export function MediaPicker({
               <button type="button" className="text-gray-400 text-xl" onClick={() => setOpen(false)}>✕</button>
             </div>
             <p className="text-xs text-gray-400 mb-4">
-              Escolha uma imagem ou envie uma nova. Ela será armazenada no Cloudflare R2.
+              Escolha uma imagem ou envie novas (pode selecionar vários arquivos de uma vez). Ela será armazenada no Cloudflare R2.
             </p>
             {value && (
               <div className="mb-4 flex items-center gap-3 rounded-lg bg-gray-50 p-3">

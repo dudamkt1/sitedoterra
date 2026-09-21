@@ -65,46 +65,63 @@ export function MediaUploader({
     if (!files || files.length === 0) return;
     setError(null);
 
+    // Envio em LOTE: o usuário pode selecionar vários arquivos de uma vez
+    // (input `multiple`). Cada arquivo é enviado em sequência; quem falhar
+    // não interrompe os demais — o resumo aparece no final.
     const list = Array.from(files);
-    for (const file of list) {
-      setUploading(true);
-      setProgress(0);
-      setStage(null);
-      setStageDetail("");
-      try {
-        const isVideo = (file.type || "").toLowerCase().startsWith("video/");
-        if (isVideo) {
-          const { media, posterUrl } = await uploadVideoWithPoster({
-            file,
-            // Vídeo sempre na categoria "video" (validação do servidor).
-            category: "video",
-            scope,
-            onProgress: setProgress,
-            onStage: handleStage,
-          });
-          if (posterUrl && onPoster) onPoster(posterUrl);
-          if (onUploaded) onUploaded(media);
-        } else {
-          const media = await uploadMedia({
-            file,
-            category,
-            scope,
-            onProgress: setProgress,
-            onStage: handleStage,
-          });
-          if (onUploaded) onUploaded(media);
-        }
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Erro no upload.");
-        // se formos enviar vários e um falhar, interrompe
-        break;
-      } finally {
-        setUploading(false);
+    const total = list.length;
+    const failures: string[] = [];
+    let done = 0;
+    setUploading(true);
+    try {
+      for (let i = 0; i < list.length; i++) {
+        const file = list[i];
         setProgress(0);
         setStage(null);
         setStageDetail("");
-        if (inputRef.current) inputRef.current.value = "";
+        try {
+          const isVideo = (file.type || "").toLowerCase().startsWith("video/");
+          if (isVideo) {
+            const { media, posterUrl } = await uploadVideoWithPoster({
+              file,
+              // Vídeo sempre na categoria "video" (validação do servidor).
+              category: "video",
+              scope,
+              onProgress: setProgress,
+              onStage: (s, detail) =>
+                handleStage(s, total > 1 ? `${i + 1}/${total} · ${detail || ""}` : detail),
+            });
+            if (posterUrl && onPoster) onPoster(posterUrl);
+            if (onUploaded) onUploaded(media);
+          } else {
+            const media = await uploadMedia({
+              file,
+              category,
+              scope,
+              onProgress: setProgress,
+              onStage: (s, detail) =>
+                handleStage(s, total > 1 ? `${i + 1}/${total} · ${detail || ""}` : detail),
+            });
+            if (onUploaded) onUploaded(media);
+          }
+          done++;
+        } catch (e) {
+          failures.push(`${file.name} (${e instanceof Error ? e.message : "erro"})`);
+        }
       }
+    } finally {
+      setUploading(false);
+      setProgress(0);
+      setStage(null);
+      setStageDetail("");
+      if (inputRef.current) inputRef.current.value = "";
+    }
+    if (failures.length > 0) {
+      setError(
+        total > 1
+          ? `${done}/${total} enviado(s). Falharam: ${failures.join("; ")}`
+          : `Falha: ${failures.join("; ")}`
+      );
     }
   }
 
@@ -112,7 +129,7 @@ export function MediaUploader({
     ? stage === "optimizing"
       ? stageDetail || "Otimizando..."
       : `Enviando... ${progress}%`
-    : buttonLabel || (acceptVideo || category === "video" ? "+ Enviar mídia" : "+ Enviar imagem");
+    : buttonLabel || (acceptVideo || category === "video" ? "+ Enviar mídia(s)" : "+ Enviar imagem(ns)");
 
   return (
     <div className={className}>
@@ -120,6 +137,7 @@ export function MediaUploader({
         ref={inputRef}
         type="file"
         accept={accept}
+        multiple
         className="hidden"
         onChange={(e) => handleFiles(e.target.files)}
         disabled={uploading}
@@ -144,7 +162,8 @@ export function MediaUploader({
           ? "JPEG, PNG, WEBP, MP4 ou WebM · até 100 MB (vídeo sai em 720p otimizado)"
           : svgAllowed
             ? `JPEG, PNG, WEBP ou SVG · até ${catLimitMb} MB (SVG: até 1 MB, vetor nítido em qualquer tamanho)`
-            : `JPEG, PNG ou WEBP · até ${catLimitMb} MB (imagem sai otimizada em WebP)`}
+            : `JPEG, PNG ou WEBP · até ${catLimitMb} MB (imagem sai otimizada em WebP)`}{" "}
+        · pode selecionar vários arquivos de uma vez
       </p>
     </div>
   );
