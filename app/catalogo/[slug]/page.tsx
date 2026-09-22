@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { resolveModelLogo } from "@/lib/site-data";
 import CatalogClient from "./CatalogClient";
 
 export const dynamic = "force-dynamic";
@@ -53,9 +52,13 @@ export default async function PublicCatalogPage({
     ? `https://wa.me/${whatsappDigits}?text=${encodeURIComponent(`Olá! Vi um produto no catálogo e gostaria de mais informações.`)}`
     : null;
 
-  // Identidade do cabeçalho: mesma resolução do site (/[slug]) —
-  // o conteúdo da seção "Cabeçalho/Menu" do editor (tenant_sections) tem
-  // prioridade, com fallback para "Logo do site" de painel/meu-site.
+  // LOGOTIPO SEMPRE SINCRONIZADO COM O SITE DO USUÁRIO (/[slug] → SiteHome):
+  // prioridade IDÊNTICA à do site — os dados do PRÓPRIO tenant (site_settings,
+  // editados em painel/meu-site) vencem primeiro; o override da seção
+  // Cabeçalho/Menu (tenant_sections) é SÓ fallback, pois pode conter o
+  // snapshot do template oficial com o logotipo do domínio principal.
+  // (Antes era o inverso — resolveModelLogo prioriza a seção — e o catálogo
+  // exibia o logo do domínio principal em vez do logo do usuário.)
   const { data: headerSection } = await admin
     .from("site_sections")
     .select("id")
@@ -71,11 +74,27 @@ export default async function PublicCatalogPage({
       .maybeSingle();
     headerContent = ((headerOverride as { content?: Record<string, unknown> } | null)?.content || {}) as Record<string, unknown>;
   }
-  const logo = resolveModelLogo(
-    headerContent,
-    siteData,
-    t.profile_name || t.site_name || "Consultora"
-  );
+  const str = (v: unknown): string | undefined => {
+    const s = typeof v === "string" ? v.trim() : "";
+    return s || undefined;
+  };
+  const siteLogoMode: "image" | "text" =
+    siteData.logoMode === "text"
+      ? "text"
+      : siteData.logoMode === "image" || str(siteData.logoUrl)
+        ? "image"
+        : "text";
+  const logo = {
+    mode: siteLogoMode,
+    url: siteLogoMode === "text" ? undefined : str(siteData.logoUrl) || str(headerContent.logoUrl),
+    lightUrl: str(siteData.logoLightUrl) || str(headerContent.logoLightUrl),
+    text:
+      str(siteData.logoText) ||
+      str(headerContent.logoText) ||
+      t.profile_name ||
+      t.site_name ||
+      "Consultora",
+  };
   const initialMessage = searchParams?.msg ? decodeURIComponent(String(searchParams.msg)) : null;
 
   return (
