@@ -57,13 +57,25 @@ export default async function PublicProductPage({
     ? `https://wa.me/${whatsappDigits}?text=${encodeURIComponent(`Olá! Tenho interesse no produto "${product.name}" (${formatBRL(product.price_cents)}). Gostaria de mais informações e finalizar a compra.`)}`
     : null;
 
+  // NUNCA expõe o access token ao browser: só campos públicos do checkout.
+  const s = (paymentSettings || {}) as Record<string, unknown>;
+  const publicSettings = {
+    pix_enabled: s.pix_enabled !== false,
+    pix_discount_percent: Number(s.pix_discount_percent) || 0,
+    mp_enabled: s.mp_enabled === true,
+    mp_installments: Math.max(1, Math.min(12, Number(s.mp_installments) || 1)),
+    mp_installments_without_interest: s.mp_installments_without_interest ?? 1,
+    mp_public_key: typeof s.mp_public_key === "string" ? s.mp_public_key : null,
+    requires_contact_info: s.requires_contact_info !== false,
+  };
+
   return (
     <PublicProductClient
       slug={t.slug}
       profileName={t.profile_name || t.site_name || "Consultora"}
       product={product as never}
       whatsappLink={whatsappLink}
-      paymentSettings={paymentSettings as any}
+      paymentSettings={publicSettings as any}
     />
   );
 }
