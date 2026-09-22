@@ -7,6 +7,7 @@ import { MoneyInput } from "@/components/ui/MoneyInput";
 import { formatBRL } from "@/lib/utils";
 import type { CrmProduct } from "@/types";
 import { CreditCard, QrCode, Settings, Check, AlertCircle } from "lucide-react";
+import CrmCatalogPayments from "@/components/crm/CrmCatalogPayments";
 
 const UNITS = ["un", "cx", "kit", "pct", "kg", "g", "ml", "L", "fr", "mes", "serv"];
 const STATUS_FILTERS = [
@@ -63,6 +64,8 @@ export default function CrmCatalogClient({ tenantSlug }: { tenantSlug: string | 
   const [paymentSettings, setPaymentSettings] = useState<PaymentSettingsState>(DEFAULT_PAYMENT_SETTINGS);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentSaving, setPaymentSaving] = useState(false);
+  const [tab, setTab] = useState<"products" | "payments">("products");
+  const [pendingPayments, setPendingPayments] = useState(0);
 
   async function load() {
     setLoading(true);
@@ -293,12 +296,47 @@ export default function CrmCatalogClient({ tenantSlug }: { tenantSlug: string | 
             <Settings className="h-4 w-4 mr-1" />
             Config. Pagamento
           </button>
-          <button type="button" className="btn btn-primary" onClick={openCreate}>
-            + Adicionar produto
-          </button>
+          {tab === "products" && (
+            <button type="button" className="btn btn-primary" onClick={openCreate}>
+              + Adicionar produto
+            </button>
+          )}
         </div>
       </div>
 
+      {/* Abas: Produtos | Pagamentos */}
+      <div className="flex gap-1 mb-4 bg-white border border-[#e2e8e0] rounded-[12px] p-1 max-w-md shadow-[0_2px_10px_rgba(0,0,0,0.03)]">
+        <button
+          type="button"
+          onClick={() => setTab("products")}
+          className={`flex-1 inline-flex items-center justify-center gap-1.5 rounded-[8px] px-3 py-2 text-sm font-semibold transition ${
+            tab === "products" ? "bg-[#1d5c3a] text-white shadow-sm" : "text-gray-600 hover:text-gray-800"
+          }`}
+        >
+          📦 Produtos
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("payments")}
+          className={`flex-1 inline-flex items-center justify-center gap-1.5 rounded-[8px] px-3 py-2 text-sm font-semibold transition ${
+            tab === "payments" ? "bg-[#1d5c3a] text-white shadow-sm" : "text-gray-600 hover:text-gray-800"
+          }`}
+        >
+          💳 Pagamentos
+          {pendingPayments > 0 && (
+            <span className={`inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-full text-[10.5px] font-extrabold leading-none ${
+              tab === "payments" ? "bg-amber-300 text-amber-900" : "bg-amber-100 text-amber-800"
+            }`}>
+              {pendingPayments}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {tab === "payments" ? (
+        <CrmCatalogPayments onSummary={(s) => setPendingPayments(Number(s.counts?.pending) || 0)} />
+      ) : (
+      <>
       {/* Filtros */}
       <div className="rounded-[14px] border border-[#e2e8e0] bg-white p-4 sm:p-5 mb-4 shadow-[0_2px_10px_rgba(0,0,0,0.03)]">
         <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
@@ -454,6 +492,8 @@ export default function CrmCatalogClient({ tenantSlug }: { tenantSlug: string | 
             </article>
           ))}
         </div>
+      )}
+      </>
       )}
 
       {/* Modal de cadastro/edição */}
