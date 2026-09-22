@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/auth";
 import { ensureTenantForUser } from "@/lib/onboarding";
 import { effectiveSubscriptionStatus } from "@/lib/access";
-import { slugify, isValidSlug } from "@/lib/utils";
+import { slugify, isValidSlug, containsBlockedBrand, BLOCKED_BRAND_MESSAGE } from "@/lib/utils";
 import type { SubscriptionStatus } from "@/types";
 
 export const runtime = "nodejs";
@@ -18,6 +18,10 @@ export async function POST(request: Request) {
 
   const { slug: rawSlug } = await request.json();
   const slug = slugify(String(rawSlug || ""));
+
+  if (containsBlockedBrand(slug)) {
+    return NextResponse.json({ error: BLOCKED_BRAND_MESSAGE }, { status: 400 });
+  }
 
   if (!isValidSlug(slug)) {
     return NextResponse.json(

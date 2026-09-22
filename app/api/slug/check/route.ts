@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { slugify, isValidSlug } from "@/lib/utils";
+import { slugify, isValidSlug, containsBlockedBrand, BLOCKED_BRAND_MESSAGE } from "@/lib/utils";
 
 /**
  * Verificação de disponibilidade de slug em tempo real.
@@ -24,6 +24,11 @@ export async function GET(request: Request) {
 
   if (slug !== raw.trim()) {
     response.reason = "O nome contém caracteres inválidos ou espaços. Usamos apenas letras, números e hífens.";
+    return NextResponse.json(response);
+  }
+
+  if (containsBlockedBrand(slug)) {
+    response.reason = BLOCKED_BRAND_MESSAGE;
     return NextResponse.json(response);
   }
 

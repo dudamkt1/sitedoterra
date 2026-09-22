@@ -69,8 +69,25 @@ export function isValidSlug(slug: string): boolean {
   if (!/^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(slug)) return false;
   if (slug.includes("--")) return false;
   if (RESERVED_SLUGS.includes(slug)) return false;
+  if (containsBlockedBrand(slug)) return false;
   return true;
 }
+
+/**
+ * Marcas bloqueadas em nomes de usuário/URLs.
+ * A empresa dōTERRA não permite o uso da marca em endereços de sites, então
+ * qualquer slug CONTENDO "doterra" (ex.: "doterra", "oleos-doterra",
+ * "equipe-doterra") é recusado — não só a palavra exata.
+ */
+export const BLOCKED_BRAND_SLUGS = ["doterra"];
+
+export function containsBlockedBrand(slug: string): boolean {
+  const s = String(slug || "").toLowerCase();
+  return BLOCKED_BRAND_SLUGS.some((brand) => s.includes(brand));
+}
+
+export const BLOCKED_BRAND_MESSAGE =
+  "O nome “dōTERRA” não pode ser usado na URL: a empresa dōTERRA não permite o uso da marca em endereços de sites. Escolha seu nome ou o nome da sua equipe (ex.: anabeatriz, equipe-essencia).";
 
 export function isValidDomain(domain: string): boolean {
   const value = domain.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");

@@ -229,6 +229,10 @@ export function SiteManager({ slug, pendingSlug, siteData, appUrl, hasSubscripti
               Seu site público ficará disponível em <strong>{appUrl}/{publicUrl || "seu-usuario"}</strong>.
               Use letras, números e hífens. Não pode ter espaços nem duplicar outro usuário.
             </p>
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 mb-4">
+              ⚠️ O nome <strong>“dōTERRA” não é permitido na URL</strong>: a empresa dōTERRA não autoriza o uso da
+              marca em endereços de sites. Use seu nome ou o nome da sua equipe (ex.: anabeatriz, equipe-essencia).
+            </p>
           </>
         )}
 
