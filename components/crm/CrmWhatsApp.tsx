@@ -195,7 +195,13 @@ export default function CrmWhatsApp() {
       if (isSimples) {
         const personalized = sendForm.message.replace(/{nome}/g, client.name.split(" ")[0]);
         const url = `https://wa.me/${phone}?text=${encodeURIComponent(personalized)}`;
-        window.open(url, "_blank");
+        // Reaproveita a MESMA aba do WhatsApp Web já conectada: com um nome
+        // de destino fixo ("crm-whatsapp-web"), o navegador navega a aba
+        // aberta pelo envio anterior em vez de empilhar uma nova aba a cada
+        // mensagem. (Por segurança do navegador, só dá para reaproveitar abas
+        // abertas por este botão — abas abertas manualmente não são acessíveis.)
+        const waWin = window.open(url, "crm-whatsapp-web");
+        try { waWin?.focus(); } catch {}
         // registra no histórico mesmo sem API (server libera quando provider=simples)
         try {
           await fetch("/api/crm/whatsapp/send", {
@@ -360,7 +366,7 @@ export default function CrmWhatsApp() {
             </button>
             {(form.provider === "simples" || config.provider === "simples") && (
               <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
-                Modo simples: ao clicar, abriremos <b>wa.me</b> no seu WhatsApp Web/App com a mensagem pronta — confirme o envio lá. Sem API, sem custo.
+                Modo simples: ao clicar, abriremos <b>wa.me</b> com a mensagem pronta — confirme o envio lá. Sem API, sem custo. A <b>mesma aba do WhatsApp Web é reaproveitada</b> a cada envio (nada de empilhar abas).
               </p>
             )}
           </div>
