@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CreditCard, QrCode, CheckCircle, Loader2, AlertCircle, Copy } from "lucide-react";
 import type { CatalogPaymentSettings } from "@/types";
@@ -57,6 +57,23 @@ export default function PublicProductClient({
   const [mpLoading, setMpLoading] = useState(false);
   const [mpData, setMpData] = useState<MercadoPagoData | null>(null);
   const [mpError, setMpError] = useState<string | null>(null);
+  const [mpReturn, setMpReturn] = useState<"success" | "failure" | "pending" | null>(null);
+
+  // Ao voltar do Mercado Pago (back_urls apontam para esta mesma página),
+  // exibe um aviso contextual em vez de cair em domínio/página estranha.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const mp = params.get("mp");
+    if (mp === "success" || mp === "failure" || mp === "pending") {
+      setMpReturn(mp);
+      // Limpa a query para não poluir o link ao compartilhar
+      const url = new URL(window.location.href);
+      url.searchParams.delete("mp");
+      url.searchParams.delete("order_id");
+      window.history.replaceState(null, "", url.toString());
+    }
+  }, []);
 
   const settings = paymentSettings || {
     pix_enabled: true,
@@ -153,6 +170,7 @@ export default function PublicProductClient({
           customerNotes: customerNotes.trim() || undefined,
           paymentMethod: "mercadopago",
           quantity,
+          returnUrl: typeof window !== "undefined" ? window.location.href : undefined,
         }),
       });
 
@@ -401,6 +419,29 @@ export default function PublicProductClient({
           {formatBRL(totalOriginalCents)}
         </span>
       </div>
+
+      {mpReturn && (
+        <div className={`rounded-[10px] border p-3 flex items-center gap-2 ${
+          mpReturn === "success"
+            ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+            : mpReturn === "pending"
+              ? "bg-amber-50 border-amber-200 text-amber-800"
+              : "bg-slate-50 border-slate-200 text-slate-700"
+        }`}>
+          {mpReturn === "success" ? (
+            <CheckCircle className="h-4 w-4 flex-shrink-0" />
+          ) : (
+            <AlertCircle className="h-4 w-4 flex-shrink-0" />
+          )}
+          <span className="text-sm">
+            {mpReturn === "success"
+              ? "Pagamento aprovado! Obrigado pela compra — você receberá a confirmação em instantes."
+              : mpReturn === "pending"
+                ? "Pagamento pendente no Mercado Pago. Assim que compensar, confirmamos seu pedido aqui."
+                : "Você saiu do pagamento sem concluir. Quando quiser, é só clicar em “Pagar com Mercado Pago” para tentar de novo."}
+          </span>
+        </div>
+      )}
 
       {mpError && (
         <div className="rounded-[10px] bg-red-50 border border-red-200 p-3 flex items-center gap-2 text-red-700">

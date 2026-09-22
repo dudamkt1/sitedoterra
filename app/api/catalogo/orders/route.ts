@@ -5,13 +5,63 @@ import { createMercadoPagoPreference, createPixPayment } from "@/lib/mercadopago
 
 export const runtime = "nodejs";
 
+/**
+ * Base para as back_urls do Mercado Pago: SEMPRE o local exato onde a compra
+ * começou (mesmo domínio + página do produto), nunca o domínio canônico da
+ * plataforma. Prioridade: body.returnUrl (validado) > origin > referer >
+ * x-forwarded-host > env.
+ */
+function resolveReturnBase(request: Request, bodyReturnUrl?: unknown): string {
+  const fallback = (process.env.NEXT_PUBLIC_APP_URL || "https://app.topconsultores.com.br").replace(/\/$/, "");
+
+  // 1) returnUrl enviado pelo frontend (window.location.href da página do produto)
+  if (typeof bodyReturnUrl === "string" && bodyReturnUrl.trim()) {
+    try {
+      const u = new URL(bodyReturnUrl.trim());
+      if ((u.protocol === "https:" || u.protocol === "http:") && u.pathname.startsWith("/catalogo/")) {
+        return `${u.origin}${u.pathname}`.replace(/\/$/, "");
+      }
+    } catch { /* ignora e tenta headers */ }
+  }
+
+  // 2) origin da requisição (fetch envia Origin)
+  const origin = request.headers.get("origin");
+  if (origin) {
+    try {
+      const u = new URL(origin);
+      if (u.protocol === "https:" || u.protocol === "http:") return u.origin.replace(/\/$/, "");
+    } catch { /* ignora */ }
+  }
+
+  // 3) referer (página do produto que iniciou a compra)
+  const referer = request.headers.get("referer");
+  if (referer) {
+    try {
+      const u = new URL(referer);
+      if ((u.protocol === "https:" || u.protocol === "http:") && u.pathname.startsWith("/catalogo/")) {
+        return `${u.origin}${u.pathname}`.replace(/\/$/, "");
+      }
+      if (u.protocol === "https:" || u.protocol === "http:") return u.origin.replace(/\/$/, "");
+    } catch { /* ignora */ }
+  }
+
+  // 4) host encaminhado (proxy/Vercel) — preserva o domínio que o cliente usou
+  const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
+  if (forwardedHost) {
+    const proto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() || "https";
+    return `${proto}://${forwardedHost}`.replace(/\/$/, "");
+  }
+
+  return fallback;
+}
+
 /** POST /api/catalogo/orders — cria um pedido do catálogo público. */
 export async function POST(request: Request) {
   const admin = createAdminClient();
 
   try {
     const body = await request.json();
-    const { slug, productId, customerName, customerEmail, customerPhone, customerNotes, paymentMethod, quantity = 1 } = body;
+    const { slug, productId, customerName, customerEmail, customerPhone, customerNotes, paymentMethod, quantity = 1, returnUrl } = body;
 
     if (!slug || !productId || !customerName || !paymentMethod) {
       return NextResponse.json({ error: "Dados obrigatórios faltando." }, { status: 400 });
@@ -146,6 +196,13 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Mercado Pago não configurado. O dono do catálogo precisa vincular a conta em Catálogo → Config. Pagamento." }, { status: 400 });
       }
       try {
+        // Volta SEMPRE para a página exata do produto que iniciou a compra
+        // (mesmo domínio + /catalogo/<slug>/<produto>), com status na query.
+        const returnBase = resolveReturnBase(request, returnUrl);
+        const productBase = returnBase.includes("/catalogo/")
+          ? returnBase
+          : `${returnBase}/catalogo/${slug}/${productId}`;
+        const sep = productBase.includes("?") ? "&" : "?";
         const preference = await createMercadoPagoPreference({
           accessToken: mpToken,
           items: [{
@@ -159,9 +216,9 @@ export async function POST(request: Request) {
           externalReference: `CATALOG-${order.id}`,
           notificationUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://app.topconsultores.com.br"}/api/webhooks/mercadopago`,
           backUrls: {
-            success: `${process.env.NEXT_PUBLIC_APP_URL || "https://app.topconsultores.com.br"}/catalogo/${slug}/order/success?order_id=${order.id}`,
-            failure: `${process.env.NEXT_PUBLIC_APP_URL || "https://app.topconsultores.com.br"}/catalogo/${slug}/order/failure?order_id=${order.id}`,
-            pending: `${process.env.NEXT_PUBLIC_APP_URL || "https://app.topconsultores.com.br"}/catalogo/${slug}/order/pending?order_id=${order.id}`,
+            success: `${productBase}${sep}order_id=${order.id}&mp=success`,
+            failure: `${productBase}${sep}order_id=${order.id}&mp=failure`,
+            pending: `${productBase}${sep}order_id=${order.id}&mp=pending`,
           },
         });
 
