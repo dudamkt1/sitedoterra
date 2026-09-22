@@ -9,7 +9,7 @@ import { QrCode, RefreshCw, LogOut, CheckCircle2, AlertCircle, Loader2 } from "l
  * no servidor Evolution e os envios do painel saem direto, sem confirmar
  * um por um. O API Key nunca sai do servidor (tudo via proxy /api/crm).
  */
-export default function CrmWhatsAppQr({ refreshKey }: { refreshKey: number }) {
+export default function CrmWhatsAppQr({ refreshKey, savedProvider }: { refreshKey: number; savedProvider: string | null }) {
   const [state, setState] = useState<string>("unknown");
   const [instance, setInstance] = useState<string>("");
   const [checking, setChecking] = useState(false);
@@ -28,6 +28,10 @@ export default function CrmWhatsAppQr({ refreshKey }: { refreshKey: number }) {
   }, []);
 
   useEffect(() => stopPoll, [stopPoll]);
+
+  // O QR só funciona com a configuração SALVA como evolution: o backend lê
+  // o que está no banco (não o que está só selecionado no menu acima).
+  const ready = savedProvider === "evolution";
 
   const checkStatus = useCallback(async (silent = false) => {
     if (!silent) setChecking(true);
@@ -54,10 +58,15 @@ export default function CrmWhatsAppQr({ refreshKey }: { refreshKey: number }) {
 
   // Verifica ao aparecer / quando a configuração é salva no painel pai.
   useEffect(() => {
+    if (!ready) return;
     checkStatus(true);
-  }, [refreshKey, checkStatus]);
+  }, [refreshKey, checkStatus, ready]);
 
   async function generateQr() {
+    if (!ready) {
+      setError("Selecione o provedor Evolution API acima e clique em “Salvar configuração” antes de gerar o QR Code.");
+      return;
+    }
     setQrLoading(true);
     setError(null);
     setNotice(null);
@@ -167,6 +176,15 @@ export default function CrmWhatsAppQr({ refreshKey }: { refreshKey: number }) {
           <span>{error}</span>
         </div>
       )}
+      {!ready && (
+        <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2.5 text-sm text-amber-800 flex items-start gap-2 mb-3">
+          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+          <span>
+            Você selecionou <b>Evolution API</b> no campo Provedor, mas ainda não salvou.
+            Clique em <b>“Salvar configuração”</b> acima para ativar e liberar o QR Code.
+          </span>
+        </div>
+      )}
       {notice && (
         <div className="rounded-lg bg-emerald-50 border border-emerald-100 px-3 py-2.5 text-sm text-emerald-700 flex items-start gap-2 mb-3">
           <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
@@ -193,7 +211,7 @@ export default function CrmWhatsAppQr({ refreshKey }: { refreshKey: number }) {
               <li>No celular: WhatsApp → <b>⋮ / ⚙ → Aparelhos conectados → Conectar aparelho</b> e escaneie.</li>
             </ol>
             <div className="flex flex-wrap gap-2 pt-1">
-              <button type="button" className="btn btn-primary !text-sm" disabled={qrLoading} onClick={generateQr}>
+              <button type="button" className="btn btn-primary !text-sm" disabled={qrLoading || !ready} onClick={generateQr}>
                 {qrLoading ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Gerando...</> : <><QrCode className="h-4 w-4 mr-1" /> {qr ? "Gerar novo QR Code" : "Gerar QR Code"}</>}
               </button>
             </div>

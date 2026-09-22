@@ -305,7 +305,7 @@ export default function CrmWhatsApp() {
       </div>
 
       {(form.provider === "evolution" || config.provider === "evolution") && (
-        <CrmWhatsAppQr refreshKey={qrTick} />
+        <CrmWhatsAppQr refreshKey={qrTick} savedProvider={config.provider} />
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">        <div className="card">

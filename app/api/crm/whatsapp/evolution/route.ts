@@ -21,7 +21,7 @@ type EvoCtx = { base: string; instance: string; key: string };
 async function evoContext(admin: any, tenantId: string): Promise<{ ctx?: EvoCtx; error?: string }> {
   const config = await getWhatsAppConfig(admin, tenantId);
   if (config.provider !== "evolution") {
-    return { error: "Escolha o provedor Evolution API para conectar via QR Code." };
+    return { error: "Para conectar via QR Code, selecione o provedor Evolution API e clique em Salvar configuração." };
   }
   const rawUrl = (config.api_url || "").trim().replace(/\/$/, "");
   if (!rawUrl) return { error: "Informe a URL do servidor Evolution na configuração e salve." };
