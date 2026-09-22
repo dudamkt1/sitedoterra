@@ -26,7 +26,7 @@ export async function GET() {
     pix_merchant_city: null,
     mp_enabled: false,
     mp_installments: 1,
-    mp_installments_without_interest: false,
+    mp_installments_without_interest: 1,
     mp_access_token: null,
     mp_public_key: null,
     requires_contact_info: true,
@@ -42,6 +42,13 @@ export async function POST(request: Request) {
 
   const body = await request.json();
 
+  const mpInstallments = Math.max(1, Math.min(12, Number(body.mp_installments) || 1));
+  // Aceita número (novo) ou boolean legado (true = todas sem juros, false = 1x).
+  const rawWo = body.mp_installments_without_interest;
+  const mpWithoutInterest = typeof rawWo === "boolean"
+    ? (rawWo ? mpInstallments : 1)
+    : Math.max(1, Math.min(12, Number(rawWo) || 1));
+
   const settings = {
     tenant_id: tenant!.id,
     pix_enabled: body.pix_enabled !== false,
@@ -51,8 +58,8 @@ export async function POST(request: Request) {
     pix_merchant_name: body.pix_merchant_name?.trim() || null,
     pix_merchant_city: body.pix_merchant_city?.trim() || null,
     mp_enabled: body.mp_enabled === true,
-    mp_installments: Math.max(1, Math.min(12, Number(body.mp_installments) || 1)),
-    mp_installments_without_interest: body.mp_installments_without_interest === true,
+    mp_installments: mpInstallments,
+    mp_installments_without_interest: Math.min(mpWithoutInterest, mpInstallments),
     mp_access_token: typeof body.mp_access_token === "string" && body.mp_access_token.trim() ? body.mp_access_token.trim() : null,
     mp_public_key: typeof body.mp_public_key === "string" && body.mp_public_key.trim() ? body.mp_public_key.trim() : null,
     requires_contact_info: body.requires_contact_info !== false,

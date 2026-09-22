@@ -37,7 +37,7 @@ const DEFAULT_PAYMENT_SETTINGS = {
   pix_merchant_city: "",
   mp_enabled: false,
   mp_installments: 1,
-  mp_installments_without_interest: false,
+  mp_installments_without_interest: 1,
   mp_access_token: "",
   mp_public_key: "",
   requires_contact_info: true,
@@ -90,9 +90,17 @@ export default function CrmCatalogClient({ tenantSlug }: { tenantSlug: string | 
       if (!res.ok) throw new Error(json.error || "Erro ao carregar configurações.");
       const s = json.settings || DEFAULT_PAYMENT_SETTINGS;
       // Normaliza nulls do banco para "" (inputs controlados + trim seguro)
+      // e converte mp_installments_without_interest legado (boolean) para quantidade (1-12)
+      const mpInstallments = Math.max(1, Math.min(12, Number(s.mp_installments) || 1));
+      const rawWo = s.mp_installments_without_interest;
+      const woQty = typeof rawWo === "boolean"
+        ? (rawWo ? mpInstallments : 1)
+        : Math.max(1, Math.min(12, Number(rawWo) || 1));
       setPaymentSettings({
         ...DEFAULT_PAYMENT_SETTINGS,
         ...s,
+        mp_installments: mpInstallments,
+        mp_installments_without_interest: Math.min(woQty, mpInstallments),
         pix_key: s.pix_key ?? "",
         pix_key_type: s.pix_key_type ?? "",
         pix_merchant_name: s.pix_merchant_name ?? "",
@@ -214,6 +222,8 @@ export default function CrmCatalogClient({ tenantSlug }: { tenantSlug: string | 
     setPaymentSaving(true);
     try {
       const v = values || paymentSettings;
+      const mpInstallments = Math.max(1, Math.min(12, Number(v.mp_installments) || 1));
+      const mpWoQty = Math.max(1, Math.min(mpInstallments, Number(v.mp_installments_without_interest) || 1));
       const body = {
         pix_enabled: v.pix_enabled,
         pix_discount_percent: v.pix_discount_percent,
@@ -222,8 +232,8 @@ export default function CrmCatalogClient({ tenantSlug }: { tenantSlug: string | 
         pix_merchant_name: (v.pix_merchant_name || "").trim() || null,
         pix_merchant_city: (v.pix_merchant_city || "").trim() || null,
         mp_enabled: v.mp_enabled,
-        mp_installments: v.mp_installments,
-        mp_installments_without_interest: v.mp_installments_without_interest,
+        mp_installments: mpInstallments,
+        mp_installments_without_interest: mpWoQty,
         mp_access_token: (v.mp_access_token || "").trim() || null,
         mp_public_key: (v.mp_public_key || "").trim() || null,
         requires_contact_info: v.requires_contact_info,
@@ -839,7 +849,14 @@ function PaymentSettingsModal({
                   <select
                     className="input"
                     value={form.mp_installments}
-                    onChange={(e) => setForm((f) => ({ ...f, mp_installments: Number(e.target.value) }))}
+                    onChange={(e) => setForm((f) => {
+                      const next = Number(e.target.value) || 1;
+                      return {
+                        ...f,
+                        mp_installments: next,
+                        mp_installments_without_interest: Math.min(Number(f.mp_installments_without_interest) || 1, next),
+                      };
+                    })}
                   >
                     {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => <option key={n} value={n}>{n}x</option>)}
                   </select>
@@ -847,10 +864,10 @@ function PaymentSettingsModal({
                 <Field label="Parcelas sem juros até">
                   <select
                     className="input"
-                    value={form.mp_installments_without_interest ? form.mp_installments : 1}
-                    onChange={(e) => setForm((f) => ({ ...f, mp_installments_without_interest: Number(e.target.value) < f.mp_installments }))}
+                    value={Math.min(Number(form.mp_installments_without_interest) || 1, form.mp_installments)}
+                    onChange={(e) => setForm((f) => ({ ...f, mp_installments_without_interest: Number(e.target.value) || 1 }))}
                   >
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => <option key={n} value={n}>{n}x</option>)}
+                    {Array.from({ length: form.mp_installments }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}x</option>)}
                   </select>
                   <p className="text-[11px] text-slate-500 mt-1.5">
                     Configure também o parcelamento sem juros no painel do Mercado Pago da sua conta.

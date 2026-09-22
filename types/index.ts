@@ -908,7 +908,8 @@ export interface CatalogPaymentSettings {
   // Mercado Pago
   mp_enabled: boolean;
   mp_installments: number;
-  mp_installments_without_interest: boolean;
+  /** Quantidade de parcelas sem juros (1-12). 1 = somente à vista sem juros extras. */
+  mp_installments_without_interest: number;
   /** Credenciais da conta MP do dono do catálogo (recebe direto na conta dele). */
   mp_access_token: string | null;
   mp_public_key: string | null;

@@ -48,7 +48,7 @@ export async function POST(request: Request) {
       pix_discount_percent: 0,
       mp_enabled: false,
       mp_installments: 1,
-      mp_installments_without_interest: false,
+      mp_installments_without_interest: 1,
       requires_contact_info: true,
     };
 

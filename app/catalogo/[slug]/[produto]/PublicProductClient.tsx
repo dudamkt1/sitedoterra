@@ -63,6 +63,7 @@ export default function PublicProductClient({
     pix_discount_percent: 0,
     mp_enabled: false,
     mp_installments: 1,
+    mp_installments_without_interest: 1,
     requires_contact_info: true,
   };
 
@@ -427,11 +428,16 @@ export default function PublicProductClient({
         )}
       </button>
 
-      {settings.mp_installments > 1 && (
-        <p className="text-center text-sm text-gray-500">
-          Em até {settings.mp_installments}x {settings.mp_installments_without_interest ? "sem juros" : "com juros"}
-        </p>
-      )}
+      {settings.mp_installments > 1 && (() => {
+        const max = Math.max(1, Math.min(12, Number(settings.mp_installments) || 1));
+        const rawWo = (settings as unknown as Record<string, unknown>).mp_installments_without_interest;
+        const wo = typeof rawWo === "boolean" ? (rawWo ? max : 1) : Math.max(1, Math.min(max, Number(rawWo) || 1));
+        return (
+          <p className="text-center text-sm text-gray-500">
+            {wo >= max ? `Em até ${max}x sem juros` : wo <= 1 ? `Em até ${max}x` : `Em até ${max}x (até ${wo}x sem juros)`}
+          </p>
+        );
+      })()}
 
       {whatsappLink && (
         <a
