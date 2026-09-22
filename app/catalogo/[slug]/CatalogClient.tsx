@@ -20,18 +20,14 @@ function formatBRL(cents: number) {
 export default function CatalogClient({
   slug,
   profileName,
-  siteName,
   logo,
-  siteDescription,
   products,
   whatsappLink,
   initialMessage,
 }: {
   slug: string;
   profileName: string;
-  siteName: string | null;
   logo: { mode: "image" | "text"; url?: string; lightUrl?: string; text: string };
-  siteDescription: string;
   products: PublicProduct[];
   whatsappLink: string | null;
   initialMessage: string | null;
@@ -59,47 +55,50 @@ export default function CatalogClient({
     <div className="min-h-screen bg-[#fcf9f5]">
       <header className="bg-gradient-to-br from-[#1d5c3a] to-[#2d7a4f] text-white">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="min-w-0">
               <p className="text-[11px] uppercase tracking-[0.2em] text-white/70">Catálogo</p>
-              <div className="flex items-center gap-3 mt-2">
+              <div className="mt-2.5">
                 {logo.mode === "image" && logo.url ? (
+                  // Logotipo exato do site do usuário (painel/meu-site): sem corte circular,
+                  // proporções originais preservadas — igual ao cabeçalho do site.
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={logo.url}
                     alt={logo.text}
-                    className="h-12 w-12 sm:h-14 sm:w-14 rounded-full object-cover bg-white/10 border border-white/20 shrink-0"
+                    className="h-12 sm:h-14 w-auto max-w-[240px] object-contain"
                     referrerPolicy="no-referrer"
                   />
-                ) : null}
-                <h1 className="text-[26px] sm:text-[34px] font-extrabold tracking-tight leading-tight" style={{ fontFamily: "var(--font-display)" }}>
-                  {logo.mode === "image" ? profileName : logo.text}
-                </h1>
+                ) : (
+                  <h1 className="text-[26px] sm:text-[34px] font-extrabold tracking-tight leading-tight" style={{ fontFamily: "var(--font-display)" }}>
+                    {logo.text}
+                  </h1>
+                )}
               </div>
-              {siteName && siteName !== profileName && (
-                <p className="text-[14px] text-white/80 mt-1">{siteName}</p>
-              )}
-              <p className="text-[14px] text-white/80 mt-2 max-w-xl">
-                {siteDescription || "Conheça nossos produtos e entre em contato para mais informações ou fazer seu pedido."}
-              </p>
             </div>
-            <Link
-              href={`/${slug}`}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-white/40 bg-white/10 hover:bg-white/20 text-white text-[13px] font-semibold px-4 py-2 transition mt-1"
-            >
-              🌐 Ver Site
-            </Link>
+            <div className="flex flex-wrap items-center gap-2.5">
+              {whatsappLink && (
+                <a
+                  href={whatsappLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex shrink-0 items-center gap-2 rounded-full border border-white/40 bg-white/10 backdrop-blur-sm hover:bg-white/20 text-white text-[13.5px] font-bold px-5 py-2.5 transition hover:-translate-y-px"
+                >
+                  💬 Falar pelo WhatsApp
+                </a>
+              )}
+              <Link
+                href={`/${slug}`}
+                className="group inline-flex shrink-0 items-center gap-2 rounded-full bg-white text-[#0d3320] text-[13.5px] font-bold pl-2 pr-5 py-2 transition shadow-[0_4px_14px_rgba(0,0,0,0.22)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.3)] hover:-translate-y-px"
+              >
+                <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-[#1d5c3a] to-[#2d7a4f] text-[13px] transition group-hover:scale-105">
+                  🌐
+                </span>
+                Ver site
+                <span aria-hidden className="text-[#1d5c3a] font-extrabold transition-transform group-hover:translate-x-1">→</span>
+              </Link>
+            </div>
           </div>
-          {whatsappLink && (
-            <a
-              href={whatsappLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 mt-5 rounded-full bg-white text-[#1d5c3a] hover:bg-white/90 text-[14px] font-semibold px-5 py-2.5 transition shadow-[0_4px_14px_rgba(0,0,0,0.18)]"
-            >
-              💬 Falar pelo WhatsApp
-            </a>
-          )}
         </div>
       </header>
 

@@ -76,17 +76,13 @@ export default async function PublicCatalogPage({
     siteData,
     t.profile_name || t.site_name || "Consultora"
   );
-  const siteDescription = (siteData.description as string) || "";
-
   const initialMessage = searchParams?.msg ? decodeURIComponent(String(searchParams.msg)) : null;
 
   return (
     <CatalogClient
       slug={t.slug}
       profileName={t.profile_name || t.site_name || "Consultora"}
-      siteName={t.site_name}
       logo={logo}
-      siteDescription={siteDescription}
       products={(products as never) || []}
       whatsappLink={whatsappLink}
       initialMessage={initialMessage}
