@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { EmptyState, LoadingState, ErrorState, Toast, Field, apiPost, apiPut, apiDelete, confirmDialog } from "@/components/crm/crm-ui";
+import CrmWhatsAppQr from "@/components/crm/CrmWhatsAppQr";
 import { WHATSAPP_PROVIDERS, MESSAGE_TEMPLATE_PRESETS } from "@/lib/crm-shared";
 import type { CrmWhatsAppConfig, CrmMessageTemplate, CrmClient } from "@/types";
 
@@ -64,6 +65,7 @@ const PROVIDER_HELP: Record<string, { badge: string; badgeColor: string; title: 
       "Crie uma instância via painel da Evolution e escaneie o QR Code com seu WhatsApp.",
       "Em Conexão copie: Server URL (ex.: https://sua-evolution.com), API Key (definida no .env AUTHENTICATION_API_KEY) e Instance Name.",
       "Cole aqui: API URL = https://sua-evolution.com/message/sendText/SEU_INSTANCE, Phone ID = Instance Name, Token = API Key.",
+      "Depois de salvar, use o painel “Conexão via QR Code” abaixo para escanear e manter a sessão conectada.",
     ],
     fields: "API URL + Instance Name (Phone ID) + API Key (Token)",
     linkLabel: "Ver Evolution API (GitHub)",
@@ -122,6 +124,7 @@ export default function CrmWhatsApp() {
   const [form, setForm] = useState<Record<string, string>>({});
   const [sendForm, setSendForm] = useState({ client_id: "", message: "" });
   const [sending, setSending] = useState(false);
+  const [qrTick, setQrTick] = useState(0);
 
   async function load() {
     setLoading(true);
@@ -135,6 +138,7 @@ export default function CrmWhatsApp() {
       setConfig(w.config);
       setMessages(m.messages || []);
       setClients(c.clients || []);
+      setQrTick((t) => t + 1);
       setForm({
         enabled: w.config.enabled ? "1" : "0",
         provider: w.config.provider || "simples",
@@ -171,6 +175,7 @@ export default function CrmWhatsApp() {
       if (!res.ok) throw new Error(json.error || "Erro ao salvar.");
       setConfig(json.config);
       setForm((f) => ({ ...f, enabled: json.config.enabled ? "1" : "0" }));
+      setQrTick((t) => t + 1);
       setToast({ ok: true, text: "Configuração do WhatsApp salva!" });
     } catch (e) {
       setToast({ ok: false, text: e instanceof Error ? e.message : "Erro ao salvar." });
@@ -299,8 +304,11 @@ export default function CrmWhatsApp() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="card">
+      {(form.provider === "evolution" || config.provider === "evolution") && (
+        <CrmWhatsAppQr refreshKey={qrTick} />
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">        <div className="card">
           <h2 className="card-title mb-4">Configuração da API</h2>
           <div className="space-y-3">
             <Field label="Provedor">
