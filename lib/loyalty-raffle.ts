@@ -96,3 +96,54 @@ export function formatBRL(cents: number): string {
     currency: "BRL",
   });
 }
+
+export interface RaffleSampleNumber {
+  number: number;
+  name: string;
+}
+
+export interface RaffleSampleWinner {
+  name: string;
+  number: number;
+  prize: string;
+  prize_type: string;
+  drawn_at: string;
+  seed: string;
+}
+
+/**
+ * Amostra fictícia exibida no DOMÍNIO PRINCIPAL quando a seção está ativa
+ * no /admin/editor-home mas o tenant oficial ainda não configurou o sorteio
+ * — futuros consultores veem como funciona sem gravar nada real.
+ */
+export const RAFFLE_SAMPLE = {
+  amount_per_number_cents: 5000,
+  total_numbers: 30,
+  prize_type: "brinde",
+  prize_description: "Kit Lavanda + difusor USB",
+  prize_credit_amount_cents: null as number | null,
+  numbers: [
+    { number: 3, name: "Maria" },
+    { number: 5, name: "Juliana" },
+    { number: 7, name: "Maria" },
+    { number: 8, name: "Fernanda" },
+    { number: 11, name: "Ana" },
+    { number: 13, name: "Beatriz" },
+    { number: 16, name: "Juliana" },
+    { number: 19, name: "Fernanda" },
+    { number: 21, name: "Maria" },
+    { number: 24, name: "Beatriz" },
+    { number: 27, name: "Ana" },
+    { number: 30, name: "Fernanda" },
+  ] as RaffleSampleNumber[],
+  winners: [
+    {
+      name: "Maria Silva",
+      number: 7,
+      prize: "Voucher R$ 50",
+      prize_type: "credito_loja",
+      drawn_at: new Date(Date.now() - 30 * 86400000).toISOString(),
+      seed: "a1b2c3d4e5f60718293a4b5c6d7e8f90",
+    },
+  ] as RaffleSampleWinner[],
+};

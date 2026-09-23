@@ -166,14 +166,18 @@ export default async function HomePage() {
   const destination = resolveAffiliateDestination({ sections, access: "available" });
 
   // Sorteio: NAV só lista a seção com conteúdo visível (mesma regra do /[slug]).
+  // Na HOME oficial, seção global ativa sem config vira VITRINE de exemplo
+  // (o que o /admin/editor-home liga aparece no domínio principal).
   let loyaltyRaffleLive: boolean | undefined = undefined;
-  if (sections.some((s) => s.type === "loyalty_raffle" && s.enabled)) {
+  const raffleSectionOn = sections.some((s) => s.type === "loyalty_raffle" && s.enabled);
+  if (raffleSectionOn) {
     try {
       loyaltyRaffleLive = (await getRaffleSettings(createAdminClient(), tenant.tenant_id)).enabled;
     } catch {
       loyaltyRaffleLive = undefined;
     }
   }
+  const loyaltyRaffleSample = raffleSectionOn && loyaltyRaffleLive !== true;
 
   // Logo 100% do modelo (/admin/editor-home → Cabeçalho/Menu); o tenant
   // oficial só complementa quando o modelo ainda não tem logo.
@@ -191,6 +195,7 @@ export default async function HomePage() {
         affiliateUserId={tenant.user_id}
         destination={destination}
         loyaltyRaffleLive={loyaltyRaffleLive}
+        loyaltyRaffleSample={loyaltyRaffleSample}
         contact={{
           whatsapp: (siteData.whatsapp as string) || undefined,
           whatsapp_floating_enabled: (siteData.whatsapp_floating_enabled as boolean) || false,

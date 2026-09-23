@@ -270,14 +270,17 @@ export default async function TenantSitePage({
     // Sorteio: o NAV só lista a seção quando há conteúdo visível. Revela no
     // servidor se o sorteio está ligado (evita item de menu para seção vazia
     // e flash de conteúdo que some). Só consulta quando a seção está ativa.
+    // No site do tenant oficial, seção ativa sem config vira vitrine (igual à HOME).
     let loyaltyRaffleLive: boolean | undefined = undefined;
-    if (sections.some((s) => s.type === "loyalty_raffle" && s.enabled)) {
+    const raffleSectionOn = sections.some((s) => s.type === "loyalty_raffle" && s.enabled);
+    if (raffleSectionOn) {
       try {
         loyaltyRaffleLive = (await getRaffleSettings(createAdminClient(), tenant.tenant_id)).enabled;
       } catch {
         loyaltyRaffleLive = undefined;
       }
     }
+    const loyaltyRaffleSample = isOfficial && raffleSectionOn && loyaltyRaffleLive !== true;
     return (
       <>
         <link rel="canonical" href={canonicalUrl} />
@@ -292,6 +295,7 @@ export default async function TenantSitePage({
           tenantSite={!isOfficial}
           destination={destination}
           loyaltyRaffleLive={loyaltyRaffleLive}
+          loyaltyRaffleSample={loyaltyRaffleSample}
           contact={{
             whatsapp: (siteData.whatsapp as string) || undefined,
             whatsapp_floating_enabled: (siteData.whatsapp_floating_enabled as boolean) || false,

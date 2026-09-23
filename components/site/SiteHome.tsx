@@ -76,6 +76,12 @@ interface SiteHomeProps {
    * (demonstração e fallbacks).
    */
   loyaltyRaffleLive?: boolean;
+  /**
+   * Vitrine do domínio principal: mostra a seção com dados de EXEMPLO quando
+   * o sorteio ainda não foi configurado (só onde fizer sentido — HOME
+   * oficial). Nunca grava nada real.
+   */
+  loyaltyRaffleSample?: boolean;
 }
 
 /**
@@ -84,13 +90,14 @@ interface SiteHomeProps {
  * renderiza cada uma como componente independente, na ordem correta.
  * Seções desativadas são simplesmente ignoradas.
  */
-export function SiteHome({ slug, sections, contact, logo, extraNav = [], ownerName, aboutDescription, theme, affiliateUserId, destination, tenantSite = false, loyaltyRaffleLive }: SiteHomeProps) {
+export function SiteHome({ slug, sections, contact, logo, extraNav = [], ownerName, aboutDescription, theme, affiliateUserId, destination, tenantSite = false, loyaltyRaffleLive, loyaltyRaffleSample = false }: SiteHomeProps) {
   // NAV = SOMENTE seções ativas com conteúdo visível: além do `enabled`,
   // a seção Sorteio sai junto do menu quando o servidor já sabe que o
-  // sorteio está desligado (evita link para seção vazia).
-  const visible = sections.filter(
-    (s) => s.enabled && (s.type !== "loyalty_raffle" || loyaltyRaffleLive !== false)
-  );
+  // sorteio está desligado — exceto em modo vitrine (exemplo no domínio
+  // principal), que mantém seção + menu. Evita link para seção vazia.
+  const raffleShown = (s: { type: string }) =>
+    s.type !== "loyalty_raffle" || loyaltyRaffleLive !== false || loyaltyRaffleSample;
+  const visible = sections.filter((s) => s.enabled && raffleShown(s));
 
   const headerSection = visible.find((s) => s.type === "header");
   const headerContent = (headerSection?.content || {}) as Record<string, unknown>;
@@ -169,7 +176,7 @@ export function SiteHome({ slug, sections, contact, logo, extraNav = [], ownerNa
           case "products":
             return <Products key={s.id} content={s.content as never} contactWhatsapp={whatsapp} />;
           case "loyalty_raffle":
-            return <LoyaltyRaffle key={s.id} content={s.content as never} slug={slug} />;
+            return <LoyaltyRaffle key={s.id} content={s.content as never} slug={slug} sample={loyaltyRaffleSample} />;
           case "faq":
             return <Faq key={s.id} content={s.content as never} />;
           case "pricing":
