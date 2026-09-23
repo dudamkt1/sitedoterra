@@ -21,6 +21,56 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   return { title: `Sorteio por Fidelidade | ${params.slug}` };
 }
 
+const PAGE_BG = "#faf8f2";
+const INK = "#0e3b28";
+const GOLD = "#c4963a";
+const GOLD_LIGHT = "#e8c87a";
+
+function BackButton({ href, big = false }: { href: string; big?: boolean }) {
+  return (
+    <Link
+      href={href}
+      style={{
+        display: "inline-block",
+        background: "#1d5c3a",
+        color: "#fff",
+        fontWeight: 800,
+        fontSize: big ? 16 : 14,
+        borderRadius: 999,
+        padding: big ? "14px 36px" : "11px 26px",
+        textDecoration: "none",
+        boxShadow: "0 10px 26px rgba(29,92,58,0.30)",
+      }}
+    >
+      ← Voltar pro site
+    </Link>
+  );
+}
+
+function Card({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        background: "#fff",
+        borderRadius: 20,
+        padding: "clamp(18px, 4vw, 28px)",
+        boxShadow: "0 10px 30px rgba(14,59,40,0.08)",
+        border: "1px solid rgba(14,59,40,0.08)",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function CardTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 style={{ fontSize: 18, fontWeight: 800, color: INK, margin: "0 0 12px" }}>
+      {children}
+    </h2>
+  );
+}
+
 export default async function RafflePage({ params }: { params: { slug: string } }) {
   const tenant = await getPublicTenantBySlug(params.slug);
   if (!tenant) notFound();
@@ -30,22 +80,6 @@ export default async function RafflePage({ params }: { params: { slug: string } 
   // Vitrine no site oficial: sem config, mostra exemplo fictício (nada real).
   const isOfficial = await isOfficialHomeTenantById(tenant.tenant_id).catch(() => false);
   const sampleMode = !settings?.enabled && isOfficial;
-
-  if (!settings?.enabled && !sampleMode) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#faf8f2] px-4">
-        <div className="text-center">
-          <p className="text-sm text-gray-500">O sorteio por fidelidade não está ativo neste site.</p>
-          <Link
-            href={`/${tenant.slug}#sorteio`}
-            className="btn btn-primary mt-4 inline-block"
-          >
-            ← Voltar pro site
-          </Link>
-        </div>
-      </div>
-    );
-  }
 
   const siteData = (tenant.site_data || {}) as Record<string, unknown>;
   const profileName = tenant.profile_name || tenant.site_name || tenant.slug;
@@ -62,6 +96,50 @@ export default async function RafflePage({ params }: { params: { slug: string } 
     { label: "Início", href: `/${tenant.slug}` },
     { label: "Sorteio", href: "#topo" },
   ];
+  const backHref = `/${tenant.slug}#sorteio`;
+
+  if (!settings?.enabled && !sampleMode) {
+    return (
+      <div id="tenant-site" data-slug={tenant.slug}>
+        <Header
+          logoText={profileName}
+          navItems={navItems}
+          extraNav={[{ label: "Voltar pro site", href: backHref }]}
+          logoHref={`/${tenant.slug}`}
+        />
+        <main
+          style={{
+            minHeight: "60vh",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: PAGE_BG,
+            padding: 24,
+            textAlign: "center",
+          }}
+        >
+          <div>
+            <p style={{ fontSize: 15, color: "#5b6b62" }}>
+              O sorteio por fidelidade não está ativo neste site.
+            </p>
+            <div style={{ marginTop: 16 }}>
+              <BackButton href={backHref} big />
+            </div>
+          </div>
+        </main>
+        <Footer
+          content={{}}
+          navItems={navItems}
+          contactWhatsapp={whatsapp}
+          contactEmail={email}
+          contactInstagram={instagram}
+          profileName={profileName}
+          ownerName={ownerName}
+          aboutDescription={(siteData.description as string) || undefined}
+        />
+      </div>
+    );
+  }
 
   let snap = {
     amount_per_number_cents: RAFFLE_SAMPLE.amount_per_number_cents,
@@ -118,11 +196,12 @@ export default async function RafflePage({ params }: { params: { slug: string } 
 
   const total = snap.total_numbers;
   const missing = Math.max(0, total - taken.size);
-  const prizeLabel = RAFFLE_PRIZE_LABELS[snap.prize_type as keyof typeof RAFFLE_PRIZE_LABELS] || snap.prize_type;
-  const backHref = `/${tenant.slug}#sorteio`;
+  const pct = Math.min(100, Math.round((taken.size / Math.max(1, total)) * 100));
+  const prizeLabel =
+    RAFFLE_PRIZE_LABELS[snap.prize_type as keyof typeof RAFFLE_PRIZE_LABELS] || snap.prize_type;
 
   return (
-    <div id="tenant-site" data-slug={tenant.slug} className="min-h-screen bg-[#faf8f2]">
+    <div id="tenant-site" data-slug={tenant.slug}>
       <Header
         logoText={profileName}
         navItems={navItems}
@@ -130,121 +209,218 @@ export default async function RafflePage({ params }: { params: { slug: string } 
         logoHref={`/${tenant.slug}`}
       />
 
-      <main id="topo" className="mx-auto max-w-3xl px-4 py-10">
-        <Link href={backHref} className="btn btn-primary inline-block shadow-lg">
-          ← Voltar pro site
-        </Link>
-        {sampleMode && (
-          <p className="mt-3 inline-block ml-3 text-[11px] font-bold text-[#1d5c3a] border border-dashed border-[#1d5c3a] rounded-full px-3 py-1">
-            Exemplo — veja como funciona
-          </p>
-        )}
-
-        <p className="text-xs font-bold uppercase tracking-widest text-[#1d5c3a] mt-6">
-          Programa de Fidelidade
-        </p>
-        <h1 className="text-3xl font-semibold mt-1" style={{ fontFamily: "var(--font-display)" }}>
-          🎟️ Sorteio por Fidelidade
-        </h1>
-
-        <div
-          className="mt-6 rounded-3xl p-6 text-white"
-          style={{
-            background: "linear-gradient(135deg, #0e3b28 0%, #1d5c3a 55%, #2a7a4e 100%)",
-            boxShadow: "0 24px 60px rgba(14,59,40,0.35)",
-          }}
-        >
-          <h2 className="text-lg font-extrabold">🎁 Prêmio da rodada</h2>
-          <p className="text-sm mt-1 text-white/90">
-            <span className="badge badge-gold mr-2">{prizeLabel}</span>
-            <strong>{snap.prize_description || "Prêmio surpresa"}</strong>
-            {snap.prize_type === "credito_loja" && snap.prize_credit_amount_cents ? (
-              <> · vale {formatBRL(snap.prize_credit_amount_cents)} em compras futuras</>
-            ) : null}
-          </p>
-          <p className="text-sm text-white/85 mt-3">
-            A cada {formatBRL(snap.amount_per_number_cents)} em compras confirmadas, você ganha
-            1 número da sorte. Quando os {total} números forem escolhidos, sorteamos entre quem
-            participou. Faltam <strong className="text-[#e8c87a]">{missing}</strong> número(s)!
-          </p>
-          <div className="h-3 rounded-full overflow-hidden mt-3" style={{ background: "rgba(255,255,255,0.18)" }}>
-            <div
-              className="h-full rounded-full"
+      <main
+        id="topo"
+        style={{
+          background: PAGE_BG,
+          padding: "32px 16px 56px",
+        }}
+      >
+        <div style={{ maxWidth: 720, margin: "0 auto" }}>
+          <BackButton href={backHref} />
+          {sampleMode && (
+            <span
               style={{
-                width: `${Math.min(100, Math.round((taken.size / Math.max(1, total)) * 100))}%`,
-                background: "linear-gradient(90deg, #e8c87a, #c4963a)",
+                display: "inline-block",
+                marginLeft: 10,
+                fontSize: 11,
+                fontWeight: 800,
+                color: INK,
+                border: "1px dashed #1d5c3a",
+                borderRadius: 999,
+                padding: "6px 12px",
+                verticalAlign: "middle",
               }}
-            />
-          </div>
-          <p className="text-xs text-white/80 mt-1">
-            {taken.size} de {total} números já escolhidos
-          </p>
-        </div>
+            >
+              Exemplo
+            </span>
+          )}
 
-        <div className="card mt-6">
-          <h2 className="card-title mb-3">Números da rodada</h2>
-          <div className="grid grid-cols-5 sm:grid-cols-10 gap-2">
-            {Array.from({ length: total }, (_, i) => i + 1).map((n) => {
-              const who = taken.get(n);
-              return (
-                <div
-                  key={n}
-                  title={who ? `Escolhido por ${who}` : "Disponível"}
-                  className={`rounded-lg border px-1 py-2 text-center ${
-                    who ? "bg-[#1d5c3a] text-white border-[#1d5c3a]" : "bg-white text-gray-500 border-gray-200"
-                  }`}
-                >
-                  <p className="text-sm font-bold leading-none">{n}</p>
-                  <p className="text-[10px] leading-tight mt-0.5 truncate">{who || "livre"}</p>
-                </div>
-              );
-            })}
-          </div>
-          <p className="text-xs text-gray-400 mt-3">
-            Fez uma compra? Fale com a consultora para escolher seu número entre os disponíveis.
+          <p
+            style={{
+              fontSize: 12,
+              fontWeight: 800,
+              letterSpacing: 2,
+              textTransform: "uppercase",
+              color: "#1d5c3a",
+              margin: "26px 0 0",
+            }}
+          >
+            Programa de Fidelidade
           </p>
-        </div>
+          <h1
+            style={{
+              fontSize: "clamp(26px, 5vw, 34px)",
+              fontWeight: 800,
+              color: INK,
+              margin: "6px 0 0",
+              fontFamily: "var(--font-display)",
+            }}
+          >
+            🎟️ Sorteio por Fidelidade
+          </h1>
 
-        {history.length > 0 && (
-          <div className="card mt-6">
-            <h2 className="card-title mb-3">🏆 Últimos ganhadores</h2>
-            <ul className="space-y-2">
-              {history.map((h) => (
-                <li key={h.id} className="flex flex-wrap items-center gap-x-2 text-sm text-gray-700">
-                  <span>
-                    <strong>{h.winner_name || "—"}</strong> ganhou <strong>{h.prize || "o prêmio"}</strong>{" "}
-                    com o número <strong>{h.winner_number}</strong>
-                  </span>
-                  <span className="text-xs text-gray-400">
-                    · {h.drawn_at ? new Date(h.drawn_at).toLocaleDateString("pt-BR") : ""}
-                    {h.seed ? ` · semente ${h.seed.slice(0, 8)}…` : ""}
-                  </span>
-                </li>
-              ))}
-            </ul>
-            <p className="text-xs text-gray-400 mt-3">
-              Sorteio verificável: semente pública + data registrados em cada rodada para auditoria.
+          {/* cartão do prêmio */}
+          <div
+            style={{
+              marginTop: 20,
+              borderRadius: 24,
+              padding: "clamp(20px, 4vw, 30px)",
+              color: "#fff",
+              background: "linear-gradient(135deg, #0e3b28 0%, #1d5c3a 55%, #2a7a4e 100%)",
+              boxShadow: "0 24px 60px rgba(14,59,40,0.35)",
+            }}
+          >
+            <p style={{ fontSize: 13, fontWeight: 800, letterSpacing: 1.5, textTransform: "uppercase", color: GOLD_LIGHT, margin: 0 }}>
+              Prêmio da rodada
+            </p>
+            <p style={{ fontSize: "clamp(19px, 4vw, 24px)", fontWeight: 800, margin: "8px 0 0" }}>
+              🎁 {snap.prize_description || "Prêmio surpresa"}
+            </p>
+            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.85)", margin: "6px 0 0" }}>
+              {prizeLabel}
+              {snap.prize_type === "credito_loja" && snap.prize_credit_amount_cents
+                ? ` · vale ${formatBRL(snap.prize_credit_amount_cents)} em compras futuras`
+                : ""}
+            </p>
+            <div
+              style={{
+                marginTop: 16,
+                border: "2px dashed rgba(232,200,122,0.8)",
+                borderRadius: 16,
+                padding: "12px 16px",
+                fontSize: 14,
+                lineHeight: 1.6,
+                background: "rgba(255,255,255,0.10)",
+              }}
+            >
+              A cada <strong style={{ color: GOLD_LIGHT }}>{formatBRL(snap.amount_per_number_cents)}</strong>{" "}
+              em compras confirmadas, você ganha <strong>1 número da sorte</strong>. Faltam{" "}
+              <strong style={{ color: GOLD_LIGHT }}>{missing}</strong> de {total}!
+            </div>
+            <div
+              style={{ height: 12, borderRadius: 999, background: "rgba(255,255,255,0.18)", overflow: "hidden", marginTop: 14 }}
+            >
+              <div
+                style={{
+                  height: "100%",
+                  width: `${pct}%`,
+                  borderRadius: 999,
+                  background: `linear-gradient(90deg, ${GOLD_LIGHT}, ${GOLD})`,
+                }}
+              />
+            </div>
+            <p style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", margin: "6px 0 0" }}>
+              {taken.size} de {total} números já escolhidos
             </p>
           </div>
-        )}
 
-        <div className="card mt-6">
-          <h2 className="card-title mb-2">Como participar</h2>
-          <ol className="text-sm text-gray-600 space-y-1 list-decimal list-inside">
-            <li>Faça suas compras com a consultora (loja, WhatsApp ou catálogo).</li>
-            <li>
-              A cada {formatBRL(snap.amount_per_number_cents)} em compras confirmadas, você ganha
-              1 número da sorte.
-            </li>
-            <li>Escolha seu número entre os disponíveis com a consultora.</li>
-            <li>Quando todos os {total} números forem escolhidos (ou a consultora antecipar), ocorre o sorteio.</li>
-          </ol>
-        </div>
+          {/* grade de números */}
+          <div style={{ marginTop: 20 }}>
+            <Card>
+              <CardTitle>Números da rodada</CardTitle>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(58px, 1fr))",
+                  gap: 8,
+                }}
+              >
+                {Array.from({ length: total }, (_, i) => i + 1).map((n) => {
+                  const who = taken.get(n);
+                  return (
+                    <div
+                      key={n}
+                      title={who ? `Escolhido por ${who}` : "Disponível"}
+                      style={{
+                        borderRadius: 12,
+                        border: `1px solid ${who ? "#1d5c3a" : "#e2e8e2"}`,
+                        background: who ? "#1d5c3a" : "#fff",
+                        color: who ? "#fff" : "#75847a",
+                        padding: "8px 2px",
+                        textAlign: "center",
+                      }}
+                    >
+                      <p style={{ fontSize: 15, fontWeight: 800, margin: 0, lineHeight: 1.1 }}>{n}</p>
+                      <p
+                        style={{
+                          fontSize: 10,
+                          margin: "3px 0 0",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          padding: "0 4px",
+                        }}
+                      >
+                        {who || "livre"}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+              <p style={{ fontSize: 12, color: "#98a39b", margin: "12px 0 0" }}>
+                Fez uma compra? Fale com a consultora para escolher seu número entre os disponíveis.
+              </p>
+            </Card>
+          </div>
 
-        <div className="text-center mt-8">
-          <Link href={backHref} className="btn btn-primary inline-block shadow-lg !px-8 !py-3 !text-base">
-            ← Voltar pro site
-          </Link>
+          {/* ganhadores */}
+          {history.length > 0 && (
+            <div style={{ marginTop: 20 }}>
+              <Card>
+                <CardTitle>🏆 Últimos ganhadores</CardTitle>
+                <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 10 }}>
+                  {history.map((h) => (
+                    <li
+                      key={h.id}
+                      style={{
+                        border: "1px solid rgba(14,59,40,0.10)",
+                        background: "#f6faf7",
+                        borderRadius: 14,
+                        padding: "10px 14px",
+                        fontSize: 14,
+                        color: "#33413a",
+                      }}
+                    >
+                      <strong>{h.winner_name || "—"}</strong> ganhou{" "}
+                      <strong>{h.prize || "o prêmio"}</strong> com o número{" "}
+                      <strong style={{ color: INK }}>{h.winner_number}</strong>
+                      <span style={{ display: "block", fontSize: 12, color: "#98a39b", marginTop: 2 }}>
+                        {h.drawn_at ? new Date(h.drawn_at).toLocaleDateString("pt-BR") : ""}
+                        {h.seed ? ` · semente ${h.seed.slice(0, 8)}…` : ""}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p style={{ fontSize: 12, color: "#98a39b", margin: "12px 0 0" }}>
+                  Sorteio verificável: semente pública + data registrados em cada rodada para auditoria.
+                </p>
+              </Card>
+            </div>
+          )}
+
+          {/* como participar */}
+          <div style={{ marginTop: 20 }}>
+            <Card>
+              <CardTitle>Como participar</CardTitle>
+              <ol style={{ fontSize: 14, color: "#4b5750", lineHeight: 1.7, margin: 0, paddingLeft: 20 }}>
+                <li>Faça suas compras com a consultora (loja, WhatsApp ou catálogo).</li>
+                <li>
+                  A cada {formatBRL(snap.amount_per_number_cents)} em compras confirmadas, você ganha
+                  1 número da sorte.
+                </li>
+                <li>Escolha seu número entre os disponíveis com a consultora.</li>
+                <li>
+                  Quando todos os {total} números forem escolhidos (ou a consultora antecipar),
+                  ocorre o sorteio.
+                </li>
+              </ol>
+            </Card>
+          </div>
+
+          <div style={{ textAlign: "center", marginTop: 32 }}>
+            <BackButton href={backHref} big />
+          </div>
         </div>
       </main>
 
