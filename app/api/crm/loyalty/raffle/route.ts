@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { requireTenant } from "@/lib/crm-auth";
+import { invalidateGlobalSectionsCache } from "@/lib/home";
+import { invalidateTenantSlugCache } from "@/lib/tenant";
 import {
   ensureCurrentRound,
+  ensureRaffleSectionEnabled,
   getDrawnRounds,
   getPendingCredits,
+  getRaffleSectionState,
   getRaffleSettings,
   getRoundEntries,
   normalizeRaffleSettings,
@@ -18,14 +23,21 @@ export async function GET() {
   try {
     const settings = await getRaffleSettings(admin, tenant!.id);
     const round = await ensureCurrentRound(admin, tenant!.id, settings);
-    const [entries, credits, history] = await Promise.all([
+    const [entries, credits, history, section] = await Promise.all([
       getRoundEntries(admin, tenant!.id, round.id),
       getPendingCredits(admin, tenant!.id),
       getDrawnRounds(admin, tenant!.id, 10),
+      getRaffleSectionState(admin, tenant!.id).catch(() => ({
+        section_id: null as string | null,
+        global_enabled: false,
+        section_enabled: false,
+      })),
     ]);
     const total = round.settings_snapshot.total_numbers;
     return NextResponse.json({
       settings,
+      site_slug: (tenant as { slug?: string } | null)?.slug || null,
+      section_enabled: section.section_enabled,
       round: {
         ...round,
         filled_count: entries.length,
@@ -105,5 +117,23 @@ export async function PUT(request: Request) {
     entity_id: tenant!.id,
     metadata: { enabled: payload.enabled },
   });
-  return NextResponse.json({ success: true, settings: normalized });
+
+  // Ativou o sorteio? Liga junto a seção na home (evita o estado confuso
+  // "seção ativa mas sorteio desligado" em que nada aparece no site).
+  let sectionEnabled = false;
+  try {
+    if (payload.enabled) {
+      sectionEnabled = await ensureRaffleSectionEnabled(admin, tenant!.id);
+      const slug = (tenant as { slug?: string } | null)?.slug;
+      invalidateGlobalSectionsCache();
+      invalidateTenantSlugCache(slug);
+      try {
+        revalidatePath("/");
+        if (slug) revalidatePath(`/${slug}`);
+      } catch {}
+    } else {
+      sectionEnabled = (await getRaffleSectionState(admin, tenant!.id)).section_enabled;
+    }
+  } catch {}
+  return NextResponse.json({ success: true, settings: normalized, section_enabled: sectionEnabled });
 }

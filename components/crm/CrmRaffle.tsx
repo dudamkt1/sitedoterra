@@ -14,6 +14,8 @@ import type {
 interface RafflePayload {
   missingMigration?: boolean;
   settings: LoyaltyRaffleSettings | null;
+  site_slug?: string | null;
+  section_enabled?: boolean;
   round: (LoyaltyRaffleRound & { filled_count: number; missing_count: number }) | null;
   entries: LoyaltyRaffleEntry[];
   credits: LoyaltyRaffleCredit[];
@@ -73,7 +75,7 @@ export default function CrmRaffle() {
     setSaving(true);
     setToast(null);
     try {
-      await apiPut("/api/crm/loyalty/raffle", {
+      const res = (await apiPut("/api/crm/loyalty/raffle", {
         enabled,
         amount_reais: amountReais,
         total_numbers: parseInt(totalNumbers) || 30,
@@ -81,8 +83,17 @@ export default function CrmRaffle() {
         prize_description: prizeDescription,
         prize_credit_reais: prizeCreditReais,
         ...(patch || {}),
-      });
-      setToast({ ok: true, text: enabled ? "Sorteio ativado!" : "Sorteio desativado (dados preservados)." });
+      })) as { section_enabled?: boolean };
+      if (enabled) {
+        setToast({
+          ok: true,
+          text: res?.section_enabled
+            ? "Sorteio ativado e seção ligada na home! 🎉"
+            : "Sorteio ativado! Ligue a seção em Meu site → Minha Home.",
+        });
+      } else {
+        setToast({ ok: true, text: "Sorteio desativado (dados preservados)." });
+      }
       load();
     } catch (e) {
       setToast({ ok: false, text: e instanceof Error ? e.message : "Erro ao salvar." });
@@ -152,6 +163,8 @@ export default function CrmRaffle() {
   const snapTotal = round?.settings_snapshot.total_numbers || s.total_numbers;
   const filled = round?.filled_count || 0;
   const pct = Math.min(100, Math.round((filled / Math.max(1, snapTotal)) * 100));
+  const siteSlug = data.site_slug || null;
+  const sectionOn = data.section_enabled !== false;
 
   return (
     <div>
@@ -165,6 +178,24 @@ export default function CrmRaffle() {
             {s.enabled
               ? `Ativo · ${formatBRL(s.amount_per_number_cents)} = 1 número · meta de ${s.total_numbers}`
               : "Desativado — nenhum dado é apagado."}
+            {siteSlug ? (
+              <>
+                {" "}· Site:{" "}
+                <a href={`/${siteSlug}`} target="_blank" rel="noopener noreferrer" className="text-[#1d5c3a] underline">
+                  /{siteSlug}
+                </a>
+              </>
+            ) : null}
+          </p>
+          <p className="text-xs text-gray-500 mt-1">
+            Seção na home:{" "}
+            <strong className={sectionOn ? "text-green-700" : "text-amber-600"}>
+              {sectionOn ? "ATIVA ✓" : "INATIVA — ative o sorteio ou ligue em Meu site"}
+            </strong>{" "}
+            ·{" "}
+            <a href="/painel/meu-site" className="text-[#1d5c3a] underline">
+              Meu site → Minha Home
+            </a>
           </p>
         </div>
         <button

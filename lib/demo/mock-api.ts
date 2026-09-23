@@ -832,6 +832,8 @@ function handleCrm(pathname: string, sp: URLSearchParams, method: string, body: 
         prize_description: r.prize_description,
         prize_credit_amount_cents: r.prize_credit_amount_cents,
       },
+      site_slug: "demonstracao",
+      section_enabled: true,
       round: {
         id: "demo-round",
         settings_snapshot: raffleSnapshot(),
@@ -883,7 +885,7 @@ function handleCrm(pathname: string, sp: URLSearchParams, method: string, body: 
         r.prize_credit_amount_cents = parseReais(body.prize_credit_reais);
       }
       saveDemoCrm(db);
-      return { status: 200, json: { success: true } };
+      return { status: 200, json: { success: true, section_enabled: true } };
     }
   }
 

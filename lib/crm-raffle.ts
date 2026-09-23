@@ -50,6 +50,65 @@ export async function getRaffleSettings(admin: AdminClient, tenantId: string): P
   return normalizeRaffleSettings(tenantId, (data as Record<string, unknown> | null) || null);
 }
 
+/**
+ * Estado da seção "Sorteio Fidelidade" na home do tenant.
+ * Sem override próprio, vale o global (sites não-congelados); sites já
+ * congelados sem override nem enxergam a seção.
+ */
+export async function getRaffleSectionState(
+  admin: AdminClient,
+  tenantId: string
+): Promise<{ section_id: string | null; global_enabled: boolean; section_enabled: boolean }> {
+  const { data: section } = await admin
+    .from("site_sections")
+    .select("id, enabled")
+    .eq("type", "loyalty_raffle")
+    .maybeSingle();
+  if (!section) return { section_id: null, global_enabled: false, section_enabled: false };
+  const { data: override } = await admin
+    .from("tenant_sections")
+    .select("enabled")
+    .eq("tenant_id", tenantId)
+    .eq("section_id", (section as { id: string }).id)
+    .maybeSingle();
+  const globalEnabled = (section as { enabled: boolean }).enabled !== false;
+  return {
+    section_id: (section as { id: string }).id,
+    global_enabled: globalEnabled,
+    section_enabled: override ? (override as { enabled: boolean }).enabled !== false : globalEnabled,
+  };
+}
+
+/**
+ * Ao ATIVAR o sorteio, liga também a seção na home do tenant — sem isso a
+ * seção ficava "ativa mas invisível" (o componente público só renderiza com
+ * o sorteio ligado, e a seção precisa estar ligada para o componente
+ * existir). Preserva conteúdo/settings já personalizados. Ao desativar o
+ * sorteio, a seção é mantida como está (o componente some sozinho).
+ */
+export async function ensureRaffleSectionEnabled(admin: AdminClient, tenantId: string): Promise<boolean> {
+  const state = await getRaffleSectionState(admin, tenantId);
+  if (!state.section_id || state.section_enabled) return state.section_enabled;
+  const { data: existing } = await admin
+    .from("tenant_sections")
+    .select("content, settings")
+    .eq("tenant_id", tenantId)
+    .eq("section_id", state.section_id)
+    .maybeSingle();
+  const { error } = await admin.from("tenant_sections").upsert(
+    {
+      tenant_id: tenantId,
+      section_id: state.section_id,
+      enabled: true,
+      content: (existing as { content?: Record<string, unknown> } | null)?.content || {},
+      settings: (existing as { settings?: Record<string, unknown> } | null)?.settings || {},
+    },
+    { onConflict: "tenant_id,section_id" }
+  );
+  if (error) return false;
+  return true;
+}
+
 function snapshotOf(s: LoyaltyRaffleSettings): LoyaltyRaffleRound["settings_snapshot"] {
   return {
     amount_per_number_cents: s.amount_per_number_cents,
