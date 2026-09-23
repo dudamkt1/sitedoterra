@@ -121,8 +121,7 @@ export default function CookiesPage() {
         <div className="mx-auto max-w-3xl px-4 py-6 text-center text-xs text-gray-500">
           <p>© 2026 TopConsultores | Feito com ♥ pela TopConsultores</p>
           <p className="mt-1">
-            Consultor Independente — as opiniões expressas são pessoais e não representam
-            qualquer empresa.
+            VÓS SOIS DEUSES!
           </p>
         </div>
       </footer>

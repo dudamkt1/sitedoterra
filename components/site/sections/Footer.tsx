@@ -140,7 +140,7 @@ export function Footer({ content, navItems, contactWhatsapp, contactEmail, conta
       </div>
       <div className="footer-bottom">
         <p className="footer-copy">© 2026 {fullName} | Feito com ♥ pela TopConsultores</p>
-        <p className="footer-copy">Consultor Independente — as opiniões expressas são pessoais e não representam qualquer empresa.</p>
+        <p className="footer-copy">VÓS SOIS DEUSES!</p>
       </div>
     </footer>
   );

@@ -667,7 +667,7 @@ export function TenantSite({
         </div>
         <div className="footer-bottom">
           <p className="footer-copy">© {new Date().getFullYear()} {fullName} | Feito com ♥ pela <a href="#">TopConsultores</a></p>
-          <p className="footer-copy">Consultora Independente doTERRA — as opiniões expressas são pessoais e não representam a doTERRA International.</p>
+          <p className="footer-copy">VÓS SOIS DEUSES!</p>
         </div>
       </footer>
     </div>
