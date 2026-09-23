@@ -69,6 +69,13 @@ interface SiteHomeProps {
    * = `kind: "anchor", anchor: "planos"` (compatibilidade).
    */
   destination?: AffiliateDestination;
+  /**
+   * Revelado pelo servidor (páginas que resolvem o tenant): false esconde a
+   * seção Sorteio E o item do menu — o NAV passa a conter SOMENTE seções com
+   * conteúdo visível. undefined mantém o comportamento client-side
+   * (demonstração e fallbacks).
+   */
+  loyaltyRaffleLive?: boolean;
 }
 
 /**
@@ -77,8 +84,13 @@ interface SiteHomeProps {
  * renderiza cada uma como componente independente, na ordem correta.
  * Seções desativadas são simplesmente ignoradas.
  */
-export function SiteHome({ slug, sections, contact, logo, extraNav = [], ownerName, aboutDescription, theme, affiliateUserId, destination, tenantSite = false }: SiteHomeProps) {
-  const visible = sections.filter((s) => s.enabled);
+export function SiteHome({ slug, sections, contact, logo, extraNav = [], ownerName, aboutDescription, theme, affiliateUserId, destination, tenantSite = false, loyaltyRaffleLive }: SiteHomeProps) {
+  // NAV = SOMENTE seções ativas com conteúdo visível: além do `enabled`,
+  // a seção Sorteio sai junto do menu quando o servidor já sabe que o
+  // sorteio está desligado (evita link para seção vazia).
+  const visible = sections.filter(
+    (s) => s.enabled && (s.type !== "loyalty_raffle" || loyaltyRaffleLive !== false)
+  );
 
   const headerSection = visible.find((s) => s.type === "header");
   const headerContent = (headerSection?.content || {}) as Record<string, unknown>;

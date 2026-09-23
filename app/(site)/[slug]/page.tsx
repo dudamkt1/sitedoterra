@@ -15,7 +15,8 @@ import { resolvePwaForRequest } from "@/lib/pwa/resolver";
 import { pwaUrls, pwaIconPaths, pwaVersionToken } from "@/lib/pwa/config";
 import { themePrimaryColor, type SiteThemeConfig } from "@/lib/site-theme";
 import { resolveAffiliateDestination, hasRenderablePricing } from "@/lib/affiliate-destination";
-import {
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getRaffleSettings } from "@/lib/crm-raffle";import {
   isAffiliateInactiveSiteAllowed,
   buildAffiliateRedirectTarget,
   buildAffiliateExternalPlansUrl,
@@ -266,6 +267,17 @@ export default async function TenantSitePage({
             label: "planos no domínio principal (nova aba)",
           }
         : baseDestination;
+    // Sorteio: o NAV só lista a seção quando há conteúdo visível. Revela no
+    // servidor se o sorteio está ligado (evita item de menu para seção vazia
+    // e flash de conteúdo que some). Só consulta quando a seção está ativa.
+    let loyaltyRaffleLive: boolean | undefined = undefined;
+    if (sections.some((s) => s.type === "loyalty_raffle" && s.enabled)) {
+      try {
+        loyaltyRaffleLive = (await getRaffleSettings(createAdminClient(), tenant.tenant_id)).enabled;
+      } catch {
+        loyaltyRaffleLive = undefined;
+      }
+    }
     return (
       <>
         <link rel="canonical" href={canonicalUrl} />
@@ -279,6 +291,7 @@ export default async function TenantSitePage({
           // links de plataforma preservam o tenant (?ref=/?from=).
           tenantSite={!isOfficial}
           destination={destination}
+          loyaltyRaffleLive={loyaltyRaffleLive}
           contact={{
             whatsapp: (siteData.whatsapp as string) || undefined,
             whatsapp_floating_enabled: (siteData.whatsapp_floating_enabled as boolean) || false,

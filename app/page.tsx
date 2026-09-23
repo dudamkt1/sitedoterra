@@ -14,6 +14,8 @@ import { pwaUrls, pwaIconPaths, pwaVersionToken } from "@/lib/pwa/config";
 import { themePrimaryColor, type SiteThemeConfig } from "@/lib/site-theme";
 import { getPublicBaseUrl } from "@/lib/public-url";
 import { resolveAffiliateDestination } from "@/lib/affiliate-destination";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getRaffleSettings } from "@/lib/crm-raffle";
 import { AffiliateAttribution } from "@/components/site/AffiliateAttribution";
 import type { PublicTenant } from "@/types";
 import "@/app/(site)/site.css";
@@ -163,6 +165,16 @@ export default async function HomePage() {
 
   const destination = resolveAffiliateDestination({ sections, access: "available" });
 
+  // Sorteio: NAV só lista a seção com conteúdo visível (mesma regra do /[slug]).
+  let loyaltyRaffleLive: boolean | undefined = undefined;
+  if (sections.some((s) => s.type === "loyalty_raffle" && s.enabled)) {
+    try {
+      loyaltyRaffleLive = (await getRaffleSettings(createAdminClient(), tenant.tenant_id)).enabled;
+    } catch {
+      loyaltyRaffleLive = undefined;
+    }
+  }
+
   // Logo 100% do modelo (/admin/editor-home → Cabeçalho/Menu); o tenant
   // oficial só complementa quando o modelo ainda não tem logo.
   const headerContent = ((sections.find((s) => s.type === "header")?.content || {}) as Record<string, unknown>) || {};
@@ -178,6 +190,7 @@ export default async function HomePage() {
         theme={theme}
         affiliateUserId={tenant.user_id}
         destination={destination}
+        loyaltyRaffleLive={loyaltyRaffleLive}
         contact={{
           whatsapp: (siteData.whatsapp as string) || undefined,
           whatsapp_floating_enabled: (siteData.whatsapp_floating_enabled as boolean) || false,
