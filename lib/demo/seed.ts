@@ -12,6 +12,7 @@ export const DEMO_SECTION_TYPES = [
   "booking",
   "tips",
   "products",
+  "loyalty_raffle",
   "faq",
   "pricing",
 ] as const;

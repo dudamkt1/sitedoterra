@@ -191,6 +191,12 @@ export const SECTION_CONTENT_FIELDS: Record<SectionType, ContentFieldDef[]> = {
       ],
     },
   ],
+  loyalty_raffle: [
+    { key: "eyebrow", label: "Selo superior", type: "text" },
+    { key: "title", label: "Título", type: "text", ai: true, aiKind: "title" },
+    { key: "subtitle", label: "Subtítulo", type: "text" },
+    { key: "buttonText", label: "Texto do botão", type: "text" },
+  ],
   faq: [
     { key: "eyebrow", label: "Selo superior", type: "text" },
     { key: "title", label: "Título", type: "text", ai: true, aiKind: "title" },

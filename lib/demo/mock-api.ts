@@ -31,19 +31,26 @@ import {
   generateRecommendations,
   sumSalesInWindow,
 } from "@/lib/crm-metas";
+import {
+  drawWinnerIndex,
+  firstNameOf,
+  generateSeed,
+  numbersForPurchase,
+} from "@/lib/loyalty-raffle";
 
 export interface DemoApiResult {
   status: number;
   json: unknown;
 }
 
-const NAV_TYPES = ["about", "testimonials", "story", "booking", "products", "faq"];
+const NAV_TYPES = ["about", "testimonials", "story", "booking", "products", "loyalty_raffle", "faq"];
 const NAV_LABELS: Partial<Record<SectionType, string>> = {
   about: "Especialista IA",
   testimonials: "Depoimentos",
   story: "História",
   booking: "Agendamento",
   products: "Produtos",
+  loyalty_raffle: "Sorteio",
   faq: "Dúvidas",
 };
 
@@ -484,12 +491,28 @@ function handleCrm(pathname: string, sp: URLSearchParams, method: string, body: 
       };
     }
     if (method === "POST") {
+      const saleId = genId("sale");
+      const items = Array.isArray(body.items) ? body.items : [];
       db.sales.push({
-        id: genId("sale"), client_id: body.client_id || null, sale_date: body.sale_date || today(),
+        id: saleId, client_id: body.client_id || null, sale_date: body.sale_date || today(),
         status: body.status || "Pendente", payment_method: body.payment_method || null,
-        notes: body.notes || null, items: Array.isArray(body.items) ? body.items : [],
+        notes: body.notes || null, items,
         created_at: new Date().toISOString(),
       });
+      // Sorteio demo: compra confirmada gera créditos de número (mesmo gate Pago/Parcial).
+      try {
+        const st = String(body.status || "Pendente");
+        if (body.client_id && (st === "Pago" || st === "Parcial") && db.raffle.enabled) {
+          const total = items.reduce((s: number, it: { total_cents?: number }) => s + (Number(it.total_cents) || 0), 0);
+          const n = numbersForPurchase(total, db.raffle.amount_per_number_cents);
+          if (n > 0) {
+            db.raffle.credits.push({
+              id: genId("rc"), client_id: String(body.client_id), sale_id: saleId,
+              numbers_total: n, numbers_used: 0, created_at: new Date().toISOString(),
+            });
+          }
+        }
+      } catch {}
       recomputeAggregates(db);
       saveDemoCrm(db);
       return { status: 200, json: {} };
@@ -783,6 +806,156 @@ function handleCrm(pathname: string, sp: URLSearchParams, method: string, body: 
     recomputeAggregates(db);
     saveDemoCrm(db);
     return { status: 200, json: {} };
+  }
+
+  // ---------- raffle (sorteio por fidelidade — demonstração local) ----------
+  function raffleSnapshot() {
+    const r = db.raffle;
+    return {
+      amount_per_number_cents: r.amount_per_number_cents,
+      total_numbers: r.total_numbers,
+      prize_type: r.prize_type,
+      prize_description: r.prize_description,
+      prize_credit_amount_cents: r.prize_credit_amount_cents,
+    };
+  }
+  function rafflePayload() {
+    const r = db.raffle;
+    const nameById = new Map(db.clients.map((c) => [c.id, c.name]));
+    const total = r.total_numbers;
+    return {
+      settings: {
+        enabled: r.enabled,
+        amount_per_number_cents: r.amount_per_number_cents,
+        total_numbers: r.total_numbers,
+        prize_type: r.prize_type,
+        prize_description: r.prize_description,
+        prize_credit_amount_cents: r.prize_credit_amount_cents,
+      },
+      round: {
+        id: "demo-round",
+        settings_snapshot: raffleSnapshot(),
+        status: "collecting",
+        filled_count: r.entries.length,
+        missing_count: Math.max(0, total - r.entries.length),
+      },
+      entries: [...r.entries]
+        .sort((a, b) => a.chosen_number - b.chosen_number)
+        .map((e) => ({ ...e, client_name: nameById.get(e.client_id) || null })),
+      credits: r.credits
+        .filter((c) => c.numbers_total - c.numbers_used > 0)
+        .map((c) => ({
+          ...c,
+          client_name: nameById.get(c.client_id) || null,
+          numbers_pending: c.numbers_total - c.numbers_used,
+        })),
+      history: r.history.map((h, i) => ({
+        id: `demo-hist-${i}`,
+        winner_name: h.name,
+        winner_number: h.number,
+        settings_snapshot: { prize_description: h.prize, prize_type: h.prize_type },
+        drawn_at: h.drawn_at,
+        random_seed: h.seed,
+      })),
+    };
+  }
+  function parseReais(v: unknown): number | null {
+    if (v === undefined || v === null || v === "") return null;
+    const n = Number(String(v).replace(/\./g, "").replace(",", "."));
+    if (!Number.isFinite(n) || n <= 0) return null;
+    return Math.round(n * 100);
+  }
+
+  if (pathname === "/api/crm/loyalty/raffle") {
+    if (method === "GET") return { status: 200, json: rafflePayload() };
+    if (method === "PUT") {
+      const r = db.raffle;
+      if (typeof body.enabled === "boolean") r.enabled = body.enabled;
+      const amount = parseReais(body.amount_reais);
+      if (amount !== null) r.amount_per_number_cents = Math.max(100, amount);
+      const total = Math.floor(Number(body.total_numbers) || 0);
+      if (total >= 2 && total <= 1000) r.total_numbers = total;
+      if (["brinde", "dinheiro", "credito_loja"].includes(String(body.prize_type))) {
+        r.prize_type = String(body.prize_type);
+      }
+      if (typeof body.prize_description === "string") r.prize_description = body.prize_description.slice(0, 500);
+      if (body.prize_credit_reais !== undefined) {
+        r.prize_credit_amount_cents = parseReais(body.prize_credit_reais);
+      }
+      saveDemoCrm(db);
+      return { status: 200, json: { success: true } };
+    }
+  }
+
+  if (pathname === "/api/crm/loyalty/raffle/entries" && method === "POST") {
+    const r = db.raffle;
+    const chosen = Math.floor(Number(body.chosen_number) || 0);
+    const client = db.clients.find((c) => c.id === body.client_id);
+    if (!client) return { status: 400, json: { error: "Cliente não encontrado." } };
+    if (!Number.isInteger(chosen) || chosen < 1 || chosen > r.total_numbers) {
+      return { status: 400, json: { error: `Número deve estar entre 1 e ${r.total_numbers}.` } };
+    }
+    if (r.entries.some((e) => e.chosen_number === chosen)) {
+      return { status: 409, json: { error: `Número ${chosen} já foi escolhido nesta rodada.` } };
+    }
+    const credit = r.credits.find((c) => c.client_id === client.id && c.numbers_total - c.numbers_used > 0);
+    if (!credit) return { status: 400, json: { error: "Cliente sem crédito de número pendente." } };
+    const entry = { id: genId("re"), client_id: client.id, chosen_number: chosen, created_at: new Date().toISOString() };
+    r.entries.push(entry);
+    credit.numbers_used += 1;
+    saveDemoCrm(db);
+    return { status: 200, json: { success: true, entry } };
+  }
+
+  if (pathname === "/api/crm/loyalty/raffle/draw" && method === "POST") {
+    const r = db.raffle;
+    if (r.entries.length === 0) return { status: 400, json: { error: "Nenhum número escolhido nesta rodada." } };
+    const sorted = [...r.entries].sort((a, b) => a.chosen_number - b.chosen_number);
+    const seed = generateSeed();
+    const winner = sorted[drawWinnerIndex(seed, sorted.length)];
+    const nameById = new Map(db.clients.map((c) => [c.id, c.name]));
+    r.history.unshift({
+      name: nameById.get(winner.client_id) || "—",
+      number: winner.chosen_number,
+      prize: r.prize_description,
+      prize_type: r.prize_type,
+      drawn_at: new Date().toISOString(),
+      seed,
+    });
+    r.entries = [];
+    saveDemoCrm(db);
+    return {
+      status: 200,
+      json: { success: true, winner_number: winner.chosen_number, winner_name: nameById.get(winner.client_id) || null },
+    };
+  }
+
+  if (pathname === "/api/raffle/public" && method === "GET") {
+    const r = db.raffle;
+    if (!r.enabled) return { status: 200, json: { enabled: false } };
+    const nameById = new Map(db.clients.map((c) => [c.id, c.name]));
+    return {
+      status: 200,
+      json: {
+        enabled: true,
+        amount_per_number_cents: r.amount_per_number_cents,
+        total_numbers: r.total_numbers,
+        prize_type: r.prize_type,
+        prize_description: r.prize_description,
+        prize_credit_amount_cents: r.prize_credit_amount_cents,
+        filled_count: r.entries.length,
+        missing_count: Math.max(0, r.total_numbers - r.entries.length),
+        numbers: r.entries.map((e) => ({ number: e.chosen_number, name: firstNameOf(nameById.get(e.client_id) || "") })),
+        winners: r.history.slice(0, 5).map((h) => ({
+          name: h.name,
+          number: h.number,
+          prize: h.prize,
+          prize_type: h.prize_type,
+          drawn_at: h.drawn_at,
+          seed: h.seed,
+        })),
+      },
+    };
   }
 
   // ---------- settings / automations / messages / whatsapp ----------

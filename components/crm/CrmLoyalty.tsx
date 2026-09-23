@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { LoadingState, ErrorState, Toast, Field, EmptyState, CrmModal, apiPost, apiPut } from "@/components/crm/crm-ui";
+import CrmRaffle from "@/components/crm/CrmRaffle";
 import { sortedLevels, levelPosition, isCloseToNextLevel, levelDiscountLabel } from "@/lib/crm-loyalty";
 import type { CrmLoyaltySettings, CrmLoyaltyLevel, CrmLoyaltyRedeemable } from "@/types";
 
@@ -71,6 +72,7 @@ export default function CrmLoyalty() {
   const [viewClient, setViewClient] = useState<ClientRow | null>(null);
   const [history, setHistory] = useState<HistoryRow[] | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [tab, setTab] = useState<"programa" | "sorteio">("programa");
 
   async function load() {
     setLoading(true);
@@ -224,6 +226,27 @@ export default function CrmLoyalty() {
   return (
     <div>
       <Toast msg={toast} />
+      {/* ---------- ABAS ---------- */}
+      <div className="flex gap-2 mb-4">
+        <button
+          type="button"
+          className={`btn !py-2 !px-4 !text-sm ${tab === "programa" ? "btn-primary" : "btn-outline"}`}
+          onClick={() => setTab("programa")}
+        >
+          🎁 Programa de pontos
+        </button>
+        <button
+          type="button"
+          className={`btn !py-2 !px-4 !text-sm ${tab === "sorteio" ? "btn-primary" : "btn-outline"}`}
+          onClick={() => setTab("sorteio")}
+        >
+          🎟️ Sorteio por Fidelidade
+        </button>
+      </div>
+      {tab === "sorteio" ? (
+        <CrmRaffle />
+      ) : (
+      <>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
         <div>
           <h1 className="text-3xl font-semibold" style={{ fontFamily: "var(--font-display)" }}>Programa de Fidelidade</h1>
@@ -657,6 +680,8 @@ export default function CrmLoyalty() {
             </div>
           </div>
         </div>
+      )}
+      </>
       )}
     </div>
   );

@@ -12,7 +12,7 @@ import type { SectionType } from "@/types";
 import { DemoFetchBridge } from "@/components/demo/DemoFetchBridge";
 
 const HEADER_FOOTER: SectionType[] = ["header", "footer"];
-const NAV_TYPES = ["about", "testimonials", "story", "booking", "products", "faq"];
+const NAV_TYPES = ["about", "testimonials", "story", "booking", "products", "loyalty_raffle", "faq"];
 
 const NAV_LABELS: Partial<Record<SectionType, string>> = {
   about: "Especialista IA",
@@ -20,6 +20,7 @@ const NAV_LABELS: Partial<Record<SectionType, string>> = {
   story: "História",
   booking: "Agendamento",
   products: "Produtos",
+  loyalty_raffle: "Sorteio",
   faq: "Dúvidas",
 };
 
@@ -34,6 +35,7 @@ const LABELS: Record<string, string> = {
   booking: "Agendamento",
   tips: "Dicas / Rotinas",
   products: "Produtos em destaque",
+  loyalty_raffle: "Sorteio Fidelidade",
   faq: "Perguntas frequentes",
   pricing: "Planos / Oferta",
   footer: "Rodapé",

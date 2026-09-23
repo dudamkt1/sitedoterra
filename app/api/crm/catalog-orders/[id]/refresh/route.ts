@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireTenant } from "@/lib/crm-auth";
+import { grantRaffleCreditsForSale } from "@/lib/crm-raffle";
 import { getMpPayment, getMpPaymentWithToken } from "@/lib/mercadopago";
 import { resolveGateways } from "@/lib/gateway-config";
 
@@ -67,7 +68,8 @@ export async function POST(_request: Request, { params }: { params: { id: string
         })
         .eq("id", id);
       if (!order.crm_sale_id) {
-        await admin.rpc("create_crm_sale_from_catalog_order", { p_order_id: id });
+        const { data: saleId } = await admin.rpc("create_crm_sale_from_catalog_order", { p_order_id: id });
+        if (saleId) await grantRaffleCreditsForSale(admin, String(saleId));
       }
     } else if (["rejected", "cancelled", "refunded", "charged_back"].includes(st)) {
       await admin

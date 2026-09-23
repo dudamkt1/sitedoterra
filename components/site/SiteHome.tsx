@@ -10,6 +10,7 @@ import { Video } from "@/components/site/sections/Video";
 import { Booking } from "@/components/site/sections/Booking";
 import { Tips } from "@/components/site/sections/Tips";
 import { Products } from "@/components/site/sections/Products";
+import { LoyaltyRaffle } from "@/components/site/sections/LoyaltyRaffle";
 import { Faq } from "@/components/site/sections/Faq";
 import { Pricing } from "@/components/site/sections/Pricing";
 import { Affiliates } from "@/components/site/sections/Affiliates";
@@ -155,6 +156,8 @@ export function SiteHome({ slug, sections, contact, logo, extraNav = [], ownerNa
             return <Tips key={s.id} content={s.content as never} />;
           case "products":
             return <Products key={s.id} content={s.content as never} contactWhatsapp={whatsapp} />;
+          case "loyalty_raffle":
+            return <LoyaltyRaffle key={s.id} content={s.content as never} slug={slug} />;
           case "faq":
             return <Faq key={s.id} content={s.content as never} />;
           case "pricing":

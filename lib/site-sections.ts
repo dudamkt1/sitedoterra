@@ -22,6 +22,7 @@ export const SECTION_TYPES: SectionType[] = [
   "booking",
   "tips",
   "products",
+  "loyalty_raffle",
   "faq",
   "pricing",
   "affiliates",
@@ -39,6 +40,7 @@ export const SECTION_TYPE_LABELS: Record<SectionType, string> = {
   booking: "Agendamento",
   tips: "Dicas / Rotinas",
   products: "Produtos em destaque",
+  loyalty_raffle: "Sorteio Fidelidade",
   faq: "Perguntas frequentes",
   pricing: "Planos / Oferta",
   affiliates: "Chamada Afiliados",
@@ -56,6 +58,7 @@ export const SECTION_TYPE_ICONS: Record<SectionType, string> = {
   booking: "📅",
   tips: "💡",
   products: "🛍️",
+  loyalty_raffle: "🎟️",
   faq: "❓",
   pricing: "💰",
   affiliates: "🤝",
@@ -74,6 +77,7 @@ export function anchorFor(type: SectionType): string {
     booking: "agendamento",
     tips: "dicas",
     products: "produtos",
+    loyalty_raffle: "sorteio",
     faq: "faq",
     pricing: "planos",
     affiliates: "afiliados",
@@ -353,11 +357,17 @@ export const DEFAULT_SECTION_CONTENT: Record<SectionType, Record<string, unknown
     buttonText: "Saiba como funciona",
     buttonUrl: "/afiliados",
   },
+  loyalty_raffle: {
+    eyebrow: "Programa de Fidelidade",
+    title: "Toda compra te aproxima do prêmio",
+    subtitle: "A cada compra você ganha números da sorte e concorre a prêmios exclusivos.",
+    buttonText: "Ver números",
+  },
 };
 
 function makeFallbackSection(type: SectionType, sort: number, required = true): SiteSection {
   const label = SECTION_TYPE_LABELS[type];
-  const navLabel = ["about", "testimonials", "story", "booking", "products", "faq"].includes(type)
+  const navLabel = ["about", "testimonials", "story", "booking", "products", "loyalty_raffle", "faq"].includes(type)
     ? label
     : undefined;
   return {
@@ -372,7 +382,7 @@ function makeFallbackSection(type: SectionType, sort: number, required = true): 
     sort_order: sort,
     settings: {
       showInNav: navLabel ? true : false,
-      ...(navLabel ? { navLabel: label.replace("Especialista / Apresentação", "Especialista IA").replace("Produtos em destaque", "Produtos").replace("Perguntas frequentes", "Dúvidas") } : {}),
+      ...(navLabel ? { navLabel: label.replace("Especialista / Apresentação", "Especialista IA").replace("Produtos em destaque", "Produtos").replace("Perguntas frequentes", "Dúvidas").replace("Sorteio Fidelidade", "Sorteio") } : {}),
     },
     content: DEFAULT_SECTION_CONTENT[type],
     permissions: DEFAULT_PERMISSIONS,
@@ -394,6 +404,7 @@ export const DEFAULT_SECTIONS: SiteSection[] = [
   makeFallbackSection("booking", 80),
   makeFallbackSection("tips", 90),
   makeFallbackSection("products", 100),
+  makeFallbackSection("loyalty_raffle", 105, false),
   makeFallbackSection("faq", 110),
   makeFallbackSection("pricing", 120, false),
   makeFallbackSection("affiliates", 125, false),

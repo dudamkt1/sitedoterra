@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireTenant } from "@/lib/crm-auth";
 import { autoTimestampSaleMetrics, getCrmSettings, applyVipRules } from "@/lib/crm";
+import { grantRaffleCredits } from "@/lib/crm-raffle";
 
 export const runtime = "nodejs";
 
@@ -93,6 +94,25 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     await autoTimestampSaleMetrics(admin, tenant!.id, newClientId);
     const settings = await getCrmSettings(admin, tenant!.id);
     await applyVipRules(admin, tenant!.id, settings);
+  }
+
+  // Sorteio por fidelidade: cobre a transição Pendente → Pago/Parcial
+  // (e vendas do catálogo confirmadas depois). Idempotente por venda.
+  try {
+    const { data: updated } = await admin
+      .from("crm_sales")
+      .select("id, client_id, status, total_cents")
+      .eq("id", params.id)
+      .eq("tenant_id", tenant!.id)
+      .maybeSingle();
+    if (
+      updated?.client_id &&
+      (updated.status === "Pago" || updated.status === "Parcial")
+    ) {
+      await grantRaffleCredits(admin, tenant!.id, updated.client_id, updated.id, updated.total_cents);
+    }
+  } catch {
+    // Sorteio é acessório: nunca bloqueia a atualização da venda.
   }
 
   await admin.from("audit_logs").insert({

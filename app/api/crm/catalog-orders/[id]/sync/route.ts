@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireTenant } from "@/lib/crm-auth";
+import { grantRaffleCreditsForSale } from "@/lib/crm-raffle";
 
 export const runtime = "nodejs";
 
@@ -37,6 +38,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
       console.error("[catalog-orders] erro ao sincronizar:", rpcErr);
       return NextResponse.json({ error: "Erro ao criar venda no CRM." }, { status: 500 });
     }
+    if (saleId) await grantRaffleCreditsForSale(admin, String(saleId));
     return NextResponse.json({ success: true, saleId });
   } catch (e) {
     console.error("[catalog-orders] erro em sync:", e);

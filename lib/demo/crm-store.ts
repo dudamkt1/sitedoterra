@@ -175,6 +175,43 @@ export interface DemoCrmLoyaltySettings {
   redeemables?: { id?: string; name: string; cost_points: number; description?: string | null }[];
 }
 
+export interface DemoRaffleEntry {
+  id: string;
+  client_id: string;
+  chosen_number: number;
+  created_at: string;
+}
+
+export interface DemoRaffleCredit {
+  id: string;
+  client_id: string;
+  sale_id: string;
+  numbers_total: number;
+  numbers_used: number;
+  created_at: string;
+}
+
+export interface DemoRaffleWinner {
+  name: string;
+  number: number;
+  prize: string;
+  prize_type: string;
+  drawn_at: string;
+  seed: string;
+}
+
+export interface DemoRaffleState {
+  enabled: boolean;
+  amount_per_number_cents: number;
+  total_numbers: number;
+  prize_type: string;
+  prize_description: string;
+  prize_credit_amount_cents: number | null;
+  entries: DemoRaffleEntry[];
+  credits: DemoRaffleCredit[];
+  history: DemoRaffleWinner[];
+}
+
 export interface DemoCrmWhatsAppConfig {
   enabled: boolean;
   provider: string;
@@ -251,6 +288,7 @@ export interface DemoCrmData {
   notes: DemoCrmNote[];
   timeline: DemoCrmTimelineEvent[];
   points: DemoCrmPoint[];
+  raffle: DemoRaffleState;
   messages: DemoCrmMessageTemplate[];
   automations: DemoCrmAutomation[];
   loyalty: DemoCrmLoyaltySettings;
@@ -421,6 +459,42 @@ export function buildDemoCrmSeed(): DemoCrmData {
     notes: [],
     timeline: [],
     points,
+    raffle: {
+      enabled: true,
+      amount_per_number_cents: 5000,
+      total_numbers: 30,
+      prize_type: "brinde",
+      prize_description: "Kit Lavanda + difusor USB",
+      prize_credit_amount_cents: null,
+      entries: [
+        { id: "re_1", client_id: "cli_1", chosen_number: 3, created_at: monthsAgoDate(0) },
+        { id: "re_2", client_id: "cli_3", chosen_number: 5, created_at: monthsAgoDate(0) },
+        { id: "re_3", client_id: "cli_1", chosen_number: 7, created_at: monthsAgoDate(0) },
+        { id: "re_4", client_id: "cli_5", chosen_number: 8, created_at: monthsAgoDate(0) },
+        { id: "re_5", client_id: "cli_2", chosen_number: 11, created_at: monthsAgoDate(0) },
+        { id: "re_6", client_id: "cli_7", chosen_number: 13, created_at: monthsAgoDate(0) },
+        { id: "re_7", client_id: "cli_3", chosen_number: 16, created_at: monthsAgoDate(0) },
+        { id: "re_8", client_id: "cli_5", chosen_number: 19, created_at: monthsAgoDate(0) },
+        { id: "re_9", client_id: "cli_1", chosen_number: 21, created_at: monthsAgoDate(0) },
+        { id: "re_10", client_id: "cli_7", chosen_number: 24, created_at: monthsAgoDate(0) },
+        { id: "re_11", client_id: "cli_2", chosen_number: 27, created_at: monthsAgoDate(0) },
+        { id: "re_12", client_id: "cli_5", chosen_number: 30, created_at: monthsAgoDate(0) },
+      ],
+      credits: [
+        { id: "rc_1", client_id: "cli_2", sale_id: "sale_3", numbers_total: 1, numbers_used: 0, created_at: monthsAgoDate(0) },
+        { id: "rc_2", client_id: "cli_6", sale_id: "sale_9", numbers_total: 2, numbers_used: 0, created_at: monthsAgoDate(0) },
+      ],
+      history: [
+        {
+          name: "Maria Silva",
+          number: 7,
+          prize: "Voucher R$ 50",
+          prize_type: "credito_loja",
+          drawn_at: monthsAgoDate(1),
+          seed: "a1b2c3d4e5f60718293a4b5c6d7e8f90",
+        },
+      ],
+    },
     goals,
     goalChecks: [],
     messages: [],

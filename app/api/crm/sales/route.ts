@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireTenant } from "@/lib/crm-auth";
 import { getLoyaltySettings, autoTimestampSaleMetrics, getCrmSettings, applyVipRules } from "@/lib/crm";
+import { grantRaffleCredits } from "@/lib/crm-raffle";
 import type { CrmSale } from "@/types";
 
 export const runtime = "nodejs";
@@ -146,6 +147,16 @@ export async function POST(request: Request) {
           description: "Pontos por compra",
           event_at: new Date().toISOString(),
         });
+      }
+    }
+
+    // Sorteio por fidelidade: a cada R$ X em compra confirmada, o cliente
+    // ganha crédito(s) de número da sorte (mesmo gate Pago/Parcial).
+    if (sale.status === "Pago" || sale.status === "Parcial") {
+      try {
+        await grantRaffleCredits(admin, tenant!.id, clientId, sale.id, total);
+      } catch {
+        // Sorteio é acessório: nunca bloqueia o registro da venda.
       }
     }
 

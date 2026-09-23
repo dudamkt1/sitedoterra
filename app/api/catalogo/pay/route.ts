@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { grantRaffleCreditsForSale } from "@/lib/crm-raffle";
 import { resolveGateways } from "@/lib/gateway-config";
 import { MERCADOPAGO_API, type MpPayment } from "@/lib/mercadopago";
 
@@ -203,6 +204,15 @@ export async function POST(request: Request) {
         .update({ payment_id: String(payment.id), payment_status: "paid", paid_at: new Date().toISOString() })
         .eq("id", orderId);
       await admin.rpc("create_crm_sale_from_catalog_order", { p_order_id: orderId });
+      // Sorteio por fidelidade: venda do catálogo confirmada gera créditos.
+      try {
+        const { data: synced } = await admin
+          .from("catalog_orders")
+          .select("crm_sale_id")
+          .eq("id", orderId)
+          .maybeSingle();
+        if (synced?.crm_sale_id) await grantRaffleCreditsForSale(admin, String(synced.crm_sale_id));
+      } catch {}
     } else if (["pending", "in_process", "in_mediation", "authorized"].includes(status)) {
       await admin
         .from("catalog_orders")

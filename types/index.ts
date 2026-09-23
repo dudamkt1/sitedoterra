@@ -189,6 +189,7 @@ export type SectionType =
   | "booking"
   | "tips"
   | "products"
+  | "loyalty_raffle"
   | "faq"
   | "pricing"
   | "affiliates"
@@ -630,6 +631,68 @@ export interface CrmLoyaltyPoint {
   description: string | null;
   created_at: string;
   client_name?: string | null;
+}
+
+// ============================ SORTEIO POR FIDELIDADE ============================
+
+export type LoyaltyRafflePrizeType = "brinde" | "dinheiro" | "credito_loja";
+export type LoyaltyRaffleRoundStatus = "collecting" | "drawn";
+
+export interface LoyaltyRaffleSettings {
+  tenant_id: string;
+  enabled: boolean;
+  /** Valor em centavos que gera 1 número (ex.: 5000 = R$ 50,00). */
+  amount_per_number_cents: number;
+  /** Meta N: total de números da rodada (2-1000). */
+  total_numbers: number;
+  prize_type: LoyaltyRafflePrizeType;
+  prize_description: string;
+  /** Centavos, usado quando prize_type = 'credito_loja'. */
+  prize_credit_amount_cents: number | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface LoyaltyRaffleRound {
+  id: string;
+  tenant_id: string;
+  settings_snapshot: {
+    amount_per_number_cents: number;
+    total_numbers: number;
+    prize_type: LoyaltyRafflePrizeType;
+    prize_description: string;
+    prize_credit_amount_cents: number | null;
+  };
+  status: LoyaltyRaffleRoundStatus;
+  winner_entry_id: string | null;
+  drawn_at: string | null;
+  random_seed: string | null;
+  algorithm_description: string | null;
+  created_at: string;
+}
+
+export interface LoyaltyRaffleEntry {
+  id: string;
+  round_id: string;
+  tenant_id: string;
+  client_id: string;
+  chosen_number: number;
+  earned_from_sale_id: string | null;
+  created_at: string;
+  client_name?: string | null;
+}
+
+export interface LoyaltyRaffleCredit {
+  id: string;
+  tenant_id: string;
+  client_id: string;
+  sale_id: string;
+  numbers_total: number;
+  numbers_used: number;
+  created_at: string;
+  client_name?: string | null;
+  /** Derivado: numbers_total - numbers_used. */
+  numbers_pending?: number;
 }
 
 export interface CrmTask {

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { grantRaffleCreditsForSale } from "@/lib/crm-raffle";
 import { isMercadoPagoEnabled, verifyMpSignature, getMpPayment, getMpPaymentWithToken } from "@/lib/mercadopago";
 import {
   dispatchMpPayment,
@@ -100,6 +101,15 @@ export async function POST(request: Request) {
               })
               .eq("id", (catalogOrder as { id: string }).id);
             await admin.rpc("create_crm_sale_from_catalog_order", { p_order_id: (catalogOrder as { id: string }).id });
+            // Sorteio por fidelidade: venda do catálogo confirmada gera créditos.
+            try {
+              const { data: synced } = await admin
+                .from("catalog_orders")
+                .select("crm_sale_id")
+                .eq("id", (catalogOrder as { id: string }).id)
+                .maybeSingle();
+              if (synced?.crm_sale_id) await grantRaffleCreditsForSale(admin, String(synced.crm_sale_id));
+            } catch {}
           } else if (["rejected", "cancelled", "refunded"].includes(payment.status)) {
             await admin
               .from("catalog_orders")
@@ -169,7 +179,8 @@ export async function POST(request: Request) {
             .eq("id", orderId);
 
           // Chama a função para criar venda no CRM
-          await admin.rpc("create_crm_sale_from_catalog_order", { p_order_id: orderId });
+          const { data: catalogSaleId } = await admin.rpc("create_crm_sale_from_catalog_order", { p_order_id: orderId });
+          if (catalogSaleId) await grantRaffleCreditsForSale(admin, String(catalogSaleId));
         } else if (["rejected", "cancelled", "refunded"].includes(payment.status)) {
           await admin
             .from("catalog_orders")
