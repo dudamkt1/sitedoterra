@@ -82,6 +82,11 @@ interface SiteHomeProps {
    * oficial). Nunca grava nada real.
    */
   loyaltyRaffleSample?: boolean;
+  /**
+   * Destino do botão "Ver números" da seção Sorteio (default
+   * `/{slug}/sorteio`; na HOME principal é `/sorteio`, sem slug).
+   */
+  sorteioHref?: string;
 }
 
 /**
@@ -90,7 +95,7 @@ interface SiteHomeProps {
  * renderiza cada uma como componente independente, na ordem correta.
  * Seções desativadas são simplesmente ignoradas.
  */
-export function SiteHome({ slug, sections, contact, logo, extraNav = [], ownerName, aboutDescription, theme, affiliateUserId, destination, tenantSite = false, loyaltyRaffleLive, loyaltyRaffleSample = false }: SiteHomeProps) {
+export function SiteHome({ slug, sections, contact, logo, extraNav = [], ownerName, aboutDescription, theme, affiliateUserId, destination, tenantSite = false, loyaltyRaffleLive, loyaltyRaffleSample = false, sorteioHref }: SiteHomeProps) {
   // NAV = SOMENTE seções ativas com conteúdo visível: além do `enabled`,
   // a seção Sorteio sai junto do menu quando o servidor já sabe que o
   // sorteio está desligado — exceto em modo vitrine (exemplo no domínio
@@ -176,7 +181,7 @@ export function SiteHome({ slug, sections, contact, logo, extraNav = [], ownerNa
           case "products":
             return <Products key={s.id} content={s.content as never} contactWhatsapp={whatsapp} />;
           case "loyalty_raffle":
-            return <LoyaltyRaffle key={s.id} content={s.content as never} slug={slug} sample={loyaltyRaffleSample} />;
+            return <LoyaltyRaffle key={s.id} content={s.content as never} slug={slug} sample={loyaltyRaffleSample} sorteioHref={sorteioHref} />;
           case "faq":
             return <Faq key={s.id} content={s.content as never} />;
           case "pricing":

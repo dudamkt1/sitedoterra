@@ -32,10 +32,13 @@ export function LoyaltyRaffle({
   content,
   slug,
   sample = false,
+  sorteioHref,
 }: {
   content: LoyaltyRaffleContent;
   slug: string;
   sample?: boolean;
+  /** Destino do botão (default `/{slug}/sorteio`; na HOME principal é `/sorteio`). */
+  sorteioHref?: string;
 }) {
   const [data, setData] = useState<PublicRaffle | null>(null);
   const [disabled, setDisabled] = useState(false);
@@ -216,7 +219,7 @@ export function LoyaltyRaffle({
           </div>
 
           <a
-            href={`/${slug}/sorteio`}
+            href={sorteioHref || `/${slug}/sorteio`}
             style={{
               display: "inline-block",
               marginTop: 18,

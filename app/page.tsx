@@ -196,6 +196,7 @@ export default async function HomePage() {
         destination={destination}
         loyaltyRaffleLive={loyaltyRaffleLive}
         loyaltyRaffleSample={loyaltyRaffleSample}
+        sorteioHref="/sorteio"
         contact={{
           whatsapp: (siteData.whatsapp as string) || undefined,
           whatsapp_floating_enabled: (siteData.whatsapp_floating_enabled as boolean) || false,
