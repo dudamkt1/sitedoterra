@@ -4,8 +4,22 @@ import Link from "next/link";
  * Aviso discreto exibido nas páginas PÚBLICAS quando o usuário está logado.
  * Não bloqueia a navegação: apenas indica a sessão e dá acesso rápido ao
  * painel. Adequado para servidor (sem estado).
+ *
+ * O "Sair" preserva a página atual via `?next=` para que o logout em um
+ * site de usuário (ex.: /afiliado1) volte para o MESMO site — e não
+ * para o domínio principal.
  */
-export function LoggedInNotice({ email }: { email?: string }) {
+export function LoggedInNotice({
+  email,
+  returnTo,
+}: {
+  email?: string;
+  returnTo?: string;
+}) {
+  const signOutHref =
+    returnTo && returnTo.startsWith("/") && !returnTo.startsWith("//")
+      ? `/auth/signout?next=${encodeURIComponent(returnTo)}`
+      : "/auth/signout";
   return (
     <div
       style={{
@@ -27,7 +41,7 @@ export function LoggedInNotice({ email }: { email?: string }) {
         Painel
       </Link>{" "}
       ·{" "}
-      <a href="/auth/signout" style={{ color: "#a7e0c0", textDecoration: "underline" }}>
+      <a href={signOutHref} style={{ color: "#a7e0c0", textDecoration: "underline" }}>
         Sair
       </a>
     </div>

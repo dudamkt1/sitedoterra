@@ -269,7 +269,7 @@ export default async function TenantSitePage({
     return (
       <>
         <link rel="canonical" href={canonicalUrl} />
-        {user && <LoggedInNotice email={user.email} />}
+        {user && <LoggedInNotice email={user.email} returnTo={`/${tenant.slug}`} />}
         <SiteHome
           slug={tenant.slug}
           sections={sections}
@@ -362,7 +362,7 @@ export default async function TenantSitePage({
     return (
       <>
         <link rel="canonical" href={canonicalUrl} />
-        {user && <LoggedInNotice email={user.email} />}
+        {user && <LoggedInNotice email={user.email} returnTo={`/${tenant.slug}`} />}
         <SiteUnprepared tenant={tenant} destination={{ kind: "none", label: "site em preparação" }} />
       </>
     );

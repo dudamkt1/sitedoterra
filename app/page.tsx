@@ -142,7 +142,7 @@ export default async function HomePage() {
     return (
       <>
         <link rel="canonical" href={canonicalUrl} />
-        {user && <LoggedInNotice email={user.email} />}
+        {user && <LoggedInNotice email={user.email} returnTo="/" />}
         <AffiliateAttribution
           destination={{ kind: "anchor", anchor: "planos", label: "planos" }}
         />
@@ -171,7 +171,7 @@ export default async function HomePage() {
   return (
     <>
       <link rel="canonical" href={canonicalUrl} />
-      {user && <LoggedInNotice email={user.email} />}
+      {user && <LoggedInNotice email={user.email} returnTo="/" />}
       <SiteHome
         slug={tenant.slug}
         sections={sections}
