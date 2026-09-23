@@ -256,6 +256,13 @@ function getAlternativeUrls(url: string): string[] {
 /**
  * Tenta servir a variante pré-gerada diretamente do R2 via proxy.
  * Retorna o buffer se bem-sucedido, null caso contrário.
+ *
+ * REGRA DURA: só serve direto quando as dimensões reais são EXATAMENTE as
+ * declaradas no manifest para aquele kind (180/192/512). Servir um arquivo
+ * maior/menor com `sizes` errado faz o Chrome invalidar o ícone
+ * ("Actual size does not match specified size") e a instalação nativa nunca
+ * é oferecida (cai em "criar atalho"). Divergência → null, e o pipeline
+ * Sharp normaliza para o tamanho exato.
  */
 async function tryProxyPreGeneratedVariant(
   settings: PwaSettings,
@@ -266,6 +273,7 @@ async function tryProxyPreGeneratedVariant(
   if (!variantUrl || typeof variantUrl !== "string" || !variantUrl.trim()) {
     return null;
   }
+  const want = KIND_SIZE[kind];
 
   const urlsToTry = getAlternativeUrls(variantUrl);
 
@@ -313,6 +321,19 @@ async function tryProxyPreGeneratedVariant(
             `[pwa/icon] proxy pré-gerado tamanho inválido: url=${currentUrl} bytes=${buf.length} max=${MAX_SOURCE_BYTES}`
           );
           continue;
+        }
+        // Dimensões precisam bater com o `sizes` do manifest.
+        try {
+          const meta = await sharp(buf, { failOn: "none" }).metadata();
+          if (meta.width !== want || meta.height !== want) {
+            console.log(
+              `[pwa/icon] proxy pré-gerado fora do tamanho (want=${want}x${want} got=${meta.width}x${meta.height}): url=${currentUrl} — normalizando via Sharp`
+            );
+            return null;
+          }
+        } catch {
+          console.warn(`[pwa/icon] proxy pré-gerado ilegível: url=${currentUrl} — normalizando via Sharp`);
+          return null;
         }
         if (isFallback) {
           console.log(
