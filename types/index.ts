@@ -807,6 +807,39 @@ export interface CrmExportBundle {
   loyaltyPoints: CrmLoyaltyPoint[];
 }
 
+// ============================ MATERIAIS PARA AFILIADOS ============================
+
+/** Tipo de arquivo do material. */
+export type AffiliateMaterialKind = "imagem" | "video";
+/**
+ * Formato padrão do material:
+ * - feed_1x1: Feed 1:1 (imagens 1080x1080, vídeos 1:1)
+ * - story_9x16: Stories 9:16 (imagens 1080x1920, vídeos 9:16)
+ */
+export type AffiliateMaterialFormat = "feed_1x1" | "story_9x16";
+
+export interface AffiliateMaterial {
+  id: string;
+  title: string;
+  description: string | null;
+  kind: AffiliateMaterialKind;
+  format: AffiliateMaterialFormat;
+  file_url: string;
+  thumbnail_url: string | null;
+  file_size_bytes: number | null;
+  width: number | null;
+  height: number | null;
+  active: boolean;
+  sort_order: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export const AFFILIATE_MATERIAL_FORMAT_LABELS: Record<AffiliateMaterialFormat, string> = {
+  feed_1x1: "Feed 1:1 (1080×1080)",
+  story_9x16: "Stories 9:16 (1080×1920)",
+};
+
 // ============================ CRM METAS ============================
 
 export type CrmGoalType = "monthly" | "semiannual" | "annual";

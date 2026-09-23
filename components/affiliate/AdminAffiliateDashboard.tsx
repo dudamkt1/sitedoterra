@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { formatBRL, formatDate } from "@/lib/utils";
 import { Button, Input, Modal, StatusBadge, Select, Checkbox } from "@/components/dashboard/ui";
+import { AffiliateMaterialsManager } from "@/components/affiliate/AffiliateMaterialsManager";
 
 interface AffiliateSettings {
   id: string;
@@ -317,6 +318,16 @@ export function AdminAffiliateDashboard({ settings, affiliates, conversions, pay
         <div className="card p-4"><p className="text-gray-500 text-sm">Aprovadas</p><p className="text-3xl font-bold text-green-600">{approvedConversions}</p></div>
         <div className="card p-4"><p className="text-gray-500 text-sm">Total comissões</p><p className="text-3xl font-bold text-[#1d5c3a]">{formatBRL(totalCommissions * 100)}</p></div>
         <div className="card p-4"><p className="text-gray-500 text-sm">Saques pagos</p><p className="text-3xl font-bold">{formatBRL(totalPayoutsPaid * 100)}</p></div>
+      </div>
+
+      {/* Materiais para afiliados */}
+      <div className="card">
+        <h2 className="card-title mb-1">🎨 Materiais para Afiliados</h2>
+        <p className="text-sm text-gray-500 mb-4">
+          Criativos que os afiliados baixam em /painel/afiliados. Padrão: imagens Feed
+          1080×1080 · Stories 1080×1920 · vídeos 1:1 e 9:16.
+        </p>
+        <AffiliateMaterialsManager />
       </div>
 
       {/* Afiliados */}

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { formatBRL, formatDate } from "@/lib/utils";
 import { StatCard, StatusBadge, Button, Input, Modal } from "@/components/dashboard/ui";
+import { AffiliateMaterials } from "@/components/affiliate/AffiliateMaterials";
 import type {
   AffiliatePaymentMethod,
   AffiliatePayoutMethod,
@@ -597,6 +598,9 @@ export function AffiliateDashboard({ userId, userEmail, userName, tenantSlug, is
 
       {/* Usar saldo como pagamento — condicional ao status do site */}
       {programActive && summary && <CreditActionCard summary={summary} siteActive={siteActive} pubConfig={pubConfig} />}
+
+      {/* Materiais de divulgação */}
+      {programActive && <AffiliateMaterials />}
 
       {/* Solicitar Saque */}
       {programActive && summary && summary.available_balance > 0 && (
