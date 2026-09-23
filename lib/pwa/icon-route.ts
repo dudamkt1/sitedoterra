@@ -23,6 +23,12 @@ export async function servePwaPng(
       tenantId,
       versionToken
     );
+    // Defesa final: nunca servir 200 com corpo vazio (vira "ícone quebrado"
+    // no celular e invalida a instalação). Vazio aqui = 404.
+    if (!buffer || buffer.length === 0) {
+      console.error(`[pwa/icon] buffer vazio: slug=${resolved.ref.slug} kind=${kind}`);
+      return new Response("Not Found", { status: 404 });
+    }
     if (generated) {
       // Sinal vital de diagnóstico: nenhum upload pôde ser usado e o tile
       // genérico foi servido. O painel lê este header no "Verificar se

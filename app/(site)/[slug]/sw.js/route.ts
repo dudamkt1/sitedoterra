@@ -6,7 +6,9 @@ export const dynamic = "force-dynamic";
 
 /**
  * GET /{slug}/sw.js
- * Service Worker com escopo /{slug}/ — isola o cache por usuário.
+ * Service Worker com escopo /{slug} (SEM barra final) — isola o cache por
+ * usuário E controla a página canônica (servida sem barra). O header
+ * Service-Worker-Allowed autoriza esse scope para o script em /{slug}/sw.js.
  * Versão do cache baseada no `updated_at` das configurações PWA:
  * ao trocar o ícone, o cache é invalidado automaticamente.
  */
@@ -22,10 +24,11 @@ export async function GET(
   const url = new URL(req.url);
   const uid = url.searchParams.get("u") || params.slug;
   const cacheVersion = pwaVersionToken(resolved.settings);
+  const scope = `/${params.slug}`;
 
   const js = buildServiceWorkerSource({
     cacheName: uid,
-    scope: resolved.basePath,
+    scope,
     cacheVersion,
   });
 
@@ -34,7 +37,7 @@ export async function GET(
     headers: {
       "Content-Type": "application/javascript; charset=utf-8",
       "Cache-Control": "no-cache, no-store, must-revalidate",
-      "Service-Worker-Allowed": resolved.basePath,
+      "Service-Worker-Allowed": scope,
     },
   });
 }

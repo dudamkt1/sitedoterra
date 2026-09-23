@@ -1,5 +1,4 @@
 import sharp from "sharp";
-import { unstable_cache } from "next/cache";
 import type { PwaSettings } from "./config";
 import { r2Env } from "@/lib/r2";
 
@@ -92,9 +91,19 @@ function sourceCandidates(s: PwaSettings): string[] {
 
 /**
  * Processa uma imagem fonte com Sharp (flatten + resize) para o tamanho alvo.
- * Versão com cache: chaveada por tenant_id + pwaVersionToken + kind + source URL.
- * Só roda sharp uma vez por versão de configuração por fonte.
+ *
+ * Cache em MEMÓRIA (Map por instância), chaveado por tenant + versão + kind +
+ * fonte. NUNCA `unstable_cache` aqui: ele serializa o valor (Buffer vira
+ * `{type:"Buffer",data:[...]}`), e ao restaurar `buffer.length` é undefined —
+ * a rota servia 200 `image/png` com **0 bytes**, quebrando o ícone no celular
+ * de forma intermitente (dependia de qual instância Lambda atendia).
+ * Buffers em Map preservam os bytes reais. O HTTP da rota já manda
+ * `Cache-Control: public, max-age=86400`, então o edge/browser absorve o
+ * tráfego repetido.
  */
+const SHARP_MEMO = new Map<string, Promise<Buffer>>();
+const SHARP_MEMO_MAX = 60;
+
 async function processWithSharpCached(
   input: Buffer,
   size: number,
@@ -102,22 +111,54 @@ async function processWithSharpCached(
   tenantId: string,
   versionToken: string,
   kind: PwaPngKind,
-  sourceUrl: string
+  sourceUrl: string,
+  maskableSafeZone: boolean
 ): Promise<Buffer> {
-  const cacheKey = `pwa-icon-sharp:${tenantId}:${versionToken}:${kind}:${sourceUrl}`;
-  return unstable_cache(
-    async () => {
-      const start = Date.now();
+  const cacheKey = `pwa-icon-sharp:${tenantId}:${versionToken}:${kind}:${maskableSafeZone ? "safe" : "full"}:${sourceUrl}`;
+  const hit = SHARP_MEMO.get(cacheKey);
+  if (hit) return hit;
+  const job = (async () => {
+    const start = Date.now();
+    let buffer: Buffer;
+    if (maskableSafeZone) {
+      // Maskable: arte em 80% centralizada sobre fundo opaco (safe zone do
+      // Android) — sem esticar, sem cortar o logotipo.
+      const inner = Math.round(size * 0.8);
+      const art = await sharp(input, { failOn: "none" })
+        .flatten({ background: theme })
+        .resize(inner, inner, { fit: "contain", background: theme })
+        .toBuffer();
+      buffer = await sharp({
+        create: { width: size, height: size, channels: 4, background: theme },
+      })
+        .composite([{ input: art, gravity: "center" }])
+        .png({ compressionLevel: 9 })
+        .toBuffer();
+    } else {
       const pipeline = sharp(input, { failOn: "none" })
         .flatten({ background: theme })
         .resize(size, size, { fit: "contain", background: theme });
-      const buffer = await pipeline.png({ compressionLevel: 9 }).toBuffer();
-      console.log(`[pwa/icon] sharp process: kind=${kind} size=${size} source=${sourceUrl} took=${Date.now() - start}ms`);
-      return buffer;
-    },
-    [cacheKey],
-    { revalidate: 86400, tags: [`pwa-icon:${tenantId}:${versionToken}`] }
-  )();
+      buffer = await pipeline.png({ compressionLevel: 9 }).toBuffer();
+    }
+    if (!buffer || buffer.length === 0) throw new Error("Sharp devolveu buffer vazio.");
+    console.log(`[pwa/icon] sharp process: kind=${kind} size=${size} source=${sourceUrl} took=${Date.now() - start}ms`);
+    return buffer;
+  })();
+  SHARP_MEMO.set(cacheKey, job);
+  // Evita crescimento ilimitado (a chave inclui o token de versão, que muda
+  // a cada save — entradas antigas morrem aqui).
+  while (SHARP_MEMO.size > SHARP_MEMO_MAX) {
+    const oldest = SHARP_MEMO.keys().next();
+    if (oldest.done) break;
+    SHARP_MEMO.delete(oldest.value);
+  }
+  try {
+    return await job;
+  } catch (err) {
+    // Não envenena o cache com falha: próxima request tenta de novo.
+    if (SHARP_MEMO.get(cacheKey) === job) SHARP_MEMO.delete(cacheKey);
+    throw err;
+  }
 }
 
 function absolutize(url: string, origin: string): string {
@@ -299,12 +340,13 @@ async function tryProxyPreGeneratedVariant(
  * Sempre devolve um PNG válido — nunca lança para o chamador tratar como
  * "sem ícone" (em último caso, o tile de fallback).
  *
- * RESULTADO CACHEADO (unstable_cache, chave = tenant + versão da config +
- * kind): depois do primeiro acesso, o PNG sai em milissegundos SEM refazer
- * fetch no R2. Sem isso, CADA request (inclusive a checagem de instalação
- * do Chrome) refazia download+retry do zero — o celular desistia de
- * oferecer "Instalar app" (caía em "criar atalho") e o logo não aparecia.
+ * Cache em MEMÓRIA (mesmo motivo do processWithSharpCached: `unstable_cache`
+ * corrompe Buffers ao serializar). A rota HTTP já responde com
+ * `Cache-Control: public, max-age=86400`, então o edge absorve o repeteco.
  */
+const FINAL_MEMO = new Map<string, Promise<{ buffer: Buffer; generated: boolean }>>();
+const FINAL_MEMO_MAX = 60;
+
 export async function renderPwaPng(
   settings: PwaSettings,
   kind: PwaPngKind,
@@ -314,11 +356,24 @@ export async function renderPwaPng(
 ): Promise<{ buffer: Buffer; generated: boolean }> {
   const sourcesKey = sourceCandidates(settings).join("|");
   const cacheKey = `pwa-icon-final:${tenantId}:${versionToken}:${kind}:${sourcesKey}`;
-  return unstable_cache(
-    async () => renderPwaPngUncached(settings, kind, origin, tenantId, versionToken),
-    [cacheKey],
-    { revalidate: 86400, tags: [`pwa-icon:${tenantId}:${versionToken}`] }
-  )();
+  const hit = FINAL_MEMO.get(cacheKey);
+  if (hit) return hit;
+  const job = renderPwaPngUncached(settings, kind, origin, tenantId, versionToken).then((r) => {
+    if (!r.buffer || r.buffer.length === 0) throw new Error("Ícone vazio.");
+    return r;
+  });
+  FINAL_MEMO.set(cacheKey, job);
+  while (FINAL_MEMO.size > FINAL_MEMO_MAX) {
+    const oldest = FINAL_MEMO.keys().next();
+    if (oldest.done) break;
+    FINAL_MEMO.delete(oldest.value);
+  }
+  try {
+    return await job;
+  } catch (err) {
+    if (FINAL_MEMO.get(cacheKey) === job) FINAL_MEMO.delete(cacheKey);
+    throw err;
+  }
 }
 
 async function renderPwaPngUncached(
@@ -347,6 +402,10 @@ async function renderPwaPngUncached(
 
   // 2) FALLBACK: tenta os uploads do usuário (maior resolução primeiro)
   // e re-processa com Sharp para o tamanho exato (com cache).
+  // Composição quadrada profissional: proporção preservada (contain, sem
+  // esticar/cortar), centralizada, fundo opaco da cor do tema (transparência
+  // vira fundo — Android não aceita ícone "fantasma"). O maskable usa a
+  // safe zone de 80% para o launcher não cortar o logotipo.
   for (const src of sourceCandidates(settings)) {
     const absolute = absolutize(src, origin);
     // Evita loop: nunca busca de si mesma (rotas /pwa/*.png).
@@ -358,15 +417,8 @@ async function renderPwaPngUncached(
     const fetchTime = Date.now() - fetchStart;
     if (!input) continue;
     try {
-      // Full-bleed INTENCIONAL (inclusive maskable): a arte enviada pelo
-      // usuário já é o ícone final quadrado. Encolher para "safe zone" criava
-      // moldura de cor diferente do fundo do logo — e o Android usa justamente
-      // o maskable na tela inicial ("logo diferente" no app instalado).
-      // Bordas full-bleed têm a cor do próprio fundo do logo → o recorte do
-      // launcher (círculo/squircle) fica invisível e o ícone é IDÊNTICO ao
-      // enviado em todos os tamanhos e launchers.
       const sharpStart = Date.now();
-      const buffer = await processWithSharpCached(input, size, theme, tenantId, versionToken, kind, absolute);
+      const buffer = await processWithSharpCached(input, size, theme, tenantId, versionToken, kind, absolute, kind === "maskable");
       const sharpTime = Date.now() - sharpStart;
       console.log(`[pwa/icon] renderPwaPng: kind=${kind} fallback_hit=true took=${Date.now() - totalStart}ms (fetch=${fetchTime}ms sharp=${sharpTime}ms source=${absolute})`);
       return { buffer, generated: false };

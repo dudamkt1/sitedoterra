@@ -186,7 +186,7 @@ export default async function TenantSitePage({
           slug="demonstracao"
           manifestUrl={manifestUrl}
           swUrl={swUrl}
-          scope={pwa?.basePath || "/demonstracao/"}
+          scope="/demonstracao"
           appName={pwa?.settings.app_name || "Demonstração"}
           themeColor={pwa?.settings.theme_color || "#1d5c3a"}
         />
@@ -318,7 +318,9 @@ export default async function TenantSitePage({
           slug={params.slug}
           manifestUrl={manifestUrl}
           swUrl={swUrl}
-          scope={pwa?.basePath || `/${params.slug}/`}
+          // Scope SEM barra final: precisa cobrir a página canônica
+          // (/{slug}) para o beforeinstallprompt disparar.
+          scope={`/${params.slug}`}
           appName={pwa?.settings.app_name || tenant.site_name || tenant.profile_name || params.slug}
           themeColor={pwa?.settings.theme_color || "#1d5c3a"}
         />

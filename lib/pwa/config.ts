@@ -159,7 +159,12 @@ export function pwaIconPaths(basePath: string): {
 
 /**
  * Monta o manifest dinâmico do usuário.
- * - start_url/scope respeitam a origem de acesso
+ * - start_url/scope/id SEM trailing slash em sites /{slug} (ex.:
+ *   https://.../afiliado1): a página canônica é servida SEM barra e o SW só
+ *   controla a página quando o scope a cobre — com barra (`/{slug}/`), o SW
+ *   não controlava `/{slug}`, o start_url redirecionava (308) e o Chrome
+ *   nunca disparava o beforeinstallprompt (botão caía no passo a passo).
+ *   Na raiz ("/", HOME/domínio próprio) tudo permanece como está.
  * - icons SEMPRE inclui PNGs 180/192/512 (any) + 512 maskable servidos pelo
  *   próprio domínio (proxy normalizado — nunca quebra, nunca sofre CORS),
  *   com `?v=<token>` para forçar revalidação quando o usuário trocar o ícone.
@@ -175,11 +180,12 @@ export function buildManifest(
   const v = pwaVersionToken(s);
   const paths = pwaIconPaths(scopeBase);
   const absV = (rel: string) => abs(withVersion(rel, v), ctx.origin);
-  // start_url/scope/id ABSOLUTOS (mesma origem do acesso): o Chrome e o
-  // gerador de WebAPK resolvem sem ambiguidade — com relativos, qualquer
-  // divergência de resolução invalida a instalação ("criar atalho" em vez
-  // de "Instalar app").
-  const startUrl = joinOrigin(ctx.origin, scopeBase);
+  // start/scope/id ABSOLUTOS e SEM barra final em /{slug} (mesma origem do
+  // acesso): o Chrome e o gerador de WebAPK resolvem sem ambiguidade e o SW
+  // registrado com o mesmo scope controla a página canônica — sem isso, a
+  // instalação nativa ("Instalar app") nunca é oferecida.
+  const appBase = scopeBase === "/" ? "/" : scopeBase.replace(/\/$/, "");
+  const startUrl = joinOrigin(ctx.origin, appBase);
 
   const icons: Record<string, unknown>[] = [
     // iOS também lê o manifest em alguns fluxos — 180 first.
@@ -202,7 +208,7 @@ export function buildManifest(
   });
 
   return {
-    id: joinOrigin(ctx.origin, scopeBase),
+    id: startUrl,
     name,
     short_name: shortName,
     description: s.description || `Aplicativo ${name}`,

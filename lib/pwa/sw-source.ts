@@ -13,11 +13,15 @@
  */
 export function buildServiceWorkerSource(opts: {
   cacheName: string;
+  /** Scope exato: "/" na raiz; "/{slug}" (SEM barra) nos sites da plataforma. */
   scope: string;
   cacheVersion?: string;
 }): string {
   const cacheName = opts.cacheName.replace(/[^\w.-]/g, "");
-  const scope = opts.scope.endsWith("/") ? opts.scope : `${opts.scope}/`;
+  // SEM trailing slash em /{slug}: o SW precisa controlar a página canônica
+  // (servida sem barra). Com scope "/{slug}/", a página "/{slug}" ficava
+  // fora de controle e o beforeinstallprompt nunca disparava.
+  const scope = opts.scope === "/" ? "/" : opts.scope.replace(/\/$/, "");
   // Sem version = "v1" (compatibilidade). Com version = v<token-base36> (dinâmico).
   const ver = (opts.cacheVersion || "1").replace(/[^\w]/g, "");
   const versionedCache = `pwa-${cacheName}-v${ver}`;
@@ -73,8 +77,13 @@ self.addEventListener("fetch", (event) => {
   if (isExcluded(url.pathname)) return;
 
   // Isolamento por escopo: fora do app do usuário, não interfere.
-  const inScope = url.pathname === SCOPE || url.pathname.startsWith(SCOPE);
-  if (!inScope && SCOPE !== "/") return;
+  // Com scope "/{slug}" (sem barra): cobre a página canônica e tudo abaixo
+  // dela, sem vazar para slugs vizinhos (prefixo "/{slug}/" exigido adiante).
+  const inScope =
+    SCOPE === "/" ||
+    url.pathname === SCOPE ||
+    url.pathname.startsWith(SCOPE + "/");
+  if (!inScope) return;
 
   // Manifest + ícones do PWA: network-first com fallback ao cache.
   // Garante que, ao trocar o ícone, o usuário SEMPRE vê a versão nova na

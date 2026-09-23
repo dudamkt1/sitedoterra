@@ -126,17 +126,27 @@ async function drawComposedSquare(
   return await canvasToBlob(canvas, type);
 }
 
-/** Maskable full-bleed: IDÊNTICO ao ícone "any" (sem encolhimento).
- * Encolher para "safe zone" criava moldura de cor diferente do fundo do logo
- * — e o Android usa justamente o maskable na tela inicial, exibindo um "logo
- * diferente" do enviado. Bordas full-bleed têm a cor do próprio fundo do logo,
- * então o recorte do launcher fica invisível. */
+/** Maskable com safe zone de 80%: arte centralizada em 80% do canvas sobre
+ * fundo opaco — o launcher do Android recorta as bordas sem tocar no
+ * logotipo. Sem esticar (contain) e sem cortar. */
 async function drawMaskable(
   source: HTMLImageElement | ImageBitmap,
   size: number,
   bgColor: string
 ): Promise<Blob> {
-  return drawComposedSquare(source, size, bgColor, "opaque");
+  const { canvas, ctx } = makeCanvas(size);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.fillStyle = bgColor || "#1d5c3a";
+  ctx.fillRect(0, 0, size, size);
+  const srcW = "naturalWidth" in source ? source.naturalWidth : source.width;
+  const srcH = "naturalHeight" in source ? source.naturalHeight : source.height;
+  const inner = Math.round(size * 0.8);
+  const ratio = Math.min(inner / srcW, inner / srcH);
+  const drawW = Math.round(srcW * ratio);
+  const drawH = Math.round(srcH * ratio);
+  ctx.drawImage(source, Math.floor((size - drawW) / 2), Math.floor((size - drawH) / 2), drawW, drawH);
+  return await canvasToBlob(canvas, "image/png");
 }
 
 function canvasToBlob(canvas: HTMLCanvasElement, type: string): Promise<Blob> {
@@ -156,7 +166,8 @@ function canvasToBlob(canvas: HTMLCanvasElement, type: string): Promise<Blob> {
  *   mas opaco fica melhor quando a home screen é clara).
  * - icon_192 (Android legacy): opaco, fundo = theme_color.
  * - icon_512 (Android splash/home): opaco, fundo = theme_color.
- * - icon_maskable_512: idêntico ao 512 (full-bleed — sem moldura).
+ * - icon_maskable_512: arte em 80% centralizada sobre fundo opaco (safe zone
+ *   do Android — o launcher não corta o logotipo).
  *
  * Imagens retangulares são COMPOSTAS com padding (não distorcidas).
  * Imagens transparentes ficam visíveis porque o fundo é sempre opaco.

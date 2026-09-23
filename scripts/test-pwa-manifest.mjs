@@ -50,10 +50,12 @@ const m = buildManifest(settings, {
 
 assert(m.name === "Maria Sucesso", `name = ${m.name}`);
 assert(m.short_name === "Maria", `short_name = ${m.short_name}`);
-// start_url/scope/id ABSOLUTOS (mesma origem) — exigência para WebAPK/install 1-toque.
-assert(m.start_url === "https://oleos.topconsultores.com.br/mariatest/", `start_url = ${m.start_url}`);
-assert(m.scope === "https://oleos.topconsultores.com.br/mariatest/", `scope = ${m.scope}`);
-assert(m.id === "https://oleos.topconsultores.com.br/mariatest/", `id = ${m.id}`);
+// start_url/scope/id ABSOLUTOS e SEM barra final em /{slug} (mesma origem) —
+// exigência para o SW controlar a página canônica e o Chrome oferecer a
+// instalação nativa. Na raiz ("/") a barra permanece.
+assert(m.start_url === "https://oleos.topconsultores.com.br/mariatest", `start_url = ${m.start_url}`);
+assert(m.scope === "https://oleos.topconsultores.com.br/mariatest", `scope = ${m.scope}`);
+assert(m.id === "https://oleos.topconsultores.com.br/mariatest", `id = ${m.id}`);
 assert(m.theme_color === "#1d5c3a", `theme_color = ${m.theme_color}`);
 assert(m.background_color === "#faf8f2", `background_color = ${m.background_color}`);
 assert(m.display === "standalone", `display = ${m.display}`);

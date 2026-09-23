@@ -209,9 +209,8 @@ export function PwaRegister(props: PwaRegisterProps) {
     function onInstalled() {
       deferredPrompt.current = null;
       setCanNativeInstall(false);
-      setVisible(false);
-      setManualSteps(false);
       setInstallMode("installed");
+      celebrateInstalled();
       try {
         sessionStorage.setItem(DISMISS_KEY(slug), "1");
       } catch {}
@@ -337,7 +336,7 @@ export function PwaRegister(props: PwaRegisterProps) {
       await p.prompt();
       const choice = await p.userChoice;
       if (choice.outcome === "accepted") {
-        dismiss();
+        celebrateInstalled();
         return;
       }
       // Recusou/dispensou o diálogo nativo: abre a tela visual.
@@ -355,6 +354,20 @@ export function PwaRegister(props: PwaRegisterProps) {
   // Toque no INSTALAR sem prompt nativo ainda: mostra "Preparando..." e dá
   // uma última chance ao Chrome (o evento pode chegar DEPOIS do toque).
   const [preparing, setPreparing] = useState(false);
+  // Confirmação visual após instalar (accepted/appinstalled): mostra
+  // "APP INSTALADO" antes de esconder o convite.
+  const [justInstalled, setJustInstalled] = useState(false);
+
+  /** Exibe "APP INSTALADO" e esconde o convite em seguida. */
+  function celebrateInstalled() {
+    setJustInstalled(true);
+    setManualSteps(false);
+    setSheetOpen(false);
+    window.setTimeout(() => {
+      dismiss();
+      window.setTimeout(() => setJustInstalled(false), 500);
+    }, 4500);
+  }
 
   /**
    * Aguarda o `beforeinstallprompt` por até `ms` milissegundos.
@@ -531,11 +544,13 @@ export function PwaRegister(props: PwaRegisterProps) {
               <button
                 type="button"
                 onClick={installNow}
-                disabled={preparing}
+                disabled={preparing || justInstalled}
                 className="flex-1 rounded-lg px-4 py-3 text-xs font-bold uppercase tracking-wide text-white hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-70"
-                style={{ background: props.themeColor }}
+                style={{ background: justInstalled ? "#16a34a" : props.themeColor }}
               >
-                {preparing
+                {justInstalled
+                  ? "✓ App instalado"
+                  : preparing
                   ? "⏳ Preparando…"
                   : installMode === "installed"
                     ? "📲 Abrir o app"
