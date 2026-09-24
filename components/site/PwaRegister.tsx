@@ -130,6 +130,13 @@ export function PwaRegister(props: PwaRegisterProps) {
           link.href = manifestUrl;
           document.head.appendChild(link);
         }
+        // REGRA: o manifest NUNCA pode ter crossorigin="use-credentials".
+        // O Next 14 emite esse atributo quando se usa metadata.manifest, e a
+        // combinação dele + Access-Control-Allow-Origin: * (sem
+        // Allow-Credentials) reprova o CORS do fetcher do Google (WebAPK) —
+        // ele não lê o manifest e instala o app sem o logotipo do usuário.
+        // Remove defensivamente caso o HTML venha de um cache antigo.
+        if (link) link.removeAttribute("crossorigin");
       }
     } catch {}
 

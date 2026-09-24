@@ -198,8 +198,9 @@ export function buildManifest(
     { src: absV(paths.maskable), sizes: "512x512", type: "image/png", purpose: "maskable" },
   ];
 
-  // Fallback SVG (monograma do app) — Chrome e Edge aceitam `any maskable`.
-  const svgIcon = joinOrigin(ctx.origin, `${scopeBase}pwa/icon.svg`);
+  // Fallback SVG (monograma/logo embutida) — Chrome e Edge aceitam `any maskable`.
+  // Com ?v= para o navegador não reusar um SVG antigo quando o usuário troca a logo.
+  const svgIcon = joinOrigin(ctx.origin, withVersion(`${scopeBase}pwa/icon.svg`, v));
   icons.push({
     src: svgIcon,
     sizes: "any",

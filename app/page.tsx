@@ -77,7 +77,6 @@ export async function generateMetadata(): Promise<Metadata> {
       iconList.push({ url: bust, type: "image/png", sizes: "192x192" });
     }
     if (pwa?.settings.enabled) {
-      const { manifestUrl } = pwaUrls(pwa.basePath);
       const v = pwaVersionToken(pwa.settings);
       const paths = pwaIconPaths(pwa.basePath);
       const withV = (rel: string) => `${rel}?v=${v}`;
@@ -89,9 +88,14 @@ export async function generateMetadata(): Promise<Metadata> {
       iconList.push({ url: withV(paths.icon512), type: "image/png", sizes: "512x512" });
 
       return {
-        // REGRA: string, nunca objeto — objeto renderizava href="[object Object]"
-        // no <link rel="manifest"> e o navegador nunca achava o manifest.
-        manifest: manifestUrl,
+        // REGRA: NÃO usar metadata.manifest aqui. O Next 14 (basic.js) emite
+        // <link rel="manifest" crossorigin="use-credentials"> para QUALQUER
+        // valor de metadata.manifest, e esse atributo faz o fetcher do Google
+        // (WebAPK) buscar o manifest em modo CORS com credenciais — a rota
+        // responde Access-Control-Allow-Origin: * SEM Allow-Credentials, ou
+        // seja, CORS REPROVADO → o servidor do Google não lê o manifest e
+        // instala o app SEM o logotipo do usuário. O link é renderizado no
+        // JSX da página (o React/Next move para o <head>) sem crossorigin.
         icons: iconList.length ? iconList : undefined,
         appleWebApp: {
           capable: true,
@@ -189,6 +193,7 @@ export default async function HomePage() {
   return (
     <>
       <link rel="canonical" href={canonicalUrl} />
+      {pwaEnabled && <link rel="manifest" href={manifestUrl} />}
       {user && <LoggedInNotice email={user.email} returnTo="/" />}
       <SiteHome
         slug={tenant.slug}

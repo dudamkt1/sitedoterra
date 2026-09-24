@@ -335,6 +335,41 @@ async function tryProxyPreGeneratedVariant(
           console.warn(`[pwa/icon] proxy pré-gerado ilegível: url=${currentUrl} — normalizando via Sharp`);
           return null;
         }
+        // REGRA DE OPACIDADE: PNG com transparência servido "cru" vira ícone
+        // "fantasma" no Android (o launcher pinta a área vazia e o logotipo
+        // some). O caminho Sharp aplica .flatten({background}) justamente para
+        // evitar isso — então só servimos direto se o arquivo já for 100% opaco.
+        try {
+          const stats = await sharp(buf, { failOn: "none" }).stats();
+          if (!stats.isOpaque) {
+            console.log(
+              `[pwa/icon] proxy pré-gerado tem transparência — normalizando com fundo opaco: url=${currentUrl}`
+            );
+            return null;
+          }
+        } catch {
+          return null;
+        }
+        // REGRA DO MASKABLE: só servimos o arquivo cru se ele for uma variante
+        // maskable DEDICADA. O painel grava a MESMA URL nos 4 campos quando o
+        // usuário cola uma URL ou escolhe da biblioteca — nesse caso servir cru
+        // entregaria o logo SEM a safe zone de 80% e o launcher Android cortaria
+        // o logotipo em círculo (parece "outro ícone").
+        if (kind === "maskable") {
+          const others: (keyof PwaSettings)[] = [
+            "icon_512_url",
+            "icon_192_url",
+            "icon_180_url",
+            "logo_url",
+          ];
+          const shared = others.some((f) => f !== urlField && settings[f] === variantUrl);
+          if (shared) {
+            console.log(
+              `[pwa/icon] maskable compartilha URL com outro campo — compondo safe zone via Sharp: url=${currentUrl}`
+            );
+            return null;
+          }
+        }
         if (isFallback) {
           console.log(
             `[pwa/icon] proxy pré-gerado SUCESSO via fallback .r2.dev: url=${currentUrl}`

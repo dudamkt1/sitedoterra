@@ -36,15 +36,18 @@ export async function generateMetadata({ params }: { params: { slug: string } })
       robots: { index: false },
     };
     if (pwa?.settings.enabled) {
-      const { manifestUrl } = pwaUrls(pwa.basePath);
       const v = pwaVersionToken(pwa.settings);
       const paths = pwaIconPaths(pwa.basePath);
       const withV = (rel: string) => `${rel}?v=${v}`;
-      // REGRA: metadata.manifest aceita somente string/URL no Next 14.
-      // Passar objeto {url, crossOrigin} renderizava href="[object Object]"
-      // no HTML — o navegador buscava 404, marcava o site como não instalável
-      // e o beforeinstallprompt nunca disparava (botão caía em "criar atalho").
-      meta.manifest = manifestUrl;
+      // REGRA: NUNCA metadata.manifest. O Next 14 emite
+      // <link rel="manifest" crossorigin="use-credentials"> para qualquer
+      // valor de metadata.manifest (next/dist/lib/metadata/generate/basic.js),
+      // e esse atributo faz o fetcher do Google (WebAPK) buscar o manifest em
+      // CORS com credenciais — a rota responde Access-Control-Allow-Origin: *
+      // SEM Allow-Credentials, logo o Google NÃO consegue ler o manifest e
+      // instala o app sem o logotipo do usuário. O <link rel="manifest"> é
+      // renderizado no JSX da página (o React/Next o move para o <head>)
+      // sem crossorigin. Ver comentário equivalente em app/page.tsx.
       meta.icons = [
         { url: withV(paths.apple), type: "image/png", sizes: "180x180", rel: "apple-touch-icon" },
         { url: withV(paths.icon192), type: "image/png", sizes: "192x192" },
@@ -107,9 +110,8 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   };
 
   if (pwa?.settings.enabled) {
-    const { manifestUrl } = pwaUrls(pwa.basePath);
-    // string (nunca objeto): ver comentário do branch "demonstracao" acima.
-    meta.manifest = manifestUrl;
+    // metadata.manifest NÃO é usado (crossOrigin hardcoded use-credentials
+    // pelo Next 14) — o <link rel="manifest"> sai do JSX sem crossorigin.
     // Não adiciona SVG ao HTML — favicon PNG transparente já é o correto; SVG fica só no manifest como fallback maskable
     meta.appleWebApp = {
       capable: true,
@@ -185,6 +187,7 @@ export default async function TenantSitePage({
     }
     return (
       <>
+        {Boolean(pwa?.settings.enabled) && <link rel="manifest" href={manifestUrl} />}
         <DemoPublicSite model={demoModel} />
         <PwaRegister
           enabled={Boolean(pwa?.settings.enabled)}
@@ -289,6 +292,7 @@ export default async function TenantSitePage({
     return (
       <>
         <link rel="canonical" href={canonicalUrl} />
+        {pwaEnabled && <link rel="manifest" href={manifestUrl} />}
         {user && <LoggedInNotice email={user.email} returnTo={`/${tenant.slug}`} />}
         <SiteHome
           slug={tenant.slug}
