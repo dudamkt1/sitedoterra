@@ -40,7 +40,11 @@ export async function generateMetadata({ params }: { params: { slug: string } })
       const v = pwaVersionToken(pwa.settings);
       const paths = pwaIconPaths(pwa.basePath);
       const withV = (rel: string) => `${rel}?v=${v}`;
-      meta.manifest = { url: manifestUrl, crossOrigin: "anonymous" } as any;
+      // REGRA: metadata.manifest aceita somente string/URL no Next 14.
+      // Passar objeto {url, crossOrigin} renderizava href="[object Object]"
+      // no HTML — o navegador buscava 404, marcava o site como não instalável
+      // e o beforeinstallprompt nunca disparava (botão caía em "criar atalho").
+      meta.manifest = manifestUrl;
       meta.icons = [
         { url: withV(paths.apple), type: "image/png", sizes: "180x180", rel: "apple-touch-icon" },
         { url: withV(paths.icon192), type: "image/png", sizes: "192x192" },
@@ -104,7 +108,8 @@ export async function generateMetadata({ params }: { params: { slug: string } })
 
   if (pwa?.settings.enabled) {
     const { manifestUrl } = pwaUrls(pwa.basePath);
-    meta.manifest = { url: manifestUrl, crossOrigin: "anonymous" } as any;
+    // string (nunca objeto): ver comentário do branch "demonstracao" acima.
+    meta.manifest = manifestUrl;
     // Não adiciona SVG ao HTML — favicon PNG transparente já é o correto; SVG fica só no manifest como fallback maskable
     meta.appleWebApp = {
       capable: true,
@@ -318,9 +323,12 @@ export default async function TenantSitePage({
           slug={params.slug}
           manifestUrl={manifestUrl}
           swUrl={swUrl}
-          // Scope SEM barra final: precisa cobrir a página canônica
-          // (/{slug}) para o beforeinstallprompt disparar.
-          scope={`/${params.slug}`}
+          // Scope DEVE bater com o scope do manifest:
+          // - plataforma: "/{slug}" (sem barra — cobre a página canônica);
+          // - domínio próprio/HOME (basePath "/"): "/" — se registrássemos
+          //   "/{slug}" aqui, o SW ficaria MENOR que o scope do manifest ("/")
+          //   e o Chrome recusaria o beforeinstallprompt no domínio próprio.
+          scope={pwa && pwa.basePath === "/" ? "/" : `/${params.slug}`}
           appName={pwa?.settings.app_name || tenant.site_name || tenant.profile_name || params.slug}
           themeColor={pwa?.settings.theme_color || "#1d5c3a"}
         />

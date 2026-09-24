@@ -100,15 +100,36 @@ export function PwaRegister(props: PwaRegisterProps) {
   useEffect(() => {
     if (!enabled || typeof window === "undefined") return;
 
-    // 0) Garante <link rel="manifest"> no <head> (rede de segurança: se o
-    //    metadata do servidor não emitiu, o navegador ainda encontra o
-    //    manifest e mostra o logotipo na instalação).
+    // 0) Garante <link rel="manifest"> CORRETO no <head>.
+    //    Se o servidor emitiu um href quebrado (ex.: "[object Object]" —
+    //    bug do metadata.manifest como objeto no Next 14), o link EXISTE e o
+    //    antigo `querySelector` o aceitava → o navegador buscava 404 e o
+    //    beforeinstallprompt nunca disparava. Agora: href inválido é REMOVIDO
+    //    e substituído pela URL real do manifest deste usuário.
     try {
-      if (!document.querySelector('link[rel="manifest"]') && manifestUrl) {
-        const link = document.createElement("link");
-        link.rel = "manifest";
-        link.href = manifestUrl;
-        document.head.appendChild(link);
+      if (manifestUrl) {
+        let link = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
+        const expected = new URL(manifestUrl, window.location.origin).href;
+        if (link) {
+          const href = link.getAttribute("href") || "";
+          const formOk =
+            href.startsWith("/") ||
+            href.startsWith("https://") ||
+            href.startsWith("http://") ||
+            href.startsWith("//");
+          // Remove se o href é inválido (ex.: "[object Object]") ou se aponta
+          // para OUTRO manifest (cache/SSR antigo de outra página).
+          if (!formOk || link.href !== expected) {
+            link.remove();
+            link = null;
+          }
+        }
+        if (!link) {
+          link = document.createElement("link");
+          link.rel = "manifest";
+          link.href = manifestUrl;
+          document.head.appendChild(link);
+        }
       }
     } catch {}
 

@@ -89,7 +89,9 @@ export async function generateMetadata(): Promise<Metadata> {
       iconList.push({ url: withV(paths.icon512), type: "image/png", sizes: "512x512" });
 
       return {
-        manifest: { url: manifestUrl, crossOrigin: "anonymous" } as any,
+        // REGRA: string, nunca objeto — objeto renderizava href="[object Object]"
+        // no <link rel="manifest"> e o navegador nunca achava o manifest.
+        manifest: manifestUrl,
         icons: iconList.length ? iconList : undefined,
         appleWebApp: {
           capable: true,
