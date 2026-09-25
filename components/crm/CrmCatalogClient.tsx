@@ -288,16 +288,16 @@ export default function CrmCatalogClient({ tenantSlug }: { tenantSlug: string | 
         </div>
         <div className="flex flex-wrap gap-2">
           {tenantSlug && (
-            <button type="button" className="btn btn-outline !text-sm" onClick={() => setShowShare(true)}>
+            <button type="button" className="btn btn-outline !text-sm w-full sm:w-auto" onClick={() => setShowShare(true)}>
               📤 Compartilhar catálogo
             </button>
           )}
-          <button type="button" className="btn btn-outline !text-sm" onClick={() => setShowPaymentSettings(true)}>
+          <button type="button" className="btn btn-outline !text-sm w-full sm:w-auto" onClick={() => setShowPaymentSettings(true)}>
             <Settings className="h-4 w-4 mr-1" />
             Config. Pagamento
           </button>
           {tab === "products" && (
-            <button type="button" className="btn btn-primary" onClick={openCreate}>
+            <button type="button" className="btn btn-primary w-full sm:w-auto" onClick={openCreate}>
               + Adicionar produto
             </button>
           )}
@@ -352,7 +352,7 @@ export default function CrmCatalogClient({ tenantSlug }: { tenantSlug: string | 
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Nome, categoria ou SKU…"
-                className="w-full rounded-[10px] border border-[#dde2dc] bg-white pl-9 pr-3 py-2.5 text-[14px] focus:outline-none focus:ring-2 focus:ring-[#1d5c3a]/15 focus:border-[#1d5c3a]"
+                className="w-full rounded-[10px] border border-[#dde2dc] bg-white pl-9 pr-3 py-2.5 text-[16px] sm:text-[14px] focus:outline-none focus:ring-2 focus:ring-[#1d5c3a]/15 focus:border-[#1d5c3a]"
               />
             </div>
           </div>
@@ -361,7 +361,7 @@ export default function CrmCatalogClient({ tenantSlug }: { tenantSlug: string | 
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as "all" | "active" | "inactive")}
-              className="w-full rounded-[10px] border border-[#dde2dc] bg-white px-3 py-2.5 text-[14px] focus:outline-none focus:ring-2 focus:ring-[#1d5c3a]/15 focus:border-[#1d5c3a]"
+              className="w-full rounded-[10px] border border-[#dde2dc] bg-white px-3 py-2.5 text-[16px] sm:text-[14px] focus:outline-none focus:ring-2 focus:ring-[#1d5c3a]/15 focus:border-[#1d5c3a]"
             >
               {STATUS_FILTERS.map((s) => (
                 <option key={s.value} value={s.value}>{s.label} ({s.value === "all" ? counts.all : counts[s.value as "active" | "inactive"]})</option>
@@ -373,7 +373,7 @@ export default function CrmCatalogClient({ tenantSlug }: { tenantSlug: string | 
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="w-full rounded-[10px] border border-[#dde2dc] bg-white px-3 py-2.5 text-[14px] focus:outline-none focus:ring-2 focus:ring-[#1d5c3a]/15 focus:border-[#1d5c3a]"
+              className="w-full rounded-[10px] border border-[#dde2dc] bg-white px-3 py-2.5 text-[16px] sm:text-[14px] focus:outline-none focus:ring-2 focus:ring-[#1d5c3a]/15 focus:border-[#1d5c3a]"
             >
               <option value="">Todas</option>
               {categories.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -455,14 +455,14 @@ export default function CrmCatalogClient({ tenantSlug }: { tenantSlug: string | 
                   <button
                     type="button"
                     onClick={() => openEdit(p)}
-                    className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[11.5px] font-semibold text-slate-700 hover:bg-slate-50 hover:border-[#1d5c3a]/30 hover:text-[#1d5c3a] transition"
+                    className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-[12.5px] sm:px-2 sm:py-1 sm:text-[11.5px] font-semibold text-slate-700 hover:bg-slate-50 hover:border-[#1d5c3a]/30 hover:text-[#1d5c3a] transition"
                   >
                     ✏️ Editar
                   </button>
                   <button
                     type="button"
                     onClick={() => duplicate(p)}
-                    className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[11.5px] font-semibold text-slate-700 hover:bg-slate-50 transition"
+                    className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-[12.5px] sm:px-2 sm:py-1 sm:text-[11.5px] font-semibold text-slate-700 hover:bg-slate-50 transition"
                     title="Duplicar"
                   >
                     ⧉ Duplicar
@@ -470,7 +470,7 @@ export default function CrmCatalogClient({ tenantSlug }: { tenantSlug: string | 
                   <button
                     type="button"
                     onClick={() => toggleActive(p)}
-                    className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11.5px] font-semibold transition ${
+                    className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-[12.5px] sm:px-2 sm:py-1 sm:text-[11.5px] font-semibold transition ${
                       p.active
                         ? "border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100"
                         : "border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
@@ -482,7 +482,7 @@ export default function CrmCatalogClient({ tenantSlug }: { tenantSlug: string | 
                   <button
                     type="button"
                     onClick={() => remove(p)}
-                    className="inline-flex items-center gap-1 rounded-md border border-red-100 bg-white px-2 py-1 text-[11.5px] font-semibold text-red-600 hover:bg-red-50 transition"
+                    className="inline-flex items-center gap-1 rounded-md border border-red-100 bg-white px-2.5 py-1.5 text-[12.5px] sm:px-2 sm:py-1 sm:text-[11.5px] font-semibold text-red-600 hover:bg-red-50 transition"
                     title="Excluir"
                   >
                     🗑

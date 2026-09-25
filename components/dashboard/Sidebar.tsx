@@ -268,7 +268,11 @@ export default function DashboardSidebar({
   return (
     <>
       {/* ── Topbar mobile ─────────────────────────────────── */}
-      <header className="sticky top-0 z-40 flex items-center gap-3 border-b border-gray-100 bg-white/95 px-4 py-3 backdrop-blur md:hidden">
+      {/* Sólido (sem /95 nem backdrop-blur): no mobile o conteúdo rolava
+          "por dentro" do topo e aparecia através do cabeçalho. z-50 mantém o
+          topo acima de qualquer bloco de conteúdo (drawer/modal continuam
+          acima por ordem no DOM). */}
+      <header className="sticky top-0 z-50 flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-3 shadow-[0_2px_10px_rgba(15,23,42,0.06)] md:hidden">
         <button
           type="button"
           onClick={() => setOpen(true)}
