@@ -255,7 +255,8 @@ export function Pricing({ content }: { content: PricingContent }) {
         <div className="oferta-incluidos">
           <h3 className="oferta-incluidos-title">✨ Tudo o que você recebe ao ativar</h3>
           <p className="oferta-incluidos-sub">
-            Site completo, Central de IA e CRM — o pacote inteiro que este site usa, sem taxas escondidas.
+            Não é só o site: você já leva a Central de IA e o CRM completos —
+            as mesmas ferramentas que este site usa agora.
           </p>
           <div className="oferta-incluidos-grid">
             {INCLUDED_CATALOG.map((g) => (
@@ -273,15 +274,16 @@ export function Pricing({ content }: { content: PricingContent }) {
             ))}
           </div>
           <p className="oferta-incluidos-nota">
-            Tudo o que está nesta página e mais — pronto para você usar no seu painel.
+            Tudo já vem liberado no seu painel — você personaliza em poucos cliques e usa no mesmo dia,
+            sem taxas escondidas.
           </p>
 
           <div className="oferta-demo-callout" role="region" aria-label="Demonstração do painel">
             <div className="oferta-demo-callout-text">
-              <strong>Quer testar antes de decidir?</strong>
+              <strong>Quer ver funcionando antes de decidir?</strong>
               <span>
-                Acesse nosso painel de demonstração e explore todas as ferramentas — Central de IA, CRM,
-                agendamento — sem compromisso.
+                Entre no nosso painel de demonstração e navegue pelas ferramentas — Central de IA, CRM,
+                catálogo, agendamento e sorteio de fidelidade — sem compromisso.
               </span>
             </div>
             <button
