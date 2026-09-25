@@ -68,6 +68,22 @@
 }
 
 
+/* Páginas internas (`.subpage`, ex.: /sorteio) não têm o hero escuro atrás do
+   nav fixo: aplica desde o start o mesmo visual de `nav.scrolled`, senão o
+   logo branco some no fundo claro e o conteúdo passa "por dentro" do topo. */
+#tenant-site.subpage nav:not(.scrolled) {
+  background: rgba(247, 242, 234, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(196, 150, 58, 0.15);
+}
+#tenant-site.subpage nav:not(.scrolled) .nav-logo { color: var(--verde); }
+#tenant-site.subpage nav:not(.scrolled) .nav-links a { color: var(--cinza); }
+#tenant-site.subpage nav:not(.scrolled) .nav-links a:hover { color: var(--verde); }
+#tenant-site.subpage nav:not(.scrolled) .nav-extra-link { color: var(--ouro); border-color: rgba(196, 150, 58, 0.4); }
+#tenant-site.subpage nav:not(.scrolled) .hamburger span { background: var(--verde); }
+
+
 #tenant-site .nav-logo {
   font-family: var(--font-display);
   font-size: 1.3rem;

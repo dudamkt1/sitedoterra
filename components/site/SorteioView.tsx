@@ -121,7 +121,7 @@ export function SorteioView({
   const takenMap = new Map(taken.map((t) => [t.number, t.name]));
 
   return (
-    <div id="tenant-site" data-slug={slug}>
+    <div id="tenant-site" data-slug={slug} className="subpage">
       <Header
         logoText={profileName}
         navItems={navItems}
@@ -133,7 +133,10 @@ export function SorteioView({
         id="topo"
         style={{
           background: "#faf8f2",
-          padding: "32px 16px 56px",
+          /* Nav é `position: fixed` (70px): reserva esse espaço, senão o
+             conteúdo começa por baixo do topo fixo. */
+          padding: "calc(70px + 32px) 16px 56px",
+          scrollMarginTop: 70,
         }}
       >
         <div style={{ maxWidth: 720, margin: "0 auto" }}>
