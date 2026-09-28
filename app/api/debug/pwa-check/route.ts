@@ -26,7 +26,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Missing slug parameter" }, { status: 400 });
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.topconsultores.com.br";
+  const baseUrl =
+    process.env.NEXT_PUBLIC_HOME_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    "https://site.topconsultores.com.br";
   const manifestUrl = `${baseUrl}/${slug}/manifest.webmanifest`;
 
   // 1. Buscar manifest

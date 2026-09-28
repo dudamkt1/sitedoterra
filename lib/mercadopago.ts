@@ -232,7 +232,7 @@ export async function createActivationPreference(
     },
     auto_return: "approved",
     notification_url: notificationUrl,
-    statement_descriptor: "SITE DOTERRA",
+    statement_descriptor: "TOPCONSULTOR",
   };
   if (paymentMethods) body.payment_methods = paymentMethods;
 
@@ -401,7 +401,7 @@ export async function processBrickPayment(input: BrickPaymentInput): Promise<MpP
     external_reference: kind === "subscription" ? `mon_${input.tenantId}` : `act_${input.tenantId}`,
     metadata,
     notification_url: `${appUrl}/api/webhooks/mercadopago`,
-    statement_descriptor: "SITE DOTERRA",
+    statement_descriptor: "TOPCONSULTOR",
     capture: true,
   };
   if (!isPix) {
@@ -729,7 +729,7 @@ export async function createMercadoPagoPreference(input: CreateMercadoPagoPrefer
     back_urls: input.backUrls,
     auto_return: "approved",
     metadata: { catalog_order: true },
-    statement_descriptor: "SITE DOTERRA",
+    statement_descriptor: "TOPCONSULTOR",
   };
 
   const res = await fetch(`${MERCADOPAGO_API}/checkout/preferences`, {

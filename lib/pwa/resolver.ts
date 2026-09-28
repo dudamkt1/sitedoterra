@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPublicTenantByDomain, getPublicTenantBySlug } from "@/lib/tenant";
+import { isPlatformHostname } from "@/lib/platform-domain";
 import {
   DEMO_PWA_SETTINGS,
   defaultPwaSettings,
@@ -11,7 +12,8 @@ import {
  * RESOLUÇÃO CENTRAL DO USUÁRIO ATUAL (PWA).
  *
  * Arquitetura: rota dinâmica /{slug} no domínio principal
- * (oleos.topconsultores.com.br/demonstracao) + domínio próprio opcional
+ * (site.topconsultores.com.br/demonstracao — domínio legado
+ * oleos.topconsultores.com.br continua no ar) + domínio próprio opcional
  * (joaoconsultor.com.br → mesmo perfil). NUNCA subdomínios.
  */
 export interface CurrentUserRef {
@@ -19,7 +21,7 @@ export interface CurrentUserRef {
   slug: string | null;
   /** true quando o acesso veio de um domínio próprio verificado */
   isCustomDomain: boolean;
-  /** origem do acesso, ex.: https://oleos.topconsultores.com.br */
+  /** origem do acesso, ex.: https://site.topconsultores.com.br */
   origin: string;
 }
 
@@ -44,6 +46,9 @@ function mainHosts(): string[] {
 export function isMainHost(host: string): boolean {
   const h = normalizeHost(host);
   if (!h || h === "localhost" || h.endsWith(".vercel.app") || h.endsWith(".local")) return true;
+  // Domínios da plataforma: principal (site.topconsultores.com.br) e legado
+  // (oleos.topconsultores.com.br) — ambos continuam servindo a mesma app.
+  if (isPlatformHostname(h)) return true;
   return mainHosts().includes(h);
 }
 

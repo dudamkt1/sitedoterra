@@ -14,13 +14,16 @@ import { LoyaltyRaffle } from "@/components/site/sections/LoyaltyRaffle";
 import { Faq } from "@/components/site/sections/Faq";
 import { Pricing } from "@/components/site/sections/Pricing";
 import { Affiliates } from "@/components/site/sections/Affiliates";
+import { PortfolioSection } from "@/components/site/sections/PortfolioSection";
 import { Footer } from "@/components/site/sections/Footer";
 import { SiteEffects } from "@/components/site/sections/SiteEffects";
 import { ThemePickerSection } from "@/components/site/ThemePickerSection";
 import { FloatingWhatsApp } from "@/components/site/FloatingWhatsApp";
 import { AffiliateAttribution } from "@/components/site/AffiliateAttribution";
 import { themeStyleTag, type SiteThemeConfig } from "@/lib/site-theme";
+import type { HeaderAccount } from "@/lib/header-account";
 import type { AffiliateDestination } from "@/lib/affiliate-destination";
+import type { PortfolioModelCard } from "@/lib/portfolio";
 
 export interface SiteContact {
   whatsapp?: string;
@@ -43,6 +46,11 @@ interface SiteHomeProps {
   contact?: SiteContact;
   logo?: SiteLogo;
   extraNav?: { label: string; href: string; className?: string }[];
+  /**
+   * Sessão ativa: o Header troca o link "Painel" pelo nome do usuário
+   * (menu suspenso Painel / Sair no desktop, ações abertas no drawer mobile).
+   */
+  account?: HeaderAccount | null;
   /**
    * Nome do consultor vindo de "Informações do site" (meu site) — 1ª coluna
    * do rodapé e linha final. Cai para o nome do perfil quando ausente.
@@ -87,6 +95,14 @@ interface SiteHomeProps {
    * `/{slug}/sorteio`; na HOME principal é `/sorteio`, sem slug).
    */
   sorteioHref?: string;
+  /**
+   * Modelos do PORTFÓLIO para a seção "Escolha seu modelo de site".
+   *
+   * Só a HOME do domínio principal informa esta lista. Em site de tenant a
+   * seção não recebe modelos → não renderiza nem entra no menu: um site de
+   * consultor nunca divulga modelos de outros sites.
+   */
+  portfolioModels?: PortfolioModelCard[] | null;
 }
 
 /**
@@ -95,14 +111,18 @@ interface SiteHomeProps {
  * renderiza cada uma como componente independente, na ordem correta.
  * Seções desativadas são simplesmente ignoradas.
  */
-export function SiteHome({ slug, sections, contact, logo, extraNav = [], ownerName, aboutDescription, theme, affiliateUserId, destination, tenantSite = false, loyaltyRaffleLive, loyaltyRaffleSample = false, sorteioHref }: SiteHomeProps) {
+export function SiteHome({ slug, sections, contact, logo, extraNav = [], account = null, ownerName, aboutDescription, theme, affiliateUserId, destination, tenantSite = false, loyaltyRaffleLive, loyaltyRaffleSample = false, sorteioHref, portfolioModels = null }: SiteHomeProps) {
   // NAV = SOMENTE seções ativas com conteúdo visível: além do `enabled`,
   // a seção Sorteio sai junto do menu quando o servidor já sabe que o
   // sorteio está desligado — exceto em modo vitrine (exemplo no domínio
   // principal), que mantém seção + menu. Evita link para seção vazia.
+  // A seção "portfolio" só existe onde há modelos para mostrar.
+  const showPortfolio = !!portfolioModels && portfolioModels.length > 0;
   const raffleShown = (s: { type: string }) =>
     s.type !== "loyalty_raffle" || loyaltyRaffleLive !== false || loyaltyRaffleSample;
-  const visible = sections.filter((s) => s.enabled && raffleShown(s));
+  const visible = sections.filter(
+    (s) => s.enabled && raffleShown(s) && (s.type !== "portfolio" || showPortfolio)
+  );
 
   const headerSection = visible.find((s) => s.type === "header");
   const headerContent = (headerSection?.content || {}) as Record<string, unknown>;
@@ -146,7 +166,7 @@ export function SiteHome({ slug, sections, contact, logo, extraNav = [], ownerNa
       {/* Tema do dono do site (server-side): variáveis CSS em #tenant-site */}
       <style dangerouslySetInnerHTML={{ __html: themeStyleTag(theme) }} />
       <SiteEffects />
-      <Header logoText={logoText} logoUrl={logoUrl} logoLightUrl={logoLightUrl} navItems={navItems} extraNav={extraNav} />
+      <Header logoText={logoText} logoUrl={logoUrl} logoLightUrl={logoLightUrl} navItems={navItems} extraNav={extraNav} account={account} />
 
       {/* Captura ?ref= do link de afiliado: dispara o click, persiste visitor_token
           em cookie first-party e leva o visitante até o destino resolvido
@@ -188,6 +208,10 @@ export function SiteHome({ slug, sections, contact, logo, extraNav = [], ownerNa
             return <Pricing key={s.id} content={s.content as never} />;
           case "affiliates":
             return <Affiliates key={s.id} content={s.content as never} />;
+          case "portfolio":
+            return (
+              <PortfolioSection key={s.id} content={s.content as never} models={portfolioModels} />
+            );
           case "footer":
             return null;
           default:

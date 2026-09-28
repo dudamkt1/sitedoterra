@@ -62,6 +62,25 @@ export async function POST(request: Request) {
   const tenant = await ensureTenantForUser(user.id);
   if (!tenant) return NextResponse.json({ error: "Tenant não encontrado" }, { status: 400 });
 
+  // MODELO DO SITE (portfólio): escolha da tela de ativação. Valida e grava
+  // em `tenants.portfolio_model_id` ANTES do pagamento — é esta referência
+  // que a ativação usa para copiar a estrutura. Site já criado = 409
+  // silencioso: o site é cópia independente e não muda mais de modelo.
+  const portfolioModelKey =
+    typeof body.portfolioModelKey === "string" ? body.portfolioModelKey.trim() : "";
+  if (portfolioModelKey) {
+    try {
+      const { selectPortfolioModelForTenant } = await import("@/lib/portfolio");
+      const picked = await selectPortfolioModelForTenant(tenant.id, portfolioModelKey);
+      if (!picked.ok && picked.status !== 409) {
+        return NextResponse.json({ error: picked.error }, { status: picked.status });
+      }
+    } catch (e) {
+      // Sem tabela ainda / falha transitória: o modelo padrão cobre o caso.
+      console.warn("[checkout] modelo do site não pôde ser registrado", (e as Error)?.message);
+    }
+  }
+
   // ---- Gateway definido pelo Super Admin (/admin/pagamentos) decide o fluxo ----
   // visitor_token: persiste a atribuição do afiliado até o webhook de pagamento.
   // Lido do cookie first-party definido por /api/affiliate/click.

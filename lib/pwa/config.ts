@@ -57,7 +57,7 @@ export const DEMO_PWA_SETTINGS: PwaSettings = {
 };
 
 export interface PwaUrlContext {
-  /** Origem canônica, ex.: https://oleos.topconsultores.com.br ou domínio próprio */
+  /** Origem canônica, ex.: https://site.topconsultores.com.br ou domínio próprio */
   origin: string;
   /** Escopo/base do app: "/{slug}/" na plataforma; "/" em domínio próprio */
   basePath: string; // sempre com barras nas pontas

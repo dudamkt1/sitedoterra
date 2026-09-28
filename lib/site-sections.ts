@@ -16,6 +16,7 @@ export const SECTION_TYPES: SectionType[] = [
   "hero",
   "trustbar",
   "about",
+  "portfolio",
   "testimonials",
   "story",
   "video",
@@ -34,6 +35,7 @@ export const SECTION_TYPE_LABELS: Record<SectionType, string> = {
   hero: "Hero principal",
   trustbar: "Barra de destaque",
   about: "Especialista / Apresentação",
+  portfolio: "Modelos de site",
   testimonials: "Depoimentos",
   story: "História / Sobre",
   video: "Vídeo / Conteúdo",
@@ -52,6 +54,7 @@ export const SECTION_TYPE_ICONS: Record<SectionType, string> = {
   hero: "🖼️",
   trustbar: "⭐",
   about: "🤖",
+  portfolio: "🧩",
   testimonials: "💬",
   story: "📖",
   video: "🎬",
@@ -71,6 +74,7 @@ export function anchorFor(type: SectionType): string {
     hero: "hero",
     trustbar: "destaque",
     about: "about",
+    portfolio: "modelos",
     testimonials: "depoimentos",
     story: "historia",
     video: "video",
@@ -149,6 +153,17 @@ export const DEFAULT_SECTION_CONTENT: Record<SectionType, Record<string, unknown
         "Olá! Sou a assistente especialista em óleos essenciais doTERRA 🌿 Me conte como você está se sentindo hoje — fisicamente ou emocionalmente — e vou indicar os melhores óleos para o seu momento!",
       placeholder: "Como você está se sentindo?",
     },
+  },
+  portfolio: {
+    eyebrow: "Modelos de site",
+    title: "Escolha seu modelo de site",
+    subtitle:
+      "Seu site profissional + ferramentas para vender e organizar seu negócio. Escolha o modelo que mais combina com a sua empresa e produtos — depois personalize textos, imagens, cores e seções no seu painel.",
+    buttonText: "Ver todos os modelos",
+    buttonUrl: "/portfolio",
+    maxModels: 6,
+    primaryButtonText: "Quero este modelo",
+    secondaryButtonText: "Ver modelo",
   },
   testimonials: {
     eyebrow: "O que dizem por aí",
@@ -367,7 +382,7 @@ export const DEFAULT_SECTION_CONTENT: Record<SectionType, Record<string, unknown
 
 function makeFallbackSection(type: SectionType, sort: number, required = true): SiteSection {
   const label = SECTION_TYPE_LABELS[type];
-  const navLabel = ["about", "testimonials", "story", "booking", "products", "loyalty_raffle", "faq"].includes(type)
+  const navLabel = ["about", "testimonials", "story", "booking", "products", "loyalty_raffle", "faq", "portfolio"].includes(type)
     ? label
     : undefined;
   return {
@@ -398,6 +413,7 @@ export const DEFAULT_SECTIONS: SiteSection[] = [
   makeFallbackSection("hero", 20),
   makeFallbackSection("trustbar", 30, false),
   makeFallbackSection("about", 40),
+  makeFallbackSection("portfolio", 45, false),
   makeFallbackSection("testimonials", 50),
   makeFallbackSection("story", 60),
   makeFallbackSection("video", 70),

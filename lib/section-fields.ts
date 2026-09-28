@@ -218,6 +218,16 @@ export const SECTION_CONTENT_FIELDS: Record<SectionType, ContentFieldDef[]> = {
     { key: "buttonText", label: "Texto do botão", type: "text" },
     { key: "buttonUrl", label: "Link do botão", type: "url" },
   ],
+  portfolio: [
+    { key: "eyebrow", label: "Selo superior", type: "text" },
+    { key: "title", label: "Título", type: "text", ai: true, aiKind: "title" },
+    { key: "subtitle", label: "Subtítulo", type: "textarea" },
+    { key: "buttonText", label: "Texto do botão", type: "text" },
+    { key: "buttonUrl", label: "Link do botão", type: "url" },
+    { key: "primaryButtonText", label: "Texto do botão do card", type: "text" },
+    { key: "secondaryButtonText", label: "Texto do link do card", type: "text" },
+    { key: "maxModels", label: "Máximo de modelos na Home", type: "text" },
+  ],
   footer: [
     { key: "aboutText", label: "Texto sobre", type: "textarea", ai: true, aiKind: "description" },
     {

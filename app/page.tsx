@@ -1,12 +1,13 @@
 import type { Metadata, Viewport } from "next";
 import { getCurrentUser } from "@/lib/auth";
 import { SiteHome } from "@/components/site/SiteHome";
-import { LoggedInNotice } from "@/components/site/LoggedInNotice";
+import { buildHeaderAccount } from "@/lib/header-account";
 import { SiteUnprepared } from "@/components/site/SiteUnprepared";
 import { PwaRegister } from "@/components/site/PwaRegister";
 import { DEFAULT_SITE_DATA } from "@/lib/site-data";
 import { resolveModelLogo } from "@/lib/site-data";
 import { resolveHomeSections } from "@/lib/home";
+import { listPortfolioModels, toModelCard } from "@/lib/portfolio";
 import { getPublicTenantBySlug } from "@/lib/tenant";
 import { getOfficialHomeTenant } from "@/lib/site-official";
 import { resolvePwaForRequest } from "@/lib/pwa/resolver";
@@ -137,9 +138,15 @@ export default async function HomePage() {
   const { manifestUrl, swUrl } = pwaUrls(pwa?.basePath || "/");
 
   const sections = await resolveHomeSections({ tenant, tenantDataOverridesGlobal: true, ignoreTenantOverrides: true });
+  // PORTFÓLIO: modelos ativos exibidos na seção "Escolha seu modelo de site"
+  // (somente no domínio principal; em /[slug] a lista fica vazia e a seção
+  // some da página e do menu). Lista em cache de 60s — casa com o ISR.
+  const portfolioModels = (await listPortfolioModels()).map(toModelCard);
   const siteData = (tenant.site_data || {}) as Record<string, unknown>;
   const theme = (siteData.theme as SiteThemeConfig | undefined) || null;
   const user = await userPromise;
+  // Menu de conta do nav: quando logado, o nome do usuário substitui "Painel".
+  const account = await buildHeaderAccount(user, "/");
 
   const canonicalUrl = getPublicBaseUrl();
 
@@ -150,7 +157,6 @@ export default async function HomePage() {
     return (
       <>
         <link rel="canonical" href={canonicalUrl} />
-        {user && <LoggedInNotice email={user.email} returnTo="/" />}
         <AffiliateAttribution
           destination={{ kind: "anchor", anchor: "planos", label: "planos" }}
         />
@@ -194,10 +200,10 @@ export default async function HomePage() {
     <>
       <link rel="canonical" href={canonicalUrl} />
       {pwaEnabled && <link rel="manifest" href={manifestUrl} />}
-      {user && <LoggedInNotice email={user.email} returnTo="/" />}
       <SiteHome
         slug={tenant.slug}
         sections={sections}
+        portfolioModels={portfolioModels}
         theme={theme}
         affiliateUserId={tenant.user_id}
         destination={destination}
@@ -220,6 +226,7 @@ export default async function HomePage() {
         ownerName={ownerName}
         aboutDescription={aboutDescription}
         extraNav={[{ label: "Painel", href: user ? "/painel" : "/login" }]}
+        account={account}
       />
       <PwaRegister
         enabled={pwaEnabled}

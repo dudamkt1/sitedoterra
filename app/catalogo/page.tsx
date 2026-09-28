@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getOfficialHomeTenant } from "@/lib/site-official";
+import { resolveHomeSections } from "@/lib/home";
+import { resolveModelLogo } from "@/lib/site-data";
 import {
   MAIN_CATALOG_KEY,
   buildWhatsAppLink,
@@ -11,7 +13,7 @@ import MainCatalogClient from "@/components/catalog/MainCatalogClient";
 export const dynamic = "force-dynamic";
 
 /**
- * Catálogo do DOMÍNIO PRINCIPAL — https://oleos.topconsultores.com.br/catalogo
+ * Catálogo do DOMÍNIO PRINCIPAL — https://site.topconsultores.com.br/catalogo
  *
  * Rota FIXA (sem slug), diferente de `/catalogo/[slug]` que é o catálogo
  * público de cada tenant. O conteúdo vem de `platform_config.main_catalog`,
@@ -48,9 +50,22 @@ export default async function MainCatalogPage({
     return s || undefined;
   };
 
-  const logoUrl = str(siteData.logoUrl);
-  const logoMode: "image" | "text" =
-    siteData.logoMode === "text" ? "text" : siteData.logoMode === "image" || logoUrl ? "image" : "text";
+  // LOGOTIPO SINCRONIZADO COM A HOME DO DOMÍNIO PRINCIPAL (`/` → SiteHome):
+  // mesma fonte e mesma prioridade — seção "Cabeçalho/Menu" do
+  // /admin/editor-home primeiro, `site_data` só como fallback, via
+  // `resolveModelLogo` (exatamente como app/page.tsx).
+  const sections = await resolveHomeSections({
+    tenant,
+    tenantDataOverridesGlobal: true,
+    ignoreTenantOverrides: true,
+  });
+  const headerContent = ((sections.find((s) => s.type === "header")?.content ||
+    {}) as Record<string, unknown>) || {};
+  const modelLogo = resolveModelLogo(
+    headerContent,
+    siteData,
+    tenant.profile_name || tenant.site_name || undefined
+  );
 
   const profileName =
     tenant.profile_name || str(siteData.fullName) || tenant.site_name || "TopConsultores";
@@ -70,7 +85,7 @@ export default async function MainCatalogPage({
       title={catalog.title}
       subtitle={catalog.subtitle}
       profileName={profileName}
-      logo={{ mode: logoMode, url: logoMode === "image" ? logoUrl : undefined, text: profileName }}
+      logo={{ mode: modelLogo.mode, url: modelLogo.url, text: modelLogo.text }}
       products={products}
       whatsappLink={whatsappLink}
       initialMessage={initialMessage}

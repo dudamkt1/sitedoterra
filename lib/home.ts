@@ -105,18 +105,55 @@ export async function getTenantSections(tenantId: string): Promise<Map<string, T
 export const SECTIONS_SNAPSHOT_MARKER = "_sections_snapshot_at";
 
 /**
- * FOTOGRAFIA NA ATIVAÇÃO: copia o template global vigente (`site_sections`)
- * para `tenant_sections` do tenant — SOMENTE as seções que ele ainda não tem
+ * `site_data` do tenant oficial — é dele que a cópia de cadastro de cada novo
+ * usuário parte, e por isso serve de LINHA DE BASE para o MODELO substituir
+ * apenas o que ninguém personalizou.
+ *
+ * Lê direto do banco (e não via `lib/site-official`): este módulo também é
+ * importado por componentes cliente e `site-official` carrega `server-only`,
+ * o que quebraria o build do client bundle.
+ */
+async function readOfficialSiteData(
+  admin: ReturnType<typeof createAdminClient>
+): Promise<Record<string, unknown> | null> {
+  try {
+    const { data: t } = await admin
+      .from("tenants")
+      .select("id")
+      .eq("is_official_home", true)
+      .maybeSingle();
+    if (!t) return null;
+    const { data: s } = await admin
+      .from("site_settings")
+      .select("data")
+      .eq("tenant_id", (t as { id: string }).id)
+      .maybeSingle();
+    return ((s?.data as Record<string, unknown>) || null);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * FOTOGRAFIA NA ATIVAÇÃO: copia o MODELO ESCOLHIDO pelo usuário
+ * (`portfolio_models` — Modelo Padrão quando ele não escolheu nada) para
+ * `tenant_sections` do tenant — SOMENTE as seções que ele ainda não tem
  * (nunca sobrescreve personalização existente; idempotente e seguro para
  * repetir). Ao final, carimba `site_settings.data._sections_snapshot_at`.
+ *
+ * É uma CÓPIA: a partir daqui o site é totalmente independente do modelo —
+ * editar o modelo no /admin/modelos-portfolio NUNCA altera este site, e
+ * personalizar este site nunca altera o modelo. Sem modelo cadastrado (tabela
+ * ainda não criada), o comportamento é exatamente o anterior: copia o
+ * template global vigente (`site_sections`).
  *
  * REGRA DE REATIVAÇÃO EXATA: se o carimbo já existe (site já foi ativado
  * antes, mesmo que desativado no momento), NADA é copiado — a HOME própria
  * armazenada é restaurada exatamente como estava, sem puxar o modelo atual.
  *
  * Usado em:
- *  - ativação do tenant (`activateTenant` — futuros usuários recebem a HOME
- *    definida pelo admin como padrão; reativações não tocam em nada);
+ *  - ativação do tenant (`activateTenant` — futuros usuários recebem o
+ *    MODELO escolhido na ativação; reativações não tocam em nada);
  *  - primeira resolução pós-deploy (tenants antigos já ativos: congela o
  *    estado atual uma única vez; daí em diante o admin não os altera mais).
  *
@@ -126,29 +163,63 @@ export async function snapshotTenantSections(tenantId: string): Promise<number> 
   if (!hasSupabaseEnv() || !tenantId) return 0;
   try {
     const admin = createAdminClient();
-    const [{ data: settingsRow }, { data: globals }, { data: existing }] = await Promise.all([
-      admin.from("site_settings").select("data").eq("tenant_id", tenantId).maybeSingle(),
-      admin.from("site_sections").select("id, enabled, content, settings"),
-      admin.from("tenant_sections").select("section_id").eq("tenant_id", tenantId),
-    ]);
+    const [{ data: settingsRow }, { data: globals }, { data: existing }, { data: tenantRow }] =
+      await Promise.all([
+        admin.from("site_settings").select("data").eq("tenant_id", tenantId).maybeSingle(),
+        admin.from("site_sections").select("id, key, type, enabled, content, settings, sort_order"),
+        admin.from("tenant_sections").select("section_id").eq("tenant_id", tenantId),
+        admin.from("tenants").select("portfolio_model_id").eq("id", tenantId).maybeSingle(),
+      ]);
     // Reativação (ou snapshot já feito): carimbo presente = configuração
     // própria existente — restaura exatamente como estava, sem copiar nada.
     const currentData = ((settingsRow?.data as Record<string, unknown>) || {}) as Record<string, unknown>;
     if (typeof currentData[SECTIONS_SNAPSHOT_MARKER] === "string") return 0;
-    const globalRows = (globals as { id: string; enabled: boolean; content: unknown; settings: unknown }[] | null) || [];
+    const globalRows = (globals as GlobalSectionRowLike[] | null) || [];
     // Sem template global no banco não há o que fotografar (a renderização
     // usa os padrões estáticos em memória, igual a hoje).
     if (globalRows.length === 0) return 0;
-    const have = new Set(((existing as { section_id: string }[] | null) || []).map((r) => r.section_id));
-    const missing = globalRows.filter((s) => !have.has(s.id));
-    if (missing.length > 0) {
-      const rows = missing.map((s) => ({
-        tenant_id: tenantId,
-        section_id: s.id,
-        enabled: s.enabled !== false,
-        content: (s.content as Record<string, unknown>) || {},
-        settings: (s.settings as Record<string, unknown>) || {},
-      }));
+    const have = new Set(
+      ((existing as { section_id: string }[] | null) || []).map((r) => r.section_id)
+    );
+
+    // MODELO DE ORIGEM: escolha do usuário na ativação → Modelo Padrão.
+    // A tabela pode ainda não existir (migração pendente) — nesse caso o
+    // modelo é null e a cópia segue o template global, como antes.
+    let model: import("@/lib/portfolio").PortfolioModel | null = null;
+    let rows: {
+      tenant_id: string;
+      section_id: string;
+      enabled: boolean;
+      content: Record<string, unknown>;
+      settings: Record<string, unknown>;
+      sort_order: number | null;
+    }[] = [];
+    try {
+      const portfolio = await import("@/lib/portfolio");
+      model = await portfolio.resolveTenantPortfolioModel(
+        tenantId,
+        (tenantRow as { portfolio_model_id?: string | null } | null)?.portfolio_model_id
+      );
+      if (model && model.sections.length === 0) model = null;
+      rows = portfolio.buildTenantSectionRows(tenantId, globalRows, model, have);
+    } catch {
+      model = null;
+      rows = [];
+    }
+    if (rows.length === 0 && !model) {
+      // Fallback idêntico ao comportamento anterior (sem Portfolio).
+      rows = globalRows
+        .filter((s) => s.id && !have.has(s.id))
+        .map((s) => ({
+          tenant_id: tenantId,
+          section_id: s.id,
+          enabled: s.enabled !== false,
+          content: (s.content as Record<string, unknown>) || {},
+          settings: (s.settings as Record<string, unknown>) || {},
+          sort_order: null as number | null,
+        }));
+    }
+    if (rows.length > 0) {
       const { error } = await admin
         .from("tenant_sections")
         .upsert(rows, { onConflict: "tenant_id,section_id", ignoreDuplicates: true });
@@ -157,22 +228,51 @@ export async function snapshotTenantSections(tenantId: string): Promise<number> 
         return 0;
       }
     }
+
+    // Dados base do modelo (informações do site) — só preenche o que está
+    // vazio ou ainda idêntico ao conteúdo oficial copiado no cadastro.
+    let dataToSave = currentData;
+    if (model) {
+      try {
+        const { applyModelSiteData } = await import("@/lib/portfolio");
+        const officialData = await readOfficialSiteData(admin);
+        dataToSave = applyModelSiteData(currentData, model.site_data, officialData);
+      } catch {
+        dataToSave = currentData;
+      }
+    }
+
     // Carimba o congelamento (cria site_settings se ainda não existir).
     try {
-      const data = { ...currentData, [SECTIONS_SNAPSHOT_MARKER]: new Date().toISOString() };
+      const data = { ...dataToSave, [SECTIONS_SNAPSHOT_MARKER]: new Date().toISOString() };
       await admin.from("site_settings").upsert({ tenant_id: tenantId, data }, { onConflict: "tenant_id" });
     } catch (e) {
       console.warn("[home] carimbo de snapshot falhou", (e as Error)?.message);
     }
-    return missing.length;
+    return rows.length;
   } catch (e) {
     console.warn("[home] snapshotTenantSections falhou", (e as Error)?.message);
     return 0;
   }
 }
 
-/** Mapeia os campos legados de site_settings.data para o conteúdo da seção. */
-function legacyContentFor(type: string, siteData: Record<string, unknown> | null | undefined): Record<string, unknown> {
+type GlobalSectionRowLike = {
+  id: string;
+  key?: string;
+  type?: string;
+  enabled?: boolean;
+  content?: unknown;
+  settings?: unknown;
+  sort_order?: number;
+};
+
+/**
+ * Mapeia os campos legados de `site_settings.data` ("Informações do site")
+ * para o conteúdo da seção correspondente. Usado na mescla da HOME real e na
+ * demonstração de um MODELO (/portfolio/[key]), que monta as seções direto do
+ * modelo, sem tenant.
+ */
+export function legacyContentFor(type: string, siteData: Record<string, unknown> | null | undefined): Record<string, unknown> {
   const d = siteData || {};
   // String vazia = campo não preenchido → undefined para NÃO apagar o
   // conteúdo global do template no deepMerge (só undefined/null são pulados).
@@ -455,6 +555,10 @@ export async function resolveHomeSections(opts: ResolveOptions): Promise<Resolve
       enabled,
       permissions: perms,
       content,
+      // Ordem herdada do MODELO escolhido na ativação (tenant_sections
+      // .sort_order); sem fotografia própria, vale a ordem global.
+      sort_order:
+        typeof override?.sort_order === "number" ? override.sort_order : section.sort_order,
       anchor: anchorFor(section.type),
       navLabel,
       tenant_override: !!override,

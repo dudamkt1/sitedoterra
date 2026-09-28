@@ -1,5 +1,5 @@
 /**
- * Catálogo do DOMÍNIO PRINCIPAL (https://oleos.topconsultores.com.br/catalogo).
+ * Catálogo do DOMÍNIO PRINCIPAL (https://site.topconsultores.com.br/catalogo).
  *
  * Guardado em `platform_config` (chave `main_catalog`, jsonb) — o mesmo
  * repositório de configurações globais usado por /admin/dominios. Assim o

@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { grantRaffleCreditsForSale } from "@/lib/crm-raffle";
 import { resolveGateways } from "@/lib/gateway-config";
 import { MERCADOPAGO_API, type MpPayment } from "@/lib/mercadopago";
+import { getPublicBaseUrl } from "@/lib/public-url";
 
 export const runtime = "nodejs";
 
@@ -180,8 +181,8 @@ export async function POST(request: Request) {
         },
         external_reference: `CATALOG-${orderId}`,
         metadata: { catalog_order: true, order_id: orderId, tenant_id: t.tenant_id, product_id: productId },
-        notification_url: `${process.env.NEXT_PUBLIC_APP_URL || "https://app.topconsultores.com.br"}/api/webhooks/mercadopago`,
-        statement_descriptor: "SITE DOTERRA",
+        notification_url: `${getPublicBaseUrl()}/api/webhooks/mercadopago`,
+        statement_descriptor: "TOPCONSULTOR",
         capture: true,
       }),
     });

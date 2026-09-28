@@ -20,6 +20,30 @@ export default async function MeuSitePage({ searchParams }: { searchParams?: { a
   const userId = ctx.profile?.user_id || "";
   const tenantSlug = ctx.tenant?.slug || "";
 
+  // MODELO DO SITE (portfólio): só existe escolha enquanto o site ainda não
+  // foi criado (site_status "pending"). Depois, a estrutura é cópia
+  // independente e o card não aparece mais.
+  const sitePending = !isDemo && (ctx.tenant?.site_status || "pending") === "pending";
+  let modelCard: { current: string; explicit: boolean; count: number } | null = null;
+  if (sitePending && ctx.tenant?.id) {
+    try {
+      const { listPortfolioModels, resolveTenantPortfolioModel } = await import("@/lib/portfolio");
+      const models = await listPortfolioModels();
+      const explicitId =
+        (ctx.tenant as { portfolio_model_id?: string | null }).portfolio_model_id || null;
+      const model = await resolveTenantPortfolioModel(ctx.tenant.id, explicitId);
+      if (model && models.length > 0) {
+        modelCard = {
+          current: model.name,
+          explicit: !!explicitId,
+          count: models.length,
+        };
+      }
+    } catch {
+      modelCard = null;
+    }
+  }
+
   // Estado financeiro pela ÚLTIMA atualização (qualquer tipo: ativação ou
   // mensalidade) — é ela que vale, não um reembolso antigo já superado por
   // um pagamento posterior.
@@ -163,6 +187,40 @@ export default async function MeuSitePage({ searchParams }: { searchParams?: { a
             >
               🚀 Ativar meu site
             </Link>
+          </div>
+        </div>
+      )}
+
+      {/* MODELO DO SITE — escolhido durante a ativação e editável enquanto o
+          site ainda não existe. Escolhido/confirmado, vira cópia independente. */}
+      {modelCard && (
+        <div className="card">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div className="min-w-0">
+              <h2 className="card-title mb-1">Modelo do seu site</h2>
+              <p className="text-sm text-gray-600 mt-1.5">
+                Seu site começa com a estrutura do{" "}
+                <b>{modelCard.current}</b>
+                {modelCard.explicit ? "" : " (padrão da plataforma)"} —{" "}
+                {modelCard.explicit
+                  ? "você escolheu este modelo na ativação."
+                  : "você ainda pode escolher outro antes de ativar."}
+              </p>
+              <p className="text-xs text-gray-500 mt-2">
+                Depois que o site for criado, esta escolha é definitiva: você personaliza textos,
+                cores e imagens pelo painel, sem depender do modelo.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Link href="/portfolio" className="btn btn-outline !py-2 !px-4 text-xs">
+                Ver modelos ({modelCard.count})
+              </Link>
+              {!modelCard.explicit && (
+                <Link href="/checkout" className="btn btn-primary !py-2 !px-4 text-xs">
+                  Escolher modelo
+                </Link>
+              )}
+            </div>
           </div>
         </div>
       )}

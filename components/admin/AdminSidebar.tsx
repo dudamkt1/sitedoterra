@@ -26,12 +26,14 @@ import {
   ShieldCheck,
   ChevronRight,
   BookOpen,
+  LayoutGrid,
 } from "lucide-react";
 
 const LINKS = [
   { href: "/admin", label: "Visão geral", icon: LayoutDashboard },
   { href: "/admin/usuarios", label: "Usuários", icon: Users },
   { href: "/admin/editor-home", label: "Editor da Home", icon: PenLine },
+  { href: "/admin/modelos-portfolio", label: "Modelos de site", icon: LayoutGrid },
   { href: "/admin/editor-ia", label: "Provedores de IA", icon: KeyRound },
   { href: "/admin/ia", label: "Central de IA", icon: Bot },
   { href: "/admin/crm", label: "CRM geral", icon: ContactRound },

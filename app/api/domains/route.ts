@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/auth";
 import { ensureTenantForUser } from "@/lib/onboarding";
 import { isValidDomain, normalizeDomain, isApexDomain, domainBase } from "@/lib/utils";
+import { PLATFORM_APEX_DOMAIN, PLATFORM_LEGACY_DOMAINS, PLATFORM_MAIN_DOMAIN } from "@/lib/platform-domain";
 import { addVercelDomain, buildDnsInstructions, getVercelDomain, VercelApiError } from "@/lib/vercel";
 import { getPublicBaseUrl } from "@/lib/public-url";
 
@@ -55,12 +56,15 @@ export async function POST(request: Request) {
 
   const base = domainBase(domain);
 
-  // Domínio principal da plataforma
-  const mainDomain = getPublicBaseUrl()
-    .replace(/^https?:\/\//, "")
-    .replace(/\/$/, "")
-    .replace(/^www\./, "");
-  if (mainDomain && base === mainDomain) {
+  // Domínios da plataforma (principal, legado e apex) — nunca podem ser
+  // registrados como domínio personalizado de um tenant.
+  const platformBases = new Set<string>([
+    domainBase(normalizeDomain(getPublicBaseUrl())),
+    normalizeDomain(PLATFORM_MAIN_DOMAIN),
+    normalizeDomain(PLATFORM_APEX_DOMAIN),
+    ...PLATFORM_LEGACY_DOMAINS.map((d) => normalizeDomain(d)),
+  ]);
+  if (base && platformBases.has(base)) {
     return NextResponse.json({ error: "Este domínio pertence à plataforma e não pode ser utilizado." }, { status: 409 });
   }
 

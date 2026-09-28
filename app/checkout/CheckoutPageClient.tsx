@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { loadStripe } from "@stripe/stripe-js";
 import { MercadoPagoBrick, type PixData } from "@/components/checkout/MercadoPagoBrick";
 import { PasswordField } from "@/components/PasswordField";
+import type { PortfolioModelCard } from "@/lib/portfolio";
 
 const INTENT_KEY = "checkout_intent_v1";
 
@@ -200,6 +201,17 @@ export default function CheckoutPageClient({
     usage_id: string | null;
   } | null>(null);
 
+  /**
+   * MODELO DO SITE (portfólio) — escolhido só na ATIVAÇÃO e somente enquanto
+   * o site ainda não existe. Depois que o site nasce, a escolha é definitiva
+   * (409 no salvamento) e o seletor some: o site virou cópia independente.
+   */
+  const [portfolioModels, setPortfolioModels] = useState<PortfolioModelCard[]>([]);
+  const [portfolioModelKey, setPortfolioModelKey] = useState<string | null>(null);
+  const [portfolioLocked, setPortfolioLocked] = useState(false);
+  const [portfolioBusy, setPortfolioBusy] = useState(false);
+  const [portfolioError, setPortfolioError] = useState<string | null>(null);
+
   const pollRef = useRef<NodeJS.Timeout | null>(null);
   const checkoutGuardRef = useRef(false);
 
@@ -273,6 +285,75 @@ export default function CheckoutPageClient({
       alive = false;
     };
   }, [isAuthed]);
+
+  /**
+   * Carrega o PORTFÓLIO de modelos (só na ativação). Pré-seleciona o modelo
+   * vindo de `/checkout?model=...` (escolhido na Home), o já registrado no
+   * tenant ou, por padrão, o Modelo Padrão. Se o site já existe, o seletor
+   * fica travado — a estrutura não pode mais mudar.
+   */
+  useEffect(() => {
+    if (isMonthly) return;
+    let alive = true;
+    fetch("/api/site/portfolio-model", { cache: "no-store" })
+      .then(async (r) => {
+        const j = await r.json().catch(() => ({}));
+        if (!alive) return;
+        const models: PortfolioModelCard[] = Array.isArray(j.models) ? j.models : [];
+        setPortfolioModels(models);
+        if (j.siteStatus && j.siteStatus !== "pending") {
+          setPortfolioLocked(true);
+          return;
+        }
+        const wanted = searchParams.get("model");
+        const current = typeof j.currentKey === "string" ? j.currentKey : null;
+        const fallback = models.find((m) => m.is_default)?.key || null;
+        const chosen =
+          (wanted && models.some((m) => m.key === wanted) ? wanted : null) || current || fallback;
+        if (chosen) {
+          setPortfolioModelKey(chosen);
+          // `?model=` e a pré-seleção atual são persistidos no backend; a
+          // escolha explícita do usuário também (ver choosePortfolioModel).
+          if (wanted && chosen === wanted && wanted !== current) persistModel(chosen, true);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthed, isMonthly]);
+
+  /** Registra a escolha do modelo no tenant (falha silenciosa nunca bloqueia). */
+  function persistModel(key: string, silent = false) {
+    if (!key || portfolioLocked) return;
+    setPortfolioBusy(true);
+    if (!silent) setPortfolioError(null);
+    fetch("/api/site/portfolio-model", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ modelKey: key }),
+    })
+      .then(async (r) => {
+        const j = await r.json().catch(() => ({}));
+        if (r.status === 409) {
+          setPortfolioLocked(true);
+          setPortfolioError(j.error || "Seu site já foi criado — o modelo não pode mais mudar.");
+          return;
+        }
+        if (!r.ok && !silent) setPortfolioError(j.error || "Não foi possível salvar o modelo.");
+      })
+      .catch(() => {
+        if (!silent) setPortfolioError("Não foi possível salvar o modelo. Tente novamente.");
+      })
+      .finally(() => setPortfolioBusy(false));
+  }
+
+  function choosePortfolioModel(key: string) {
+    if (portfolioLocked || portfolioBusy) return;
+    setPortfolioModelKey(key);
+    persistModel(key);
+  }
 
   async function handleSignup(e: React.FormEvent) {
     e.preventDefault();
@@ -348,6 +429,8 @@ export default function CheckoutPageClient({
           // Mensalidade avulsa + intenção de uso de crédito (valores no backend).
           ...(isMonthly ? { type: "subscription" } : {}),
           ...(useCredit === true ? { useAffiliateCredit: true } : {}),
+          // MODELO DO SITE: escolhido nesta tela; só existe em ativação.
+          ...(!isMonthly && portfolioModelKey ? { portfolioModelKey } : {}),
         }),
       });
       const json = await readJsonSafe(res);
@@ -727,6 +810,73 @@ export default function CheckoutPageClient({
               : "Escolha a forma de pagamento e ative seu Site Profissional."}
           </p>
         </div>
+
+        {/* MODELO DO SITE — escolha feita SÓ na ativação (nunca na mensalidade)
+            e somente enquanto o site ainda não existe. */}
+        {!isMonthly && portfolioModels.length > 0 && !portfolioLocked && (
+          <div className="w-full max-w-[1020px] mx-auto px-3 sm:px-6 mb-6 sm:mb-8">
+            <div className="rounded-[24px] bg-white/95 backdrop-blur border border-[#e7ece8] shadow-[0_16px_48px_rgba(16,61,45,0.09)] p-5 sm:p-6">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold tracking-[0.14em] uppercase text-[#8a9aa8] leading-4">Modelo do seu site</p>
+                  <p className="text-[15px] font-bold text-[#0f1a2a] mt-1 leading-6">Escolha por onde seu site começa</p>
+                  <p className="text-[12.5px] text-[#64748b] mt-1 leading-5">
+                    A estrutura nasce pronta — depois você personaliza textos, cores e imagens no painel.
+                    Esta escolha só vale para sites ainda não criados.
+                  </p>
+                </div>
+                <a href="/portfolio" target="_blank" rel="noopener noreferrer" className="text-[12.5px] font-semibold text-[#1a6b4a] hover:underline shrink-0">
+                  Ver todos ↗
+                </a>
+              </div>
+
+              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                {portfolioModels.map((m) => {
+                  const selected = portfolioModelKey === m.key;
+                  return (
+                    <button
+                      key={m.key}
+                      type="button"
+                      onClick={() => choosePortfolioModel(m.key)}
+                      disabled={portfolioBusy}
+                      aria-pressed={selected}
+                      className={`text-left rounded-[16px] border px-4 py-3.5 transition ${
+                        selected
+                          ? "border-[#1a6b4a] bg-[#f0f8f2] shadow-[0_6px_18px_rgba(26,107,74,0.14)]"
+                          : "border-[#e6ece8] bg-white hover:border-[#bcd8c5]"
+                      } ${portfolioBusy ? "opacity-70" : ""}`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span
+                          className={`w-4 h-4 rounded-full border shrink-0 flex items-center justify-center ${
+                            selected ? "border-[#1a6b4a] bg-[#1a6b4a]" : "border-[#cbd5e1]"
+                          }`}
+                        >
+                          {selected && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+                        </span>
+                        <span className="text-[13.5px] font-bold text-[#0f1a2a] truncate">{m.name}</span>
+                        {m.is_default && (
+                          <span className="shrink-0 rounded-full bg-[#fffbeb] border border-[#fde68a] px-2 py-0.5 text-[9.5px] font-extrabold uppercase tracking-[0.06em] text-[#92400e]">
+                            Padrão
+                          </span>
+                        )}
+                      </div>
+                      {m.description && (
+                        <p className="text-[12px] text-[#64748b] mt-1.5 leading-5">{m.description}</p>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <p className="text-[11.5px] text-[#64748b] mt-3 leading-5">
+                Dá para ver o resultado antes: abra a demonstração do modelo no
+                <a href="/portfolio" target="_blank" rel="noopener noreferrer" className="text-[#1a6b4a] font-semibold ml-1">portfólio ↗</a>
+              </p>
+              {portfolioError && <p className="text-[12px] text-red-600 mt-2 leading-5">{portfolioError}</p>}
+            </div>
+          </div>
+        )}
 
         {/* Grid 2 colunas — 380px + flex, centralizado, com respiro lateral no mobile */}
         <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-6 lg:gap-8 items-start w-full max-w-[1020px] mx-auto">

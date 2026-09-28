@@ -50,7 +50,7 @@ function arg(name, fallback) {
 }
 
 const BASE = (
-  arg("base", process.env.PWA_AUDIT_BASE || "https://oleos.topconsultores.com.br") || ""
+  arg("base", process.env.PWA_AUDIT_BASE || "https://site.topconsultores.com.br") || ""
 ).replace(/\/$/, "");
 const LIMIT = Number(arg("limit", "6"));
 

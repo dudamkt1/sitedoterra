@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { PLATFORM_MAIN_DOMAIN, isPlatformHostname } from "@/lib/platform-domain";
 import type {
   AffiliateSettings,
   AffiliateDashboardSummary,
@@ -795,9 +796,11 @@ export async function registerAffiliateClickServerSide(opts: {
  *
  * Prioridade da base:
  *   1. `NEXT_PUBLIC_HOME_URL` (domínio principal oficial — ex.:
- *      https://oleos.topconsultores.com.br)
+ *      https://site.topconsultores.com.br)
  *   2. `NEXT_PUBLIC_APP_URL`
- *   3. Fallback hardcoded `https://oleos.topconsultores.com.br`
+ *   3. Fallback hardcoded `https://site.topconsultores.com.br`
+ *      (o domínio legado oleos.topconsultores.com.br continua no ar — quem
+ *      acessar por ele é atendido pela mesma aplicação)
  *
  * O `?ref=` garante que o AffiliateAttribution da HOME capture a
  * atribuição via /api/affiliate/click (novo visitor_token first-party no
@@ -808,7 +811,7 @@ export function buildAffiliateExternalPlansUrl(ref: string): string {
   const base = (
     process.env.NEXT_PUBLIC_HOME_URL ||
     process.env.NEXT_PUBLIC_APP_URL ||
-    "https://oleos.topconsultores.com.br"
+    `https://${PLATFORM_MAIN_DOMAIN}`
   ).replace(/\/$/, "");
   return `${base}/?ref=${encodeURIComponent(ref)}#planos`;
 }
@@ -843,15 +846,17 @@ export function buildAffiliateRedirectTarget(opts: {
   ).replace(/\/$/, "");
   const isVercelHost = /\.vercel\.app$/i.test(opts.host) || opts.host === "localhost" || opts.host.startsWith("localhost:");
 
-  // Se o host atual é o host público (ex.: oleos.topconsultores.com.br) e
-  // não estamos no preview técnico, mantemos URL relativa — o redirect vai
-  // para o mesmo host, que é exatamente o domínio público oficial.
+  // Se o host atual é o host público (ex.: site.topconsultores.com.br) ou
+  // qualquer outro host da plataforma (inclui o legado
+  // oleos.topconsultores.com.br) e não estamos no preview técnico,
+  // mantemos URL relativa — o redirect vai para o mesmo host, preservando o
+  // cookie first-party (sem hop cross-origin entre domínios da plataforma).
   if (publicBase) {
     try {
       const pub = new URL(publicBase);
       const currentHost = (opts.host || "").toLowerCase().split(":")[0];
       const pubHost = pub.host.toLowerCase();
-      if (!isVercelHost && currentHost === pubHost) {
+      if (!isVercelHost && (currentHost === pubHost || isPlatformHostname(currentHost))) {
         // Mesmo host — URL relativa preserva o cookie first-party sem
         // nenhum hop cross-origin (mais simples e mais seguro).
         return `/?ref=${encodeURIComponent(opts.ref)}#planos`;

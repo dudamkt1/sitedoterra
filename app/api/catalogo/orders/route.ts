@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveGateways } from "@/lib/gateway-config";
 import { createMercadoPagoPreference, createPixPayment } from "@/lib/mercadopago";
+import { getPublicBaseUrl } from "@/lib/public-url";
 
 export const runtime = "nodejs";
 
@@ -12,7 +13,7 @@ export const runtime = "nodejs";
  * x-forwarded-host > env.
  */
 function resolveReturnBase(request: Request, bodyReturnUrl?: unknown): string {
-  const fallback = (process.env.NEXT_PUBLIC_APP_URL || "https://app.topconsultores.com.br").replace(/\/$/, "");
+  const fallback = getPublicBaseUrl().replace(/\/$/, "");
 
   // 1) returnUrl enviado pelo frontend (window.location.href da página do produto)
   if (typeof bodyReturnUrl === "string" && bodyReturnUrl.trim()) {
@@ -169,7 +170,7 @@ export async function POST(request: Request) {
           payerEmail: customerEmail || "cliente@catalogo.com",
           payerName: customerName,
           externalReference: `CATALOG-${order.id}`,
-          notificationUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://app.topconsultores.com.br"}/api/webhooks/mercadopago`,
+          notificationUrl: `${getPublicBaseUrl()}/api/webhooks/mercadopago`,
         });
 
         // Atualiza pedido com QR Code
@@ -214,7 +215,7 @@ export async function POST(request: Request) {
           }],
           payer: customerEmail ? { email: customerEmail } : undefined,
           externalReference: `CATALOG-${order.id}`,
-          notificationUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://app.topconsultores.com.br"}/api/webhooks/mercadopago`,
+          notificationUrl: `${getPublicBaseUrl()}/api/webhooks/mercadopago`,
           backUrls: {
             success: `${productBase}${sep}order_id=${order.id}&mp=success`,
             failure: `${productBase}${sep}order_id=${order.id}&mp=failure`,

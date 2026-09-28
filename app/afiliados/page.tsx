@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth";
+import { buildHeaderAccount } from "@/lib/header-account";
 import { Suspense } from "react";
 import "@/app/(site)/site.css";
 import { Header } from "@/components/site/sections/Header";
@@ -47,6 +48,7 @@ export default async function AfiliadosPage({
 }) {
   const user = await getCurrentUser();
   const ctaHref = user ? "/painel/afiliados" : "/login?next=/painel/afiliados";
+  const account = await buildHeaderAccount(user, "/afiliados");
 
   // Visitante vindo do site de uma consultora (?from=<slug>): valida o slug
   // (só tenants reais) para voltar à HOME DELA — nunca ao domínio principal.
@@ -138,7 +140,7 @@ export default async function AfiliadosPage({
         <style dangerouslySetInnerHTML={{ __html: themeStyleTag(theme) }} />
         <style dangerouslySetInnerHTML={{ __html: `#tenant-site nav:not(.scrolled){background:rgba(247,242,234,0.92);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid rgba(196,150,58,0.15);} #tenant-site nav:not(.scrolled) .nav-logo{color:var(--verde);} #tenant-site nav:not(.scrolled) .nav-links a{color:var(--cinza);} #tenant-site nav:not(.scrolled) .nav-links a:hover{color:var(--verde);} #tenant-site nav:not(.scrolled) .hamburger span{background:var(--verde);} #tenant-site nav:not(.scrolled) .nav-extra-link{color:var(--ouro);border-color:rgba(196,150,58,0.4);} ` }} />
         <SiteEffects />
-        <Header logoText={logoText} logoUrl={logoUrl} logoLightUrl={logoLightUrl} navItems={navItems} extraNav={[{ label: "Painel", href: user ? "/painel" : "/login" }]} logoHref={logoHref} />
+        <Header logoText={logoText} logoUrl={logoUrl} logoLightUrl={logoLightUrl} navItems={navItems} extraNav={[{ label: "Painel", href: user ? "/painel" : "/login" }]} account={account} logoHref={logoHref} />
         {/* Captura ?ref= de quem veio do site de uma consultora (registra o
             click + cookie de atribuição). Sem scroll (kind none). */}
         <Suspense fallback={null}>

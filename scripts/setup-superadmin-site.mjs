@@ -233,7 +233,7 @@ async function main() {
   console.log(" ✅ Configuração concluída!");
   console.log("    Super Admin:     " + SUPERADMIN_EMAIL);
   console.log("    URL Principal:   " + (env.NEXT_PUBLIC_HOME_URL || env.NEXT_PUBLIC_APP_URL));
-  console.log("    URL do Usuário:  " + (env.NEXT_PUBLIC_APP_URL || "https://oleos.topconsultores.com.br") + "/usuarioteste");
+  console.log("    URL do Usuário:  " + (env.NEXT_PUBLIC_APP_URL || "https://site.topconsultores.com.br") + "/usuarioteste");
   console.log("    Mensalidade:     ISENTA (monthly_billing_enabled=false)");
   console.log("    Site Status:     ATIVO");
   console.log("==================================================");

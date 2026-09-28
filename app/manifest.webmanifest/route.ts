@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 /**
  * GET /manifest.webmanifest  (raiz)
  * Usado quando a PWA é acessada por DOMÍNIO PRÓPRIO ou pela HOME do
- * domínio principal (oleos.topconsultores.com.br/):
+ * domínio principal (site.topconsultores.com.br/):
  *  - domínio próprio → resolve pelo hostname (RPC get_public_tenant_by_domain);
  *  - domínio principal → resolve pelo tenant de HOME_TENANT_SLUG.
  */

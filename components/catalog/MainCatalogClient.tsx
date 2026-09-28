@@ -63,13 +63,13 @@ export default function MainCatalogClient({
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="min-w-0">
-              <p className="text-[11px] uppercase tracking-[0.2em] text-white/70">Catálogo</p>
+              <p className="text-[11px] uppercase tracking-[0.2em] text-white/70">{title || "Catálogo"}</p>
               <div className="mt-2.5">
                 {logo.mode === "image" && logo.url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={logo.url}
-                    alt={title || logo.text}
+                    alt={logo.text}
                     className="h-12 sm:h-14 w-auto max-w-[240px] object-contain"
                     referrerPolicy="no-referrer"
                   />
@@ -78,7 +78,7 @@ export default function MainCatalogClient({
                     className="text-[26px] sm:text-[34px] font-extrabold tracking-tight leading-tight"
                     style={{ fontFamily: "var(--font-display)" }}
                   >
-                    {title || logo.text}
+                    {logo.text}
                   </h1>
                 )}
               </div>

@@ -19,6 +19,7 @@ import {
   type MainCatalog,
   type MainCatalogProduct,
 } from "@/lib/catalog-main";
+import { getPublicBaseUrl } from "@/lib/public-url";
 
 const EMPTY_FORM = {
   name: "",
@@ -32,7 +33,7 @@ const EMPTY_FORM = {
 
 /**
  * CATÁLOGO (Super Admin) — monta o catálogo público do DOMÍNIO PRINCIPAL.
- * Endereço fixo: https://oleos.topconsultores.com.br/catalogo
+ * Endereço fixo: https://site.topconsultores.com.br/catalogo
  *
  * Salva em `platform_config.main_catalog` (isolado dos `crm_products` dos
  * tenants) via /api/admin/catalogo. Não altera o catálogo `/catalogo/[slug]`
@@ -212,7 +213,7 @@ export default function AdminCatalogoPage() {
   return (
     <div>
       <SectionTitle
-        sub="Monte o catálogo de amostra que aparece no domínio principal, em https://oleos.topconsultores.com.br/catalogo. Produtos ficam isolados dos catálogos dos usuários."
+        sub={`Monte o catálogo de amostra que aparece no domínio principal, em ${getPublicBaseUrl()}/catalogo. Produtos ficam isolados dos catálogos dos usuários.`}
       >
         Catálogo
       </SectionTitle>

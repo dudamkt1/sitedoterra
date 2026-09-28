@@ -50,6 +50,8 @@ export const RESERVED_SLUGS = [
   "media",
   "arquivos",
   "uploads",
+  // Rota pública do portfólio de modelos (/portfolio) — nunca pode virar slug.
+  "portfolio",
 ];
 
 export function slugify(input: string): string {
@@ -130,7 +132,7 @@ export function isApexDomain(domain: string): boolean {
   const parts = value.split(".");
   if (parts.length < 2) return false;
   // Ex.: .com.br é um sufixo de duas partes → apex tem 3 rótulos (topconsultores.com.br).
-  // Já oleos.topconsultores.com.br tem 4 rótulos → é subdomínio.
+  // Já site.topconsultores.com.br (domínio principal) tem 4 rótulos → é subdomínio.
   const lastTwo = parts.slice(-2).join(".");
   if (TWO_PART_PUBLIC_SUFFIXES.has(lastTwo)) {
     return parts.length === 3;

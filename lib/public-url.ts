@@ -1,6 +1,6 @@
 /**
  * URL pública canônica da plataforma — SEMPRE o domínio direcionado
- * (ex.: https://oleos.topconsultores.com.br), nunca o domínio *.vercel.app.
+ * (ex.: https://site.topconsultores.com.br), nunca o domínio *.vercel.app.
  *
  * Prioridade:
  *   1. NEXT_PUBLIC_HOME_URL (definida na Vercel com o domínio principal)

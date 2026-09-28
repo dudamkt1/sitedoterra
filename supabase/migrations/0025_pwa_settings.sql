@@ -15,7 +15,7 @@ create table if not exists public.pwa_settings (
   icon_512_url      text,
   theme_color       text not null default '#1d5c3a',
   background_color  text not null default '#faf8f2',
-  -- 'platform' = https://oleos.topconsultores.com.br/{slug}
+  -- 'platform' = https://site.topconsultores.com.br/{slug}
   -- 'custom'   = domínio próprio verificado (quando houver)
   canonical         text not null default 'platform'
                     check (canonical in ('platform','custom')),

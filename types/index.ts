@@ -193,6 +193,7 @@ export type SectionType =
   | "faq"
   | "pricing"
   | "affiliates"
+  | "portfolio"
   | "footer";
 
 export interface SectionPermissions {
@@ -230,6 +231,8 @@ export interface TenantSection {
   enabled: boolean;
   content: Record<string, unknown>;
   settings: Record<string, unknown>;
+  /** Ordem herdada do modelo escolhido na ativação (null = ordem global). */
+  sort_order?: number | null;
   created_at?: string;
   updated_at?: string;
 }

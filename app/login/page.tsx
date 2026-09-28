@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth";
+import { buildHeaderAccount } from "@/lib/header-account";
 import { Suspense } from "react";
 import { LoginForm } from "@/components/auth/LoginForm";
 import "@/app/(site)/site.css";
@@ -60,6 +61,7 @@ export default async function LoginPage() {
   const navItems = [...homeNavItems.map((i) => ({ ...i, href: `/${i.href}` })), { label: "Afiliados", href: "/afiliados" }];
 
   const extraNav = [{ label: "Painel", href: user ? "/painel" : "/login" }];
+  const account = await buildHeaderAccount(user, "/login");
 
   const footerSection = visible.find((s) => s.type === "footer");
   const footerContent = (footerSection?.content || {}) as Record<string, unknown>;
@@ -82,7 +84,7 @@ export default async function LoginPage() {
         {/* Garante contraste do NAV fixo sobre fundo claro (sem alterar componente) */}
         <style dangerouslySetInnerHTML={{ __html: `#tenant-site nav:not(.scrolled){background:rgba(247,242,234,0.92);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid rgba(196,150,58,0.15);} #tenant-site nav:not(.scrolled) .nav-logo{color:var(--verde);} #tenant-site nav:not(.scrolled) .nav-links a{color:var(--cinza);} #tenant-site nav:not(.scrolled) .nav-links a:hover{color:var(--verde);} #tenant-site nav:not(.scrolled) .hamburger span{background:var(--verde);} #tenant-site nav:not(.scrolled) .nav-extra-link{color:var(--ouro);border-color:rgba(196,150,58,0.4);} ` }} />
         <SiteEffects />
-        <Header logoText={logoText} logoUrl={logoUrl} logoLightUrl={logoLightUrl} navItems={navItems} extraNav={extraNav} logoHref="/" />
+        <Header logoText={logoText} logoUrl={logoUrl} logoLightUrl={logoLightUrl} navItems={navItems} extraNav={extraNav} account={account} logoHref="/" />
       </div>
       {/* Isolado do NAV fixo (70px) — fundo suave com profundidade, respiro generoso */}
       <main className="flex-1 bg-gradient-to-b from-[#fcf9f5] via-[#f7f3ea] to-[#fcf9f5] pt-[70px] relative overflow-hidden">

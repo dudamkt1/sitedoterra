@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { getPublicTenantBySlug, getPublicTenantByDomain } from "@/lib/tenant";
+import { isPlatformHostname } from "@/lib/platform-domain";
 
 export const dynamic = "force-dynamic";
 
@@ -27,17 +28,16 @@ export async function GET() {
     // 1. Domínio personalizado verificado
     if (host) {
       const domain = host.toLowerCase().replace(/^www\./, "").split(":")[0];
-      const isPlatformDomain = domain.endsWith(".vercel.app") ||
-        (process.env.NEXT_PUBLIC_HOME_URL && domain === new URL(process.env.NEXT_PUBLIC_HOME_URL).host.replace(/^www\./, "")) ||
-        (process.env.NEXT_PUBLIC_APP_URL && domain === new URL(process.env.NEXT_PUBLIC_APP_URL).host.replace(/^www\./, ""));
-
+      // Domínios da plataforma (site.topconsultores.com.br e o legado
+      // oleos.topconsultores.com.br) NUNCA são domínio de tenant.
+      const isPlatformDomain = domain.endsWith(".vercel.app") || isPlatformHostname(domain);
 
       if (!isPlatformDomain) {
         tenant = await getPublicTenantByDomain(domain);
       }
     }
 
-    // 2. Referer na plataforma principal (oleos.topconsultores.com.br/{slug})
+    // 2. Referer na plataforma principal (site.topconsultores.com.br/{slug})
     if (!tenant && referer) {
       try {
         const refUrl = new URL(referer);
@@ -47,11 +47,11 @@ export async function GET() {
           .replace(/^www\./, "")
           .split("/")[0];
 
-        if (refHost === homeHost || refHost.endsWith(".vercel.app")) {
+        if (refHost === homeHost || refHost.endsWith(".vercel.app") || isPlatformHostname(refHost)) {
           const pathSegments = refUrl.pathname.split("/").filter(Boolean);
           if (pathSegments.length > 0) {
             const slug = pathSegments[0];
-            if (slug !== "demonstracao" && slug !== "painel" && slug !== "admin" && slug !== "login" && slug !== "cadastro" && slug !== "checkout" && slug !== "afiliados") {
+            if (slug !== "demonstracao" && slug !== "painel" && slug !== "admin" && slug !== "login" && slug !== "cadastro" && slug !== "checkout" && slug !== "afiliados" && slug !== "portfolio" && slug !== "catalogo") {
               tenant = await getPublicTenantBySlug(slug);
             }
           }

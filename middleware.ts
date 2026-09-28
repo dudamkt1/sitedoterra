@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { isNonTenantHostname } from "@/lib/platform-domain";
 
 const PROTECTED_PREFIXES = ["/painel", "/admin"];
 const AUTH_PREFIXES = ["/login", "/cadastro", "/signup"];
@@ -70,6 +71,11 @@ function isCustomDomain(host: string): boolean {
   if (!h) return false;
   if (h === "localhost" || h.startsWith("localhost:")) return false;
   if (h.endsWith(".vercel.app")) return false;
+  // Domínios da plataforma: NOVO (site.topconsultores.com.br) + LEGADO
+  // (oleos.topconsultores.com.br) + qualquer subdomínio do apex. Os dois
+  // continuam no ar com a mesma aplicação — nenhum deles resolve tenant por
+  // domínio personalizado (o usuário é servido por /{slug}).
+  if (isNonTenantHostname(host)) return false;
   // É domínio da plataforma se for exatamente o apex OU subdomínio do apex da plataforma
   if (PLATFORM_APEX_DOMAIN) {
     const apex = PLATFORM_APEX_DOMAIN.replace(/^www\./, "");

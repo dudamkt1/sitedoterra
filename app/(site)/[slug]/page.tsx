@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { notFound, redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { SiteHome } from "@/components/site/SiteHome";
-import { LoggedInNotice } from "@/components/site/LoggedInNotice";
+import { buildHeaderAccount } from "@/lib/header-account";
 import { SiteUnprepared } from "@/components/site/SiteUnprepared";
 import { DemoPublicSite } from "@/components/demo/DemoPublicSite";
 import { PwaRegister } from "@/components/site/PwaRegister";
@@ -289,11 +289,12 @@ export default async function TenantSitePage({
       }
     }
     const loyaltyRaffleSample = isOfficial && raffleSectionOn && loyaltyRaffleLive !== true;
+    // Menu de conta do nav: logado, o nome do usuário substitui "Painel".
+    const account = await buildHeaderAccount(user, `/${tenant.slug}`);
     return (
       <>
         <link rel="canonical" href={canonicalUrl} />
         {pwaEnabled && <link rel="manifest" href={manifestUrl} />}
-        {user && <LoggedInNotice email={user.email} returnTo={`/${tenant.slug}`} />}
         <SiteHome
           slug={tenant.slug}
           sections={sections}
@@ -321,6 +322,7 @@ export default async function TenantSitePage({
           ownerName={ownerName}
           aboutDescription={aboutDescription}
           extraNav={[{ label: "Painel", href: user ? "/painel" : "/login" }]}
+          account={account}
         />
         <PwaRegister
           enabled={pwaEnabled}
@@ -393,7 +395,6 @@ export default async function TenantSitePage({
     return (
       <>
         <link rel="canonical" href={canonicalUrl} />
-        {user && <LoggedInNotice email={user.email} returnTo={`/${tenant.slug}`} />}
         <SiteUnprepared tenant={tenant} destination={{ kind: "none", label: "site em preparação" }} />
       </>
     );

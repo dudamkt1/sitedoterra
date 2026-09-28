@@ -44,7 +44,7 @@ assert(typeof v1 === "string" && v1.length > 0, `versionToken = ${v1}`);
 
 console.log("\n== manifest ==");
 const m = buildManifest(settings, {
-  origin: "https://oleos.topconsultores.com.br",
+  origin: "https://site.topconsultores.com.br",
   basePath: "/mariatest/",
 });
 
@@ -53,9 +53,9 @@ assert(m.short_name === "Maria", `short_name = ${m.short_name}`);
 // start_url/scope/id ABSOLUTOS e SEM barra final em /{slug} (mesma origem) —
 // exigência para o SW controlar a página canônica e o Chrome oferecer a
 // instalação nativa. Na raiz ("/") a barra permanece.
-assert(m.start_url === "https://oleos.topconsultores.com.br/mariatest", `start_url = ${m.start_url}`);
-assert(m.scope === "https://oleos.topconsultores.com.br/mariatest", `scope = ${m.scope}`);
-assert(m.id === "https://oleos.topconsultores.com.br/mariatest", `id = ${m.id}`);
+assert(m.start_url === "https://site.topconsultores.com.br/mariatest", `start_url = ${m.start_url}`);
+assert(m.scope === "https://site.topconsultores.com.br/mariatest", `scope = ${m.scope}`);
+assert(m.id === "https://site.topconsultores.com.br/mariatest", `id = ${m.id}`);
 assert(m.theme_color === "#1d5c3a", `theme_color = ${m.theme_color}`);
 assert(m.background_color === "#faf8f2", `background_color = ${m.background_color}`);
 assert(m.display === "standalone", `display = ${m.display}`);
@@ -110,7 +110,7 @@ assert(mHome.scope === "https://mariaconsultora.com.br/", `scope = ${mHome.scope
 console.log("\n== fallback (sem upload) ==");
 const empty = defaultPwaSettings("tenant-x", "user-x");
 const mEmpty = buildManifest(empty, {
-  origin: "https://oleos.topconsultores.com.br",
+  origin: "https://site.topconsultores.com.br",
   basePath: "/x/",
 });
 // Arquitetura proxy same-origin: os 4 PNGs SEMPRE existem (servem o tile
