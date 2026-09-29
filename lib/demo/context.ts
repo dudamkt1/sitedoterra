@@ -97,7 +97,9 @@ export async function getDemoDashboardContext(): Promise<DemoDashboardContext | 
       },
     },
     domains: [
-      { id: "demo-domain", domain: "carla.consultoria.local", status: "active" },
+      // id bate com o seed do crm-store: desconectar/conectar na demonstração
+      // persiste no localStorage e a lista do painel é hidratada via /api/domains.
+      { id: "dom_1", domain: "carla.consultoria.local", status: "active" },
     ],
     plans: [
       {

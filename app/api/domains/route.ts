@@ -9,6 +9,24 @@ import { getPublicBaseUrl } from "@/lib/public-url";
 
 export const runtime = "nodejs";
 
+/** Lista os domínios do tenant logado (fonte de verdade para o painel). */
+export async function GET() {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+
+  const admin = createAdminClient();
+  const tenant = await ensureTenantForUser(user.id);
+  if (!tenant) return NextResponse.json({ domains: [] });
+
+  const { data } = await admin
+    .from("domains")
+    .select("*")
+    .eq("tenant_id", tenant.id)
+    .order("created_at", { ascending: false });
+
+  return NextResponse.json({ domains: data || [] });
+}
+
 /** Traduz o erro técnico em mensagem acionável para o usuário. */
 function friendlyInfraError(err: unknown): { error: string; status: number } {
   const msg = err instanceof Error ? err.message : String(err);
