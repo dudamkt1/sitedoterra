@@ -157,6 +157,9 @@ export async function ensureR2BucketCors(extraOrigins: string[] = []): Promise<v
     "https://sitedoterra-psi.vercel.app",
     "https://www.sitedoterra.com.br",
     "https://sitedoterra.com.br",
+    // Domínio principal + legado da plataforma (os dois servem a mesma app).
+    "https://site.topconsultores.com.br",
+    "https://oleos.topconsultores.com.br",
   ];
 
   const origins = Array.from(

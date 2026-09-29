@@ -60,8 +60,8 @@ async function isDemoCookieValid(raw: string | undefined | null): Promise<boolea
 const MAIN_HOST = (process.env.NEXT_PUBLIC_APP_URL || "")
   .replace(/^https?:\/\//, "")
   .replace(/\/$/, "");
-// Domínio principal da plataforma (apex) - ex.: topconsultores.com.br ou sitedoterra-psi.vercel.app
-// NÃO deve ser um subdomínio de tenant como oleos.topconsultores.com.br
+// Domínio raiz (apex) da plataforma - ex.: topconsultores.com.br ou sitedoterra-psi.vercel.app.
+// NÃO deve ser host de domínio personalizado de tenant (ex.: meusite.com.br).
 const PLATFORM_APEX_DOMAIN = (process.env.NEXT_PUBLIC_PLATFORM_APEX_DOMAIN || MAIN_HOST)
   .replace(/^https?:\/\//, "")
   .replace(/\/$/, "");

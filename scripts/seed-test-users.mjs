@@ -480,7 +480,7 @@ async function main() {
   console.log("\n==================================================");
   console.log(" ✅ Seed concluído.");
   console.log("    Conta única:  " + SUPERADMIN_EMAIL + " (super admin + usuário)");
-  console.log("    URL pública:  " + (env.NEXT_PUBLIC_APP_URL || "https://sitedoterra-psi.vercel.app") + "/usuarioteste");
+  console.log("    URL pública:  " + (env.NEXT_PUBLIC_APP_URL || "https://site.topconsultores.com.br") + "/usuarioteste");
   console.log("==================================================");
 }
 

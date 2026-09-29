@@ -54,7 +54,7 @@ const ALLOWED_KEYS = [
   "stats",
 ] as const;
 
-/** Hostname do domínio principal (ex.: oleos.topconsultores.com.br). */
+/** Hostname do domínio principal (ex.: site.topconsultores.com.br). */
 function mainDomainHostname(): string | null {
   try {
     const host = new URL(getPublicBaseUrl()).hostname.toLowerCase().replace(/^www\./, "");
@@ -209,7 +209,7 @@ async function resolveOfficialTenantId(admin: ReturnType<typeof createAdminClien
     // tenta a próxima estratégia
   }
 
-  // 3) Domínio principal (ex.: oleos.topconsultores.com.br).
+  // 3) Domínio principal (ex.: site.topconsultores.com.br).
   if (host) {
     try {
       const byDomain = await getPublicTenantByDomain(host);
