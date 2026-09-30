@@ -22,6 +22,10 @@ export interface PortfolioContent {
  * É a ponte entre "site pronto para consultor" e "portfólio de modelos":
  * o visitante vê os modelos, abre a demonstração e escolhe um para a
  * própria ativação (`/checkout?model=<key>`).
+ *
+ * Visual: cada card simula um navegador (barra + captura do site) e revela
+ * o CTA de demonstração no hover — mesma base de classes da página
+ * /portfolio, para os dois lugares falarem a mesma linguagem.
  */
 export function PortfolioSection({
   content,
@@ -56,14 +60,32 @@ export function PortfolioSection({
           const thumb = m.cover_url || m.thumbnail_url;
           const href = `/portfolio/${encodeURIComponent(m.key)}`;
           return (
-            <article key={m.key} className="pf-card reveal" style={{ transitionDelay: `${i * 0.12}s` }}>
+            <article
+              key={m.key}
+              className="pf-card reveal"
+              style={{ transitionDelay: `${Math.min(i, 5) * 0.1}s` }}
+            >
               <a className="pf-media" href={href} aria-label={`Ver modelo ${m.name}`}>
-                {thumb ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img className="pf-thumb" src={thumb} alt={m.name} loading="lazy" />
-                ) : (
-                  <span className="pf-placeholder">🧩</span>
-                )}
+                <span className="pf-chrome" aria-hidden="true">
+                  <span className="pf-chrome-dots">
+                    <i />
+                    <i />
+                    <i />
+                  </span>
+                  <span className="pf-chrome-url">/{m.key}</span>
+                </span>
+                <span className="pf-shot">
+                  {thumb ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img className="pf-thumb" src={thumb} alt="" loading="lazy" />
+                  ) : (
+                    <span className="pf-placeholder">🧩</span>
+                  )}
+                  <span className="pf-shot-shade" aria-hidden="true" />
+                  <span className="pf-shot-cta" aria-hidden="true">
+                    {secondaryCta} →
+                  </span>
+                </span>
                 {m.is_default && <span className="pf-badge">Padrão da plataforma</span>}
               </a>
               <div className="pf-body">
@@ -76,9 +98,12 @@ export function PortfolioSection({
                 <div className="pf-actions">
                   <a className="pf-btn" href={`/checkout?model=${encodeURIComponent(m.key)}`}>
                     {primaryCta}
+                    <span className="pf-btn-arrow" aria-hidden="true">
+                      →
+                    </span>
                   </a>
                   <a className="pf-link" href={href}>
-                    {secondaryCta} →
+                    {secondaryCta}
                   </a>
                 </div>
               </div>
