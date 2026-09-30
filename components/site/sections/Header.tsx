@@ -61,17 +61,23 @@ export function Header({ logoText = "Logo", logoUrl, logoLightUrl, navItems, ext
     };
   }, [open]);
 
-  // Fecha com ESC e ao voltar para desktop
+  // Fecha com ESC
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    const onResize = () => window.innerWidth > 768 && setOpen(false);
     window.addEventListener("keydown", onKey);
-    window.addEventListener("resize", onResize);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      window.removeEventListener("resize", onResize);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  // Fecha ao clicar fora do NAV — no desktop não há backdrop, então o clique
+  // fora é o caminho natural para dispensar o painel de seções.
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (e: MouseEvent) => {
+      if (!navRef.current?.contains(e.target as Node)) setOpen(false);
     };
+    document.addEventListener("mousedown", onPointer);
+    return () => document.removeEventListener("mousedown", onPointer);
   }, [open]);
 
   const allItems = [
@@ -108,10 +114,14 @@ export function Header({ logoText = "Logo", logoUrl, logoLightUrl, navItems, ext
         )}
       </a>
 
-      {/* Links desktop */}
+      {/* Menu desktop: as seções da HOME não ficam em linha — abrem pelo
+          hambúrguer ao lado de "Painel". Só Painel/conta ficam visíveis. */}
       <ul className="nav-links">
         {visibleItems.map((item) => (
-          <li key={item.href}>
+          <li
+            key={item.href}
+            className={item.extra ? "nav-extra-item" : "nav-section-item"}
+          >
             <a
               href={item.href}
               className={
@@ -131,6 +141,22 @@ export function Header({ logoText = "Logo", logoUrl, logoLightUrl, navItems, ext
             </a>
           </li>
         ))}
+
+        {/* Hambúrguer do desktop (no mobile ele já era o único visível) */}
+        <li className="nav-hamburger-item">
+          <button
+            type="button"
+            className="hamburger"
+            onClick={() => setOpen((v) => !v)}
+            aria-label={open ? "Fechar menu" : "Abrir menu"}
+            aria-expanded={open}
+            aria-controls="nav-sections-panel"
+          >
+            <span />
+            <span />
+            <span />
+          </button>
+        </li>
 
         {/* Conta logada: nome no lugar de "Painel" + menu ao passar o mouse */}
         {account && (
@@ -180,7 +206,7 @@ export function Header({ logoText = "Logo", logoUrl, logoLightUrl, navItems, ext
 
       {/* Painel mobile */}
       {open && <div className="nav-backdrop" onClick={() => setOpen(false)} />}
-      <div className="nav-mobile" aria-hidden={!open}>
+      <div className="nav-mobile" id="nav-sections-panel" aria-hidden={!open}>
         <ul className="nav-mobile-list">
           {visibleItems.map((item, i) => (
             <li key={item.href} style={{ transitionDelay: `${40 + i * 35}ms` }}>
@@ -234,18 +260,6 @@ export function Header({ logoText = "Logo", logoUrl, logoLightUrl, navItems, ext
           )}
         </ul>
       </div>
-
-      <button
-        type="button"
-        className="hamburger"
-        onClick={() => setOpen((v) => !v)}
-        aria-label={open ? "Fechar menu" : "Abrir menu"}
-        aria-expanded={open}
-      >
-        <span />
-        <span />
-        <span />
-      </button>
     </nav>
   );
 }
