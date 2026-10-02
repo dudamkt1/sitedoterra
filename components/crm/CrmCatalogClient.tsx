@@ -64,6 +64,7 @@ export default function CrmCatalogClient({ tenantSlug }: { tenantSlug: string | 
   const [paymentSettings, setPaymentSettings] = useState<PaymentSettingsState>(DEFAULT_PAYMENT_SETTINGS);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentSaving, setPaymentSaving] = useState(false);
+  const [paymentMigrationPending, setPaymentMigrationPending] = useState(false);
   const [tab, setTab] = useState<"products" | "payments">("products");
   const [pendingPayments, setPendingPayments] = useState(0);
 
@@ -111,6 +112,8 @@ export default function CrmCatalogClient({ tenantSlug }: { tenantSlug: string | 
         mp_access_token: s.mp_access_token ?? "",
         mp_public_key: s.mp_public_key ?? "",
       });
+      // Coluna ainda boolean = migration 0052 não aplicada no banco.
+      setPaymentMigrationPending(json.pendingMigration === true);
     } catch (e) {
       console.error("Erro ao carregar configurações de pagamento:", e);
     } finally {
@@ -632,6 +635,7 @@ export default function CrmCatalogClient({ tenantSlug }: { tenantSlug: string | 
           onSave={savePaymentSettings}
           saving={paymentSaving}
           loading={paymentLoading}
+          migrationPending={paymentMigrationPending}
         />
       )}
     </div>
@@ -716,12 +720,14 @@ function PaymentSettingsModal({
   onSave,
   saving,
   loading,
+  migrationPending,
 }: {
   settings: PaymentSettingsState;
   onClose: () => void;
   onSave: (values: PaymentSettingsState) => void;
   saving: boolean;
   loading: boolean;
+  migrationPending?: boolean;
 }) {
   const [form, setForm] = useState<PaymentSettingsState>(settings);
 
@@ -755,6 +761,16 @@ function PaymentSettingsModal({
         </div>
       ) : (
         <div className="space-y-5">
+          {migrationPending && (
+            <div className="rounded-[12px] border border-amber-300 bg-amber-50 p-3">
+              <p className="text-[12px] text-amber-900 leading-5">
+                <b>Banco ainda sem a migration 0052.</b> Sem ela a quantidade escolhida em
+                &quot;Parcelas sem juros até&quot; não pode ser salva. Rode o arquivo{" "}
+                <code className="font-mono">supabase/migrations/0052_catalog_installments_without_interest_qty.sql</code>{" "}
+                no SQL Editor do Supabase e recarregue esta página.
+              </p>
+            </div>
+          )}
           {/* PIX Section */}
           <div className="rounded-[12px] border border-[#e2e8e0] bg-white p-4">
             <div className="flex items-center justify-between mb-4">
@@ -904,12 +920,26 @@ function PaymentSettingsModal({
                 <Field label="Parcelas sem juros até">
                   <select
                     className="input"
-                    value={Math.min(Number(form.mp_installments_without_interest) || 1, form.mp_installments)}
-                    onChange={(e) => setForm((f) => ({ ...f, mp_installments_without_interest: Number(e.target.value) || 1 }))}
+                    value={Math.max(1, Math.min(12, Number(form.mp_installments_without_interest) || 1))}
+                    onChange={(e) =>
+                      setForm((f) => {
+                        const wo = Math.max(1, Math.min(12, Number(e.target.value) || 1));
+                        return {
+                          ...f,
+                          mp_installments_without_interest: wo,
+                          // Sem juros não pode passar do máximo: ajusta as parcelas máximas.
+                          mp_installments: Math.max(Number(f.mp_installments) || 1, wo),
+                        };
+                      })
+                    }
                   >
-                    {Array.from({ length: form.mp_installments }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}x</option>)}
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => (
+                      <option key={n} value={n}>{n}x</option>
+                    ))}
                   </select>
                   <p className="text-[11px] text-slate-500 mt-1.5">
+                    Escolha a quantidade de parcelas sem juros (1x a 12x). Se for maior que
+                    &quot;Parcelas máximas&quot;, esse valor é ajustado automaticamente.
                     Configure também o parcelamento sem juros no painel do Mercado Pago da sua conta.
                   </p>
                 </Field>

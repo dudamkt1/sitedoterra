@@ -32,7 +32,11 @@ export async function GET() {
     requires_contact_info: true,
   };
 
-  return NextResponse.json({ settings });
+  return NextResponse.json({
+    settings,
+    // Coluna ainda boolean = migration 0052 não aplicada (quantidade não salva).
+    pendingMigration: data ? typeof data.mp_installments_without_interest === "boolean" : false,
+  });
 }
 
 /** POST /api/crm/catalog-payment — cria/atualiza configurações de pagamento do catálogo. */
@@ -74,6 +78,17 @@ export async function POST(request: Request) {
 
   if (err) {
     console.error("[catalog-payment] erro ao salvar:", err);
+    const pendingMigration =
+      (err.code === "42804" || err.code === "22P02") && /boolean|integer/i.test(err.message || "");
+    if (pendingMigration) {
+      return NextResponse.json(
+        {
+          error:
+            "Migration 0052 pendente: rode supabase/migrations/0052_catalog_installments_without_interest_qty.sql no SQL Editor do Supabase e tente salvar novamente.",
+        },
+        { status: 501 }
+      );
+    }
     return NextResponse.json({ error: err.message || "Erro ao salvar configurações." }, { status: 500 });
   }
 
