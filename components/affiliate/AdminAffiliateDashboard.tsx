@@ -325,7 +325,7 @@ export function AdminAffiliateDashboard({ settings, affiliates, conversions, pay
         <h2 className="card-title mb-1">🎨 Materiais para Afiliados</h2>
         <p className="text-sm text-gray-500 mb-4">
           Criativos que os afiliados baixam em /painel/afiliados. Padrão: imagens Feed
-          1080×1080 · Stories 1080×1920 · vídeos 1:1 e 9:16.
+          1080×1080 · Feed 1080×1350 (4:5) · Stories 1080×1920 · vídeos 1:1 e 9:16.
         </p>
         <AffiliateMaterialsManager />
       </div>

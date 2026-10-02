@@ -17,13 +17,19 @@ async function requireSuperAdmin() {
 function sanitize(body: Record<string, unknown>) {
   const kind = String(body.kind || "imagem");
   const format = String(body.format || "feed_1x1");
+  const safeKind = (["imagem", "video"].includes(kind) ? kind : "imagem") as "imagem" | "video";
+  // feed_4x5 (1080x1350) é exclusivo de imagens.
+  const safeFormat = (
+    ["feed_1x1", "feed_4x5", "story_9x16"].includes(format) &&
+    !(format === "feed_4x5" && safeKind !== "imagem")
+      ? format
+      : "feed_1x1"
+  ) as "feed_1x1" | "feed_4x5" | "story_9x16";
   return {
     title: String(body.title || "").trim().slice(0, 120),
     description: body.description ? String(body.description).slice(0, 500) : null,
-    kind: (["imagem", "video"].includes(kind) ? kind : "imagem") as "imagem" | "video",
-    format: (["feed_1x1", "story_9x16"].includes(format) ? format : "feed_1x1") as
-      | "feed_1x1"
-      | "story_9x16",
+    kind: safeKind,
+    format: safeFormat,
     file_url: String(body.file_url || "").trim(),
     thumbnail_url: body.thumbnail_url ? String(body.thumbnail_url).trim() : null,
     file_size_bytes:

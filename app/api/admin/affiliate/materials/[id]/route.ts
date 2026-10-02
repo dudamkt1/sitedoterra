@@ -24,7 +24,7 @@ function sanitize(body: Record<string, unknown>) {
   }
   if (body.kind !== undefined) out.kind = ["imagem", "video"].includes(kind) ? kind : "imagem";
   if (body.format !== undefined) {
-    out.format = ["feed_1x1", "story_9x16"].includes(format) ? format : "feed_1x1";
+    out.format = ["feed_1x1", "feed_4x5", "story_9x16"].includes(format) ? format : "feed_1x1";
   }
   if (body.file_url !== undefined) out.file_url = String(body.file_url).trim();
   if (body.thumbnail_url !== undefined) {
@@ -44,6 +44,10 @@ function sanitize(body: Record<string, unknown>) {
   }
   if (body.active !== undefined) out.active = body.active !== false;
   if (body.sort_order !== undefined) out.sort_order = Math.round(Number(body.sort_order) || 0);
+  // feed_4x5 (1080x1350) é exclusivo de imagens.
+  if (out.format === "feed_4x5" && out.kind !== undefined && out.kind !== "imagem") {
+    out.format = "feed_1x1";
+  }
   return out;
 }
 

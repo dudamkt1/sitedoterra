@@ -817,9 +817,16 @@ export type AffiliateMaterialKind = "imagem" | "video";
 /**
  * Formato padrão do material:
  * - feed_1x1: Feed 1:1 (imagens 1080x1080, vídeos 1:1)
+ * - feed_4x5: Feed 4:5 (somente imagens 1080x1350)
  * - story_9x16: Stories 9:16 (imagens 1080x1920, vídeos 9:16)
  */
-export type AffiliateMaterialFormat = "feed_1x1" | "story_9x16";
+export type AffiliateMaterialFormat = "feed_1x1" | "feed_4x5" | "story_9x16";
+
+/** Formatos disponíveis por tipo de material. */
+export const AFFILIATE_MATERIAL_FORMATS: Record<AffiliateMaterialKind, AffiliateMaterialFormat[]> = {
+  imagem: ["feed_1x1", "feed_4x5", "story_9x16"],
+  video: ["feed_1x1", "story_9x16"],
+};
 
 export interface AffiliateMaterial {
   id: string;
@@ -840,7 +847,15 @@ export interface AffiliateMaterial {
 
 export const AFFILIATE_MATERIAL_FORMAT_LABELS: Record<AffiliateMaterialFormat, string> = {
   feed_1x1: "Feed 1:1 (1080×1080)",
+  feed_4x5: "Feed 4:5 (1080×1350)",
   story_9x16: "Stories 9:16 (1080×1920)",
+};
+
+/** Rótulos curtos (botões/badges). */
+export const AFFILIATE_MATERIAL_FORMAT_SHORT_LABELS: Record<AffiliateMaterialFormat, string> = {
+  feed_1x1: "Feed 1:1",
+  feed_4x5: "Feed 1080×1350",
+  story_9x16: "Stories 9:16",
 };
 
 // ============================ CRM METAS ============================

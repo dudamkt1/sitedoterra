@@ -6,6 +6,8 @@ import { Button, Input, Modal, Checkbox } from "@/components/dashboard/ui";
 import { MediaUploader } from "@/components/dashboard/MediaUploader";
 import {
   AFFILIATE_MATERIAL_FORMAT_LABELS,
+  AFFILIATE_MATERIAL_FORMATS,
+  AFFILIATE_MATERIAL_FORMAT_SHORT_LABELS,
   type AffiliateMaterial,
   type AffiliateMaterialFormat,
   type AffiliateMaterialKind,
@@ -39,6 +41,13 @@ const EMPTY_FORM: FormState = {
   active: true,
   sort_order: 0,
 };
+
+/** Proporção do preview conforme o formato. */
+function formatAspect(format: AffiliateMaterialFormat): string {
+  if (format === "story_9x16") return "9 / 16";
+  if (format === "feed_4x5") return "4 / 5";
+  return "1 / 1";
+}
 
 export function AffiliateMaterialsManager() {
   const [materials, setMaterials] = useState<AffiliateMaterial[]>([]);
@@ -194,7 +203,7 @@ export function AffiliateMaterialsManager() {
       <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
         <p className="text-sm text-gray-500">
           Arquivos que os afiliados baixam em <strong>/painel/afiliados</strong>. Padrão: imagens
-          Feed 1080×1080 · Stories 1080×1920 · vídeos 1:1 e 9:16.
+          Feed 1080×1080 · Feed 1080×1350 (4:5) · Stories 1080×1920 · vídeos 1:1 e 9:16.
         </p>
         <Button onClick={openCreate} icon={<Plus className="h-4 w-4 mr-2" />}>
           Novo Material
@@ -215,7 +224,7 @@ export function AffiliateMaterialsManager() {
               className={`rounded-xl border bg-white overflow-hidden ${m.active ? "border-gray-200" : "border-gray-200 opacity-60"}`}
             >
               <div className="relative bg-gray-100 flex items-center justify-center overflow-hidden"
-                style={{ aspectRatio: m.format === "story_9x16" ? "9 / 16" : "1 / 1", maxHeight: 220 }}>
+                style={{ aspectRatio: formatAspect(m.format), maxHeight: 220 }}>
                 {m.kind === "video" ? (
                   m.thumbnail_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -233,7 +242,7 @@ export function AffiliateMaterialsManager() {
                   {m.kind === "video" ? "🎬 Vídeo" : "🖼️ Imagem"}
                 </span>
                 <span className="absolute top-2 right-2 badge badge-gray !text-[10px]">
-                  {m.format === "story_9x16" ? "Stories 9:16" : "Feed 1:1"}
+                  {AFFILIATE_MATERIAL_FORMAT_SHORT_LABELS[m.format]}
                 </span>
                 {!m.active && (
                   <span className="absolute bottom-2 left-2 badge badge-gray !text-[10px]">Oculto</span>
@@ -307,7 +316,7 @@ export function AffiliateMaterialsManager() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-3">
             <div>
               <label className="label">Tipo *</label>
               <div className="flex gap-2">
@@ -316,7 +325,16 @@ export function AffiliateMaterialsManager() {
                     key={k}
                     type="button"
                     className={`btn flex-1 !py-2 !text-sm ${form.kind === k ? "btn-primary" : "btn-outline"}`}
-                    onClick={() => setForm((f) => ({ ...f, kind: k, file_url: "", thumbnail_url: "" }))}
+                    onClick={() =>
+                      setForm((f) => ({
+                        ...f,
+                        kind: k,
+                        // feed_4x5 existe só para imagem: vídeo volta para 1:1.
+                        format: AFFILIATE_MATERIAL_FORMATS[k].includes(f.format) ? f.format : "feed_1x1",
+                        file_url: "",
+                        thumbnail_url: "",
+                      }))
+                    }
                   >
                     {k === "imagem" ? "🖼️ Imagem" : "🎬 Vídeo"}
                   </button>
@@ -326,21 +344,22 @@ export function AffiliateMaterialsManager() {
             <div>
               <label className="label">Formato *</label>
               <div className="flex gap-2">
-                {(["feed_1x1", "story_9x16"] as AffiliateMaterialFormat[]).map((f) => (
+                {AFFILIATE_MATERIAL_FORMATS[form.kind].map((f) => (
                   <button
                     key={f}
                     type="button"
                     className={`btn flex-1 !py-2 !text-sm ${form.format === f ? "btn-primary" : "btn-outline"}`}
                     onClick={() => setForm((f2) => ({ ...f2, format: f }))}
                   >
-                    {f === "feed_1x1" ? "Feed 1:1" : "Stories 9:16"}
+                    {AFFILIATE_MATERIAL_FORMAT_SHORT_LABELS[f]}
                   </button>
                 ))}
               </div>
             </div>
           </div>
           <p className="text-[11px] text-gray-400 -mt-2">
-            Padrão: imagens Feed 1080×1080 · Stories 1080×1920 · vídeos 1:1 e 9:16.
+            Padrão: imagens Feed 1080×1080 · Feed 1080×1350 (4:5) · Stories 1080×1920 · vídeos 1:1
+            e 9:16.
           </p>
 
           <div className="w-full">
@@ -378,7 +397,7 @@ export function AffiliateMaterialsManager() {
               type="number"
               value={form.height}
               onChange={(e) => setForm((f) => ({ ...f, height: e.target.value }))}
-              placeholder="1080"
+              placeholder={form.format === "story_9x16" ? "1920" : form.format === "feed_4x5" ? "1350" : "1080"}
             />
           </div>
 

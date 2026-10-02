@@ -15,9 +15,10 @@ function formatBytes(n: number | null): string {
   return `${(n / 1024 / 1024).toFixed(1)} MB`;
 }
 
-const FORMAT_ORDER: AffiliateMaterialFormat[] = ["feed_1x1", "story_9x16"];
+const FORMAT_ORDER: AffiliateMaterialFormat[] = ["feed_1x1", "feed_4x5", "story_9x16"];
 const FORMAT_TITLES: Record<AffiliateMaterialFormat, string> = {
   feed_1x1: "🖼️ Feed 1:1",
+  feed_4x5: "🖼️ Feed 4:5",
   story_9x16: "📱 Stories 9:16",
 };
 
@@ -74,7 +75,7 @@ export function AffiliateMaterials() {
               <div key={m.id} className="rounded-xl border border-gray-100 bg-white overflow-hidden flex flex-col">
                 <div
                   className="relative bg-gray-100 flex items-center justify-center overflow-hidden"
-                  style={{ aspectRatio: m.format === "story_9x16" ? "9 / 16" : "1 / 1" }}
+                  style={{ aspectRatio: m.format === "story_9x16" ? "9 / 16" : m.format === "feed_4x5" ? "4 / 5" : "1 / 1" }}
                 >
                   {m.kind === "video" ? (
                     m.thumbnail_url ? (
