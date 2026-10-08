@@ -39,6 +39,15 @@ function sortByName(rows: Row[]): Row[] {
   });
 }
 
+/** Ordena do cadastro mais recente para o mais antigo. */
+function sortByMostRecent(rows: Row[]): Row[] {
+  return [...rows].sort((a, b) => {
+    const at = Date.parse(a?.profile?.created_at || "") || 0;
+    const bt = Date.parse(b?.profile?.created_at || "") || 0;
+    return bt - at;
+  });
+}
+
 export function AdminUsers({ rows, plans, currentUserId }: { rows: Row[]; plans: any[]; currentUserId?: string | null }) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -201,15 +210,15 @@ export function AdminUsers({ rows, plans, currentUserId }: { rows: Row[]; plans:
           name.includes(q) ||
           slug.includes(q) ||
           domains.some((d: any) => String(d?.domain || "").toLowerCase().includes(q));
-        const matchS = statusFilter === "all" || (r?.profile?.status || "") === statusFilter;
+        const matchS = statusFilter === "all" || statusFilter === "recent" || (r?.profile?.status || "") === statusFilter;
         const matchR = roleFilter === "all" || ((r?.profile?.role || "user") as string) === roleFilter;
         return matchQ && matchS && matchR;
       }),
     [rows, query, statusFilter, roleFilter]
   );
 
-  // Ordenação alfabética por nome — aplicada após filtros.
-  const sorted = useMemo(() => sortByName(filtered), [filtered]);
+  // Ordenação: "Mais recente" => por data de cadastro (desc); senão, alfabética por nome.
+  const sorted = useMemo(() => (statusFilter === "recent" ? sortByMostRecent(filtered) : sortByName(filtered)), [filtered, statusFilter]);
 
   // Paginação (20 por página).
   const totalPages = Math.max(1, Math.ceil(sorted.length / USERS_PER_PAGE));
@@ -237,6 +246,7 @@ export function AdminUsers({ rows, plans, currentUserId }: { rows: Row[]; plans:
         />
         <select className="input max-w-[180px]" value={statusFilter} onChange={(e) => changeFilter(setStatusFilter)(e.target.value)}>
           <option value="all">Todos os status</option>
+          <option value="recent">Mais recente</option>
           <option value="active">Ativo</option>
           <option value="pending_activation">Aguardando ativação</option>
           <option value="suspended">Suspenso</option>
