@@ -49,6 +49,26 @@ function sanitize(body: Record<string, unknown>) {
   };
 }
 
+/**
+ * Traduz erro de CHECK do banco em mensagem acionável.
+ * Caso conhecido: a migration 0056 (formato Feed 4:5) ainda não aplicada —
+ * o CHECK antigo de `affiliate_materials` rejeita format = 'feed_4x5'.
+ */
+function dbErrorResponse(err: { code?: string; message?: string }, fallback: string) {
+  const msg = String(err.message || "");
+  if (err.code === "23514" || /affiliate_materials_format_check/i.test(msg)) {
+    return NextResponse.json(
+      {
+        error:
+          "Banco ainda sem a migration 0056: o formato Feed 4:5 (1080×1350) não é aceito pelo banco. Rode supabase/migrations/0056_affiliate_material_format_feed_4x5.sql no SQL Editor do Supabase e tente novamente.",
+        pendingMigration: "0056",
+      },
+      { status: 409 }
+    );
+  }
+  return NextResponse.json({ error: fallback }, { status: 500 });
+}
+
 /** GET /api/admin/affiliate/materials — lista todos (ativos e inativos). */
 export async function GET() {
   const { error } = await requireSuperAdmin();
@@ -83,6 +103,6 @@ export async function POST(request: Request) {
     .insert({ ...payload, created_by: actor!.id })
     .select()
     .single();
-  if (err) return NextResponse.json({ error: "Erro ao criar material." }, { status: 500 });
+  if (err) return dbErrorResponse(err, "Erro ao criar material.");
   return NextResponse.json({ success: true, material: data });
 }

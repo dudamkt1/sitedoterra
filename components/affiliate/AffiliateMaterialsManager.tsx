@@ -139,6 +139,15 @@ export function AffiliateMaterialsManager() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
+        if (err.pendingMigration) {
+          alert(
+            `${err.error}\n\nComo aplicar:\n` +
+              "1. Abra o Supabase → SQL Editor\n" +
+              "2. Cole e execute o conteúdo de\n   supabase/migrations/0056_affiliate_material_format_feed_4x5.sql\n" +
+              "3. Recarregue a página e envie o material novamente."
+          );
+          return;
+        }
         throw new Error(err.error || "Erro ao salvar");
       }
       setOpenModal(false);
