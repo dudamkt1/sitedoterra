@@ -202,6 +202,8 @@ export function AdminUsers({ rows, plans, currentUserId }: { rows: Row[]; plans:
 
   async function createCredit() {
     setCreditMsg(null);
+    // Use the currently edited user's ID, or the first row's user ID if not editing
+    const selectedUserId = editing?.profile?.user_id || (rows.length > 0 ? rows[0].profile.user_id : null);
     // Use type assertion for HTMLInputElement since getElementById returns HTMLElement | null
     const amountInput = document.getElementById("credit-amount") as HTMLInputElement | null;
     const creditAmount = amountInput ? parseInt(amountInput.value || "0") : 0;
@@ -209,6 +211,10 @@ export function AdminUsers({ rows, plans, currentUserId }: { rows: Row[]; plans:
     const kind = kindInput?.value || "activation";
     if (creditAmount <= 0) {
       setCreditMsg({ ok: false, text: "Informe um valor maior que zero." });
+      return;
+    }
+    if (!selectedUserId) {
+      setCreditMsg({ ok: false, text: "Nenhum usuário selecionado." });
       return;
     }
     setBusy(creditAmount.toString());
