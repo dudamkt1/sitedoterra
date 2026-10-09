@@ -202,8 +202,11 @@ export function AdminUsers({ rows, plans, currentUserId }: { rows: Row[]; plans:
 
   async function createCredit() {
     setCreditMsg(null);
-    setCreditAmount(parseInt(document.getElementById("credit-amount")?.value || "0") || 0);
-    const kind = document.getElementById("credit-kind")?.value || "activation";
+    // Use type assertion for HTMLInputElement since getElementById returns HTMLElement | null
+    const amountInput = document.getElementById("credit-amount") as HTMLInputElement | null;
+    const creditAmount = amountInput ? parseInt(amountInput.value || "0") : 0;
+    const kindInput = document.getElementById("credit-kind") as HTMLInputElement | null;
+    const kind = kindInput?.value || "activation";
     if (creditAmount <= 0) {
       setCreditMsg({ ok: false, text: "Informe um valor maior que zero." });
       return;
