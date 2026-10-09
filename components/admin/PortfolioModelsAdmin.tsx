@@ -7,6 +7,7 @@ import {
   normalizeSectionPermissions,
 } from "@/lib/site-sections";
 import { SectionContentEditor } from "@/components/editors/SectionContentEditor";
+import { MediaPicker } from "@/components/media/MediaPicker";
 import type { PortfolioModel, PortfolioModelSection } from "@/lib/portfolio";
 
 interface Props {
@@ -56,6 +57,106 @@ function Field({
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
       />
+    </div>
+  );
+}
+
+/**
+ * Campo de imagem (capa / miniatura) com ENVIO de mídia e prévia do encaixe.
+ *
+ * Além da URL, o botão abre a biblioteca do sistema (upload para o Cloudflare
+ * R2). A prévia replica o cartão real do portfólio: proporção 16/11 com a
+ * "barra de navegador" no topo e corte pelo topo da imagem
+ * (`object-position: top center` em `site.css`) — assim o Super Admin vê
+ * exatamente como a foto vai ficar antes de salvar.
+ */
+function ImageField({
+  label,
+  value,
+  onChange,
+  recommended,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  recommended: string;
+}) {
+  const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
+
+  return (
+    <div>
+      <label className="label">{label}</label>
+      <div className="flex items-center gap-2">
+        <input
+          className="input"
+          type="text"
+          value={value}
+          placeholder="https://... ou envie um arquivo"
+          onChange={(e) => onChange(e.target.value)}
+        />
+        <MediaPicker
+          scope="system"
+          value={value || undefined}
+          onChange={(url) => onChange(url)}
+          label="Enviar mídia"
+        />
+      </div>
+
+      <div className="mt-2 flex items-start gap-3">
+        {/* Prévia do encaixe — mesmo formato do cartão da listagem */}
+        <div className="w-[168px] shrink-0 overflow-hidden rounded-lg border border-gray-200 bg-white">
+          <div className="flex flex-col" style={{ aspectRatio: "16 / 11" }}>
+            <div className="flex h-[16px] shrink-0 items-center gap-1 border-b border-gray-200 bg-[#f1f3f5] px-2">
+              <span className="h-1.5 w-1.5 rounded-full bg-gray-300" />
+              <span className="h-1.5 w-1.5 rounded-full bg-gray-300" />
+              <span className="h-1.5 w-1.5 rounded-full bg-gray-300" />
+            </div>
+            <div className="relative flex-1 overflow-hidden bg-gray-100">
+              {value ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={value}
+                  alt="Prévia do encaixe"
+                  className="absolute inset-0 h-full w-full object-cover object-top"
+                  referrerPolicy="no-referrer"
+                  onLoad={(e) =>
+                    setDims({
+                      w: e.currentTarget.naturalWidth,
+                      h: e.currentTarget.naturalHeight,
+                    })
+                  }
+                  onError={() => setDims(null)}
+                />
+              ) : (
+                <span className="absolute inset-0 grid place-items-center text-2xl text-gray-300">
+                  🖼️
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="min-w-0 text-[11.5px] leading-4 text-gray-500">
+          <p>
+            <strong className="text-gray-700">Melhor encaixe:</strong> proporção{" "}
+            <strong className="text-gray-700">16:11</strong> — recomendado{" "}
+            <strong className="text-gray-700">{recommended}</strong>. O recorte
+            começa pelo topo da imagem.
+          </p>
+          {value && dims && (
+            <p className="mt-1.5">
+              Arquivo atual: <strong>{dims.w}×{dims.h} px</strong>
+              {Math.abs(dims.w / dims.h - 16 / 11) > 0.08
+                ? " — fora da proporção ideal, as laterais/topo serão cortadas."
+                : " — proporção ideal."}
+            </p>
+          )}
+          <p className="mt-1.5 text-gray-400">
+            Use o botão ao lado para enviar um arquivo (PNG/JPG/WEBP) ou escolher
+            na biblioteca.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
@@ -414,8 +515,18 @@ export function PortfolioModelsAdmin({ initialModels }: Props) {
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <Field label="Imagem de capa (URL)" value={editing.cover_url || ""} onChange={(v) => setField("cover_url", v || null)} />
-                  <Field label="Miniatura (URL)" value={editing.thumbnail_url || ""} onChange={(v) => setField("thumbnail_url", v || null)} />
+                  <ImageField
+                    label="Imagem de capa"
+                    value={editing.cover_url || ""}
+                    onChange={(v) => setField("cover_url", v || null)}
+                    recommended="1600 × 1100 px"
+                  />
+                  <ImageField
+                    label="Miniatura"
+                    value={editing.thumbnail_url || ""}
+                    onChange={(v) => setField("thumbnail_url", v || null)}
+                    recommended="800 × 550 px"
+                  />
                 </div>
                 <Field label="Link da demonstração (opcional)" value={editing.demo_url || ""} onChange={(v) => setField("demo_url", v || null)} />
                 <div className="grid grid-cols-2 gap-3">

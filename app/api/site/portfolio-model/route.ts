@@ -22,10 +22,21 @@ export const runtime = "nodejs";
  */
 export async function GET() {
   const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+  const models = await listPortfolioModels();
+
+  // Visitante deslogado (1ª etapa do checkout): o CATÁLOGO é público — é o
+  // mesmo de /portfolio. Sem sessão não há tenant, então não há modelo
+  // "atual" nem status: a escolha fica no cliente e é gravada no servidor
+  // junto com o pagamento (body.portfolioModelKey em POST /api/checkout).
+  if (!user) {
+    return NextResponse.json({
+      models: models.map(toModelCard),
+      currentKey: null,
+      siteStatus: null,
+    });
+  }
 
   const tenant = await ensureTenantForUser(user.id);
-  const [models] = await Promise.all([listPortfolioModels()]);
   let currentKey: string | null = null;
   if (tenant) {
     try {

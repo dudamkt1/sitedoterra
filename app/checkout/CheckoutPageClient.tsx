@@ -58,6 +58,32 @@ function clearIntent() {
   } catch {}
 }
 
+/**
+ * Nome exibido do modelo de site. O modelo padrão do domínio principal é
+ * chamado de "Modelo Padrão" (é ele que o cliente recebe se não escolher nada).
+ */
+function modelLabel(m: PortfolioModelCard | null | undefined): string {
+  if (!m) return "Modelo Padrão";
+  return m.is_default ? "Modelo Padrão" : m.name;
+}
+
+/** Modelos agrupados por categoria (ordem do catálogo preservada). */
+function groupModelsByCategory(
+  models: PortfolioModelCard[]
+): { category: string; items: PortfolioModelCard[] }[] {
+  const groups: { category: string; items: PortfolioModelCard[] }[] = [];
+  for (const m of models) {
+    const category = (m.category || "").trim() || "Outros modelos";
+    let group = groups.find((g) => g.category === category);
+    if (!group) {
+      group = { category, items: [] };
+      groups.push(group);
+    }
+    group.items.push(m);
+  }
+  return groups;
+}
+
 type Step = "identify" | "checkout" | "payment" | "pix" | "processing" | "success" | "error" | "pending";
 
 export function friendlyError(raw: string): string {
@@ -211,6 +237,8 @@ export default function CheckoutPageClient({
   const [portfolioLocked, setPortfolioLocked] = useState(false);
   const [portfolioBusy, setPortfolioBusy] = useState(false);
   const [portfolioError, setPortfolioError] = useState<string | null>(null);
+  /** Etapa 1: painel de troca de modelo aberto/fechado. */
+  const [modelPickerOpen, setModelPickerOpen] = useState(false);
 
   const pollRef = useRef<NodeJS.Timeout | null>(null);
   const checkoutGuardRef = useRef(false);
@@ -311,7 +339,10 @@ export default function CheckoutPageClient({
         const chosen =
           (wanted && models.some((m) => m.key === wanted) ? wanted : null) || current || fallback;
         if (chosen) {
-          setPortfolioModelKey(chosen);
+          // Não apaga uma escolha já feita pelo próprio usuário (ex.: trocou
+          // o modelo na Etapa 1 antes de criar a conta) — este effect roda de
+          // novo quando a sessão nasce e o backend ainda não tem nada gravado.
+          setPortfolioModelKey((prev) => prev || chosen);
           // `?model=` e a pré-seleção atual são persistidos no backend; a
           // escolha explícita do usuário também (ver choosePortfolioModel).
           if (wanted && chosen === wanted && wanted !== current) persistModel(chosen, true);
@@ -327,6 +358,9 @@ export default function CheckoutPageClient({
   /** Registra a escolha do modelo no tenant (falha silenciosa nunca bloqueia). */
   function persistModel(key: string, silent = false) {
     if (!key || portfolioLocked) return;
+    // Visitante ainda não tem conta/tenant: a escolha vive no estado da tela
+    // e vai para o servidor junto com o pagamento (POST /api/checkout).
+    if (!isAuthed) return;
     setPortfolioBusy(true);
     if (!silent) setPortfolioError(null);
     fetch("/api/site/portfolio-model", {
@@ -647,6 +681,10 @@ export default function CheckoutPageClient({
 
   // IDENTIFY — Etapa 1 (Criar conta / Entrar) — premium, com plano no topo
   if (step === "identify") {
+    const selectedModel = portfolioModels.find((m) => m.key === portfolioModelKey) || null;
+    const modelGroups = groupModelsByCategory(portfolioModels);
+    const showModelCard = !isMonthly && portfolioModels.length > 0 && !portfolioLocked;
+
     return (
       <div className="w-full flex flex-col items-center px-2 sm:px-6">
         {/* Stepper discreto — Etapa 1 de 2 */}
@@ -685,6 +723,131 @@ export default function CheckoutPageClient({
             </div>
           </div>
         </div>
+
+        {/* MODELO DO SITE — já na 1ª página: o cliente vê o que está comprando
+            e pode trocar (opções agrupadas por categoria) antes de criar conta.
+            A escolha segue para o pagamento e vira a estrutura do site na
+            ativação (tenants.portfolio_model_id). */}
+        {showModelCard && (
+          <div className="w-full max-w-[560px] mb-6 sm:mb-8 px-1 sm:px-0">
+            <div className="rounded-[20px] bg-white/90 backdrop-blur border border-[#e7ece8] shadow-[0_12px_32px_rgba(16,61,45,0.08)] overflow-hidden">
+              <div className="px-5 sm:px-6 py-4 sm:py-5">
+                <div className="flex items-center gap-4">
+                  <div className="w-[76px] shrink-0 overflow-hidden rounded-[10px] border border-[#e2efe4] bg-[#eef6ee]">
+                    <div className="flex flex-col" style={{ aspectRatio: "16 / 11" }}>
+                      <div className="flex h-[10px] shrink-0 items-center gap-[3px] border-b border-[#e6ece8] bg-[#f4f7f4] px-1.5">
+                        <span className="h-[3px] w-[3px] rounded-full bg-[#cfd8d2]" />
+                        <span className="h-[3px] w-[3px] rounded-full bg-[#cfd8d2]" />
+                        <span className="h-[3px] w-[3px] rounded-full bg-[#cfd8d2]" />
+                      </div>
+                      <div className="relative flex-1 overflow-hidden bg-white">
+                        {selectedModel && (selectedModel.cover_url || selectedModel.thumbnail_url) ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={selectedModel.cover_url || selectedModel.thumbnail_url || ""}
+                            alt=""
+                            className="absolute inset-0 h-full w-full object-cover object-top"
+                            referrerPolicy="no-referrer"
+                          />
+                        ) : (
+                          <span className="absolute inset-0 grid place-items-center text-lg" aria-hidden>🧩</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] font-bold tracking-[0.13em] uppercase text-[#8a9aa8] leading-4">Modelo do seu site</p>
+                    <p className="text-[15px] font-bold text-[#0f1a2a] mt-0.5 leading-6 tracking-tight truncate">{modelLabel(selectedModel)}</p>
+                    <p className="text-[12px] text-[#64748b] mt-0.5 leading-5 truncate">
+                      {[selectedModel?.company, selectedModel?.category].filter(Boolean).join(" · ") ||
+                        "Estrutura pronta para personalizar"}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setModelPickerOpen((v) => !v)}
+                    disabled={portfolioBusy}
+                    className="shrink-0 rounded-[10px] border border-[#cfe0d4] bg-white px-3.5 py-2.5 text-[12.5px] font-semibold text-[#1a6b4a] hover:bg-[#f0f8f2] transition disabled:opacity-60"
+                  >
+                    {modelPickerOpen ? "Fechar" : "Trocar modelo"}
+                  </button>
+                </div>
+
+                {modelPickerOpen && (
+                  <div className="mt-4 border-t border-[#eef2ee] pt-4">
+                    <div className="max-h-[46vh] space-y-4 overflow-y-auto pr-1">
+                      {modelGroups.map((group) => (
+                        <div key={group.category}>
+                          <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[#8a9aa8]">
+                            {group.category}
+                          </p>
+                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                            {group.items.map((m) => {
+                              const selected = portfolioModelKey === m.key;
+                              return (
+                                <button
+                                  key={m.key}
+                                  type="button"
+                                  onClick={() => {
+                                    choosePortfolioModel(m.key);
+                                    setModelPickerOpen(false);
+                                  }}
+                                  disabled={portfolioBusy}
+                                  aria-pressed={selected}
+                                  className={`text-left rounded-[14px] border px-3.5 py-3 transition ${
+                                    selected
+                                      ? "border-[#1a6b4a] bg-[#f0f8f2]"
+                                      : "border-[#e6ece8] bg-white hover:border-[#bcd8c5]"
+                                  } ${portfolioBusy ? "opacity-70" : ""}`}
+                                >
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <span
+                                      className={`w-4 h-4 rounded-full border shrink-0 flex items-center justify-center ${
+                                        selected ? "border-[#1a6b4a] bg-[#1a6b4a]" : "border-[#cbd5e1]"
+                                      }`}
+                                    >
+                                      {selected && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+                                    </span>
+                                    <span className="text-[13px] font-bold text-[#0f1a2a] truncate">
+                                      {modelLabel(m)}
+                                    </span>
+                                    {m.is_default && (
+                                      <span className="shrink-0 rounded-full bg-[#fffbeb] border border-[#fde68a] px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-[0.06em] text-[#92400e]">
+                                        Padrão
+                                      </span>
+                                    )}
+                                  </div>
+                                  {m.description && (
+                                    <p className="mt-1 text-[11.5px] leading-4 text-[#64748b]">{m.description}</p>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="mt-3 text-[11.5px] leading-5 text-[#64748b]">
+                      Depois do pagamento seu site nasce exatamente com este modelo — e você personaliza tudo no
+                      painel. Quer ver antes?{" "}
+                      <a
+                        href="/portfolio"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-semibold text-[#1a6b4a]"
+                      >
+                        Demonstração no portfólio ↗
+                      </a>
+                    </p>
+                    {portfolioError && (
+                      <p className="mt-2 text-[12px] leading-5 text-red-600">{portfolioError}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="w-full max-w-[560px] px-1 sm:px-0">
           {authMode === "signup" ? (
