@@ -71,6 +71,10 @@ export function AdminUsers({ rows, plans, currentUserId }: { rows: Row[]; plans:
 
   // ---- Modal de ativação com escolha de billing ----
   const [activateFor, setActivateFor] = useState<{ row: Row; mode: "trial" | "monthly" | "none" } | null>(null);
+  const [showCreditModal, setShowCreditModal] = useState(false);
+  const [creditAmount, setCreditAmount] = useState(0);
+  const [creditKind, setCreditKind] = useState("activation");
+  const [creditMsg, setCreditMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   function openEdit(r: Row) {
     setEditing(r);
@@ -196,6 +200,28 @@ export function AdminUsers({ rows, plans, currentUserId }: { rows: Row[]; plans:
     setTimeout(() => window.location.reload(), 600);
   }
 
+  async function createCredit() {
+    setCreditMsg(null);
+    setCreditAmount(parseInt(document.getElementById("credit-amount")?.value || "0") || 0);
+    const kind = document.getElementById("credit-kind")?.value || "activation";
+    if (creditAmount <= 0) {
+      setCreditMsg({ ok: false, text: "Informe um valor maior que zero." });
+      return;
+    }
+    setBusy(creditAmount.toString());
+    const { ok, json } = await api(`/api/admin/users/${selectedUserId}/credit`, { amount: creditAmount, kind }, "POST");
+    setBusy(null);
+    if (!ok) {
+      setCreditMsg({ ok: false, text: json.error || "Erro ao criar crédito." });
+      return;
+    }
+    setCreditMsg({ ok: true, text: "Crédito criado com sucesso!" });
+    setShowCreditModal(false);
+    setCreditAmount(0);
+    setCreditKind("activation");
+    window.location.reload();
+  }
+
   const filtered = useMemo(
     () =>
       (rows || []).filter((r) => {
@@ -264,6 +290,9 @@ export function AdminUsers({ rows, plans, currentUserId }: { rows: Row[]; plans:
         </span>
         <button className="btn btn-primary" onClick={() => { setCreating(true); setCreateForm({ name: "", email: "", password: "", role: "user" }); setCreateMsg(null); }}>
           ＋ Novo usuário
+        </button>
+        <button className="btn btn-outline" onClick={() => setShowCreditModal(!showCreditModal)}>
+          ＋ Criar crédito
         </button>
       </div>
 
