@@ -146,7 +146,7 @@ export function Pricing({ content }: { content: PricingContent }) {
       ? `Após ${offer.trialMonths} ${offer.trialMonths === 1 ? "mês" : "meses"}`
       : offer.trialDays && offer.trialDays > 0
         ? `Após ${offer.trialDays === 30 ? "o primeiro mês" : `${offer.trialDays} dias`}`
-        : "Mensal";
+        : "A partir do 1º mês";
 
   return (
     <section id="planos">

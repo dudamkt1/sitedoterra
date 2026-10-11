@@ -556,7 +556,7 @@ export function TenantSite({
           <div className="planos-cards">
             <div className="plano-card">
               <div className="plano-tipo">Plano Mensal</div>
-              <div className="plano-preco"><sup>R$</sup>97</div>
+              <div className="plano-preco"><sup>R$</sup>47</div>
               <div className="plano-period">por mês</div>
               <hr className="plano-divider" />
               <ul className="plano-features">
@@ -567,14 +567,14 @@ export function TenantSite({
                 <li>Todas as ferramentas</li>
                 <li>Suporte por WhatsApp</li>
               </ul>
-              <a href="#planos" className="btn-plano">Começar agora</a>
+              <a href="#planos" className="btn-plano">Assinar</a>
             </div>
             <div className="plano-card destaque">
               <div className="plano-badge">⭐ Mais popular</div>
               <div className="plano-tipo">Plano Anual</div>
-              <div className="plano-preco"><sup>R$</sup>299</div>
+              <div className="plano-preco"><sup>R$</sup>564</div>
               <div className="plano-period">pagamento único · 12 meses</div>
-              <div className="plano-economia">= R$ 24,75/mês — Economize 75%!</div>
+              <div className="plano-economia">= R$ 47/mês — Economize 75%</div>
               <hr className="plano-divider" />
               <ul className="plano-features">
                 <li>Tudo do plano mensal</li>
@@ -583,8 +583,9 @@ export function TenantSite({
                 <li>Relatórios avançados</li>
                 <li>Prioridade no suporte</li>
                 <li>Novidades em primeira mão</li>
+                <li>Suporte dedicado</li>
               </ul>
-              <a href="#planos" className="btn-plano">Quero o anual!</a>
+              <a href="#planos" className="btn-plano">Assinar anual</a>
             </div>
           </div>
         </div>
