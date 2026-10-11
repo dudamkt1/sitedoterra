@@ -334,7 +334,7 @@ export const DEFAULT_SECTION_CONTENT: Record<SectionType, Record<string, unknown
       promoText: "Condições especiais",
       ctaText: "Quero meu site por R$ 97",
       transparencyText:
-        "R$ 97 corresponde à ativação do site. Mensalidade de R$ 47 a partir do 1º mês. Sem fidelidade e com cancelamento quando quiser. 3x sem juros no cartão ou 5% via PIX.",
+        "R$ 97,00 corresponde à ativação inicial do site. Após 1 mes, inicia-se a mensalidade de apenas R$ 47,00. Sem fidelidade e com cancelamento quando quiser.",
       cancelText: "Sem fidelidade. Cancele quando quiser.",
       allowCancel: true,
       trialDays: 0,
