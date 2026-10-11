@@ -106,7 +106,7 @@ export function AdminPlans({ plans, history }: { plans: PlanRow[]; history: Hist
       promo_text: "Oferta especial de lançamento",
       cta_text: "Quero meu site por {price}",
       transparency_text:
-        "{activation} corresponde à ativação inicial do site. Após 3 meses, inicia-se a mensalidade de {monthly}. Sem fidelidade e com cancelamento quando quiser.",
+        "{activation} corresponde à ativação inicial do site. A mensalidade de {monthly} inicia no 1º mês. Sem fidelidade e com cancelamento quando quiser.",
       cancel_text: "Sem fidelidade. Cancele quando quiser.",
       allow_cancel: true,
       trial_days: 30,

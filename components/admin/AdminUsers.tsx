@@ -514,10 +514,10 @@ export function AdminUsers({ rows, plans, currentUserId }: { rows: Row[]; plans:
               >
                 <div className="flex items-center gap-2">
                   <span className={`h-4 w-4 rounded-full border-2 ${activateFor.mode === "trial" ? "border-[#1d5c3a] bg-[#1d5c3a]" : "border-gray-300"}`} />
-                  <p className="font-semibold text-[#1d5c3a]">A) Ativar com 3 meses grátis</p>
+                  <p className="font-semibold text-[#1d5c3a]">A) Ativar agora</p>
                 </div>
                 <p className="text-xs text-gray-500 mt-1 pl-6">
-                  Site entra no ar imediatamente. A cobrança mensal inicia automaticamente após 3 meses.
+                  Site entra no ar imediatamente. A mensalidade de R$ 47 inicia no 1º mês.
                 </p>
               </button>
 
