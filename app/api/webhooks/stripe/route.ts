@@ -291,6 +291,12 @@ async function handleEvent(event: Stripe.Event) {
       if ((invoice.amount_paid || 0) <= 0) break;
 
       if (tenantId) {
+        const { data: tenant } = await admin
+          .from("tenants")
+          .select("user_id")
+          .eq("id", tenantId)
+          .maybeSingle();
+
         await admin.from("billing_history").upsert(
           {
             tenant_id: tenantId,
@@ -326,7 +332,7 @@ async function handleEvent(event: Stripe.Event) {
           typeof invoice.subscription === "string"
             ? await stripe.subscriptions.retrieve(invoice.subscription)
             : invoice.subscription;
-        if (subObj && subObj.metadata?.visitor_token && tenant.user_id) {
+        if (subObj && subObj.metadata?.visitor_token && tenant?.user_id) {
           try {
             await registerAffiliateConversionForVisitor({
               visitorToken: subObj.metadata.visitor_token,
