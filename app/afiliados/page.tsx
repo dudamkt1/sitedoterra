@@ -113,8 +113,8 @@ export default async function AfiliadosPage({
     { icon: "🆓", title: "Crie sua conta grátis", text: "Sem pagar nada: seu acesso ao painel é liberado na hora." },
     { icon: "🔗", title: "Pegue seu link exclusivo", text: "No painel de afiliados, seu link é gerado automaticamente. Copie com um clique." },
     { icon: "💬", title: "Compartilhe com outras consultoras", text: "Envie no WhatsApp, Instagram e grupos. Quem chegar pelo seu link fica vinculado a você." },
-    { icon: "💰", title: `Cada indicação confirmada gera ${brl(perSaleCents)} de saldo`, text: `${pct}% de cada ativação (${brl(activationCents)}) entra no seu painel automaticamente.` },
-    { icon: "🚀", title: "Ative de graça e siga zerando a mensalidade", text: `Ao juntar ${brl(activationCents)} em saldo, ative seu site sem tirar do bolso. Depois, com ${needMonthly} indicações/mês sua mensalidade de ${brl(monthlyCents)} fica coberta.` },
+    {icon: "💰", title: `Cada indicação confirmada gera ${brl(perSaleCents)} de saldo`, text: `${pct}% de cada ativação (${brl(activationCents)}) entra no seu painel automaticamente.` },
+    { icon: "🚀", title: "Ative de graça e siga zerando a mensalidade", text: `Ao juntar ${brl(activationCents)} em saldo, ative seu site sem tirar do bolso. Depois, com ${needMonthly} indicações por mês sua mensalidade de ${brl(monthlyCents)} fica coberta.` },
   ];
 
   const trust = [
@@ -127,8 +127,9 @@ export default async function AfiliadosPage({
     { q: "Preciso ter site ativo no TopConsultores pra participar?", a: "Não — e esse é justamente o caminho para quem está sem condições agora: crie sua conta grátis, indique e use o saldo para ativar seu site. Seu link de afiliado é gerado no painel assim que a conta existe." },
     { q: "Posso usar meu saldo para ativar o site em vez de sacar?", a: "Sim. No painel de afiliados você escolhe entre sacar via Pix e usar o saldo para ativar seu site ou pagar sua mensalidade." },
     { q: "Dá pra usar parte do saldo e pagar o restante?", a: `Sim. O saldo abate o valor automaticamente: com ${brl(5000)} de saldo numa ativação de ${brl(activationCents)}, você paga só a diferença no Pix ou cartão. A sobra continua disponível para a mensalidade ou para sacar.` },
-    { q: "Quando eu recebo a comissão?", a: `A comissão de ${pct}% é registrada no seu painel assim que a indicada ativa o site. Depois é só solicitar o saque e receber via Pix — ou usar como crédito.` },
+    { q: "Quando eu recebo a comissão?", a: `A comissão de ${pct}% sobre a ativação é registrada no seu painel assim que a indicada ativa o site. A comissão sobre mensalidadesRecurring (${pct}% sobre ${brl(monthlyCents)}) é registrada a cada cobrança mensal bem-sucedida. Ambos os valores ficam disponíveis no seu saldo para saque via Pix ou para ativar seu site.` },
     { q: "Tem valor mínimo pra sacar?", a: `Sim, o saque mínimo atual é de ${minPayout}. Atingiu esse valor, pode solicitar a qualquer momento pelo painel.` },
+    { q: "As comissões de mensalidade também geram saldo para saque?", a: `Sim. As comissões de ativação e de mensalidade acumulam no mesmo saldo. Quando atingir o mínimo de ${minPayout}, pode solicitar saque via Pix ou usar o saldo para ativar seu site ou pagar a mensalidade.` },
     { q: "Posso indicar quantas pessoas eu quiser?", a: "Sim, não há limite de indicações. Cada ativação confirmada gera uma nova comissão para você." },
     { q: "E se a pessoa que eu indiquei cancelar depois?", a: "Comissões de ativações canceladas ou estornadas podem ser estornadas do seu saldo. Vale o que foi efetivamente confirmado." },
     { q: `O percentual de ${pct}% pode mudar?`, a: "Pode, pois é uma configuração do programa. Mas o percentual da sua venda fica congelado no momento da ativação — mudanças futuras não alteram comissões já registradas." },
@@ -238,7 +239,7 @@ export default async function AfiliadosPage({
                 {pct}% por indicação
               </p>
               <p className="mt-3 text-[14px] sm:text-[15.5px] leading-relaxed text-white/80 max-w-[560px] mx-auto">
-                {brl(perSaleCents)} a cada ativação confirmada ({brl(activationCents)}). Sem limite de indicações, sem taxa, sem burocracia.
+                {brl(perSaleCents)} a cada ativação confirmada ({brl(activationCents)}) + {brl(Math.round(monthlyCents * pct / 100))} a cada mensalidade paga pela indicada ({brl(monthlyCents)}). Sem limite de indicações, sem taxa, sem burocracia.
               </p>
             </div>
 
