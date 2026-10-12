@@ -141,12 +141,7 @@ export function Pricing({ content }: { content: PricingContent }) {
   const hasRegular = regular > 0 && regular > promo;
   const tp = titleParts(content.title || "Tenha um site assim hoje mesmo");
   const benefits = offer.benefits || [];
-  const firstChargeText =
-    offer.trialMonths && offer.trialMonths > 0
-      ? `Após ${offer.trialMonths} ${offer.trialMonths === 1 ? "mês" : "meses"}`
-      : offer.trialDays && offer.trialDays > 0
-        ? `Após ${offer.trialDays === 30 ? "o primeiro mês" : `${offer.trialDays} dias`}`
-        : "Apenas";
+  const firstChargeText = "Após 1 mês, apenas";
 
   return (
     <section id="planos">
