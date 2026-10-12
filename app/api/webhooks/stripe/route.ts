@@ -191,6 +191,7 @@ async function handleEvent(event: Stripe.Event) {
           email: profile.email,
           name: profile.name,
           planId: planId || null,
+          visitorToken: visitorToken || undefined,
         });
         await upsertSubscriptionFromStripe(subscription);
       }
@@ -318,6 +319,24 @@ async function handleEvent(event: Stripe.Event) {
           },
           { onConflict: "stripe_payment_intent_id", ignoreDuplicates: true }
         );
+
+        // Registrar conversão de afiliado para pagamento de mensalidade recorrente
+        // se houver visitor_token na metadata da assinatura (primeiro clique wins)
+        const subObj =
+          typeof invoice.subscription === "string"
+            ? await stripe.subscriptions.retrieve(invoice.subscription)
+            : invoice.subscription;
+        if (subObj && subObj.metadata?.visitor_token && tenant.user_id) {
+          try {
+            await registerAffiliateConversionForVisitor({
+              visitorToken: subObj.metadata.visitor_token,
+              newCustomerUserId: tenant.user_id,
+              saleAmountCents: invoice.amount_paid || 0,
+            });
+          } catch (convErr) {
+            console.error("[stripe webhook] falha ao registrar conversão de afiliado para assinatura", convErr);
+          }
+        }
       }
       break;
     }

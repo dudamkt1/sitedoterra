@@ -268,7 +268,7 @@ export async function deactivateTenant(tenantId: string, reason?: string) {
  */
 export async function createRecurringSubscription(
   customerId: string,
-  metadata: BillingUser & { planId?: string | null }
+  metadata: BillingUser & { planId?: string | null; visitorToken?: string }
 ): Promise<Stripe.Subscription> {
   const stripe = await getStripeResolved();
 
@@ -283,6 +283,7 @@ export async function createRecurringSubscription(
     user_id: metadata.userId,
   };
   if (metadata.planId) subMetadata.plan_id = metadata.planId;
+  if (metadata.visitorToken) subMetadata.visitor_token = metadata.visitorToken;
 
   return stripe.subscriptions.create({
     customer: customerId,
