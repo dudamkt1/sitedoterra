@@ -117,6 +117,7 @@ async function handleEvent(event: Stripe.Event) {
       const { data: tenant } = await admin.from("tenants").select("*").eq("id", tenantId).single();
       const { data: profile } = await admin.from("profiles").select("*").eq("user_id", tenant.user_id).single();
       const creditUsageId = session.metadata?.credit_usage_id || null;
+      const visitorToken = (session.metadata?.visitor_token as string | undefined) || null;
 
       // Registra pagamento de ativação (R$ 297,00)
       const { data: paymentRow } = await admin.from("payments").upsert(
@@ -207,7 +208,6 @@ async function handleEvent(event: Stripe.Event) {
       // Se a sessão foi iniciada via cookie `tc_visitor_token` (link de afiliado),
       // o `metadata.visitor_token` chega aqui. A conversão é registrada para
       // associar a venda ao afiliado correto (first-click wins — função SQL).
-      const visitorToken = (session.metadata?.visitor_token as string | undefined) || null;
       if (visitorToken && tenant.user_id) {
         try {
           await registerAffiliateConversionForVisitor({
