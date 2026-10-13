@@ -38,7 +38,7 @@ export default function Landpage() {
   const { site_name, slogan, benefits, social_proof, cta_text, cta_href, checkout_text } = data;
 
   return (
-    <div style={{ bgColor: "#fefcf8" }}>
+    <div style={{ background: "#fefcf8" }}>
       <h1>{slogan}</h1>
       <p>{site_name}</p>
       <button className="btn btn-primary">{checkout_text}</button>
