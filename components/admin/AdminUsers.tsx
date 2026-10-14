@@ -62,6 +62,8 @@ export function AdminUsers({ rows, plans, currentUserId }: { rows: Row[]; plans:
   const [newPassword, setNewPassword] = useState("");
   const [subStatus, setSubStatus] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [creditAmount, setCreditAmount] = useState(0);
+  const [creditKind, setCreditKind] = useState("activation");
 
   // ---- Modal de criação ----
   const [creating, setCreating] = useState(false);
@@ -69,12 +71,8 @@ export function AdminUsers({ rows, plans, currentUserId }: { rows: Row[]; plans:
   const [createMsg, setCreateMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [creatingUser, setCreatingUser] = useState(false);
 
-  // ---- Modal de ativação com escolha de billing ----
-  const [activateFor, setActivateFor] = useState<{ row: Row; mode: "trial" | "monthly" | "none" } | null>(null);
-  const [showCreditModal, setShowCreditModal] = useState(false);
-  const [creditAmount, setCreditAmount] = useState(0);
-  const [creditKind, setCreditKind] = useState("activation");
-  const [creditMsg, setCreditMsg] = useState<{ ok: boolean; text: string } | null>(null);
+// ---- Modal de ativação com escolha de billing ----
+   const [activateFor, setActivateFor] = useState<{ row: Row; mode: "trial" | "monthly" | "none" } | null>(null);
 
   function openEdit(r: Row) {
     setEditing(r);
@@ -83,6 +81,8 @@ export function AdminUsers({ rows, plans, currentUserId }: { rows: Row[]; plans:
     setNewPassword("");
     setSubStatus(r.subscription?.status || "");
     setMsg(null);
+    setCreditAmount(0);
+    setCreditKind("activation");
   }
 
   async function api(url: string, body: Record<string, unknown>, method = "PATCH") {
@@ -204,19 +204,15 @@ export function AdminUsers({ rows, plans, currentUserId }: { rows: Row[]; plans:
     setCreditMsg(null);
     // Use the currently edited user's ID, or the first row's user ID if not editing
     const selectedUserId = editing?.profile?.user_id || (rows.length > 0 ? rows[0].profile.user_id : null);
-    // Use type assertion for HTMLInputElement since getElementById returns HTMLElement | null
-    const amountInput = document.getElementById("credit-amount") as HTMLInputElement | null;
-    const creditAmount = amountInput ? parseInt(amountInput.value || "0") : 0;
-    const kindInput = document.getElementById("credit-kind") as HTMLInputElement | null;
-    const kind = kindInput?.value || "activation";
-    if (creditAmount <= 0) {
-      setCreditMsg({ ok: false, text: "Informe um valor maior que zero." });
-      return;
-    }
     if (!selectedUserId) {
       setCreditMsg({ ok: false, text: "Nenhum usuário selecionado." });
       return;
     }
+    if (creditAmount <= 0) {
+      setCreditMsg({ ok: false, text: "Informe um valor maior que zero." });
+      return;
+    }
+    const kind = creditKind || "activation";
     setBusy(creditAmount.toString());
     const { ok, json } = await api(`/api/admin/users/${selectedUserId}/credit`, { amount: creditAmount, kind }, "POST");
     setBusy(null);
@@ -225,7 +221,7 @@ export function AdminUsers({ rows, plans, currentUserId }: { rows: Row[]; plans:
       return;
     }
     setCreditMsg({ ok: true, text: "Crédito criado com sucesso!" });
-    setShowCreditModal(false);
+    setEditing(null);
     setCreditAmount(0);
     setCreditKind("activation");
     window.location.reload();
@@ -300,9 +296,7 @@ export function AdminUsers({ rows, plans, currentUserId }: { rows: Row[]; plans:
         <button className="btn btn-primary" onClick={() => { setCreating(true); setCreateForm({ name: "", email: "", password: "", role: "user" }); setCreateMsg(null); }}>
           ＋ Novo usuário
         </button>
-        <button className="btn btn-outline" onClick={() => setShowCreditModal(!showCreditModal)}>
-          ＋ Criar crédito
-        </button>
+        <button className="btn btn-outline" onClick={() => { const firstUser = rows.length > 0 ? rows[0] : null; if (firstUser) openEdit(firstUser); }}> ＋ Criar crédito</button>
       </div>
 
       {/* ---------- Tabela ---------- */}
@@ -602,10 +596,17 @@ export function AdminUsers({ rows, plans, currentUserId }: { rows: Row[]; plans:
                   className="btn btn-primary !py-1.5 !px-4 text-xs mt-3"
                   disabled={busy === editing.profile.user_id}
                   onClick={() => saveSection("update_profile", editForm, "Dados salvos com sucesso!")}
-                >
-                  Salvar dados
-                </button>
-              </section>
+>
+                   Salvar dados
+                 </button>
+                 <button
+                   className="btn btn-outline !py-1.5 !px-4 text-xs mt-2"
+                   disabled={busy === editing.profile.user_id}
+                   onClick={createCredit}
+                 >
+                   Criar crédito
+                 </button>
+               </section>
 
               <hr className="border-gray-100" />
 
@@ -767,10 +768,39 @@ export function AdminUsers({ rows, plans, currentUserId }: { rows: Row[]; plans:
                       )}
                     </div>
                   </div>
-                  <p className="text-[0.7rem] text-gray-400">
-                    Bloquear usuário impede o login (banimento real). Bloquear site só esconde o site do público e preserva todo o histórico (CRM, conteúdo, mídias).
-                  </p>
+<p className="text-[0.7rem] text-gray-400">
+                      Bloquear usuário impede o login (banimento real). Bloquear site só esconde o site do público e preserva todo o histórico (CRM, conteúdo, mídias).
+                    </p>
 
+                  <hr className="border-gray-200/60" />
+
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div>
+                      <p className="font-semibold text-sm text-red-700">Crédito para ativação</p>
+                      <p className="text-xs text-gray-400">
+                        Crédito descontado do saldo de comissões do afiliado. Somente tipo "activation" funciona para primeiro acesso.
+                      </p>
+                    </div>
+                    <div>
+                      <select
+                        className="input"
+                        value={creditKind}
+                        onChange={(e) => setCreditKind(e.target.value)}
+                      >
+                        <option value="activation">Apenas ativação</option>
+                        <option value="subscription">Mensalidade</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <label className="label">Valor do crédito (centavos)</label>
+                    <input
+                      className="input"
+                      value={creditAmount}
+                      onChange={(e) => setCreditAmount(parseInt(e.target.value) || 0)}
+                      min="1"
+                    />
+                  </div>
                   <hr className="border-gray-200/60" />
 
                   <div className="flex items-center justify-between gap-3 flex-wrap">
