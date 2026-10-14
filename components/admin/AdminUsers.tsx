@@ -778,7 +778,7 @@ export function AdminUsers({ rows, plans, currentUserId }: { rows: Row[]; plans:
                     <div>
                       <p className="font-semibold text-sm text-red-700">Crédito para ativação</p>
                       <p className="text-xs text-gray-400">
-                        Crédito descontado do saldo de comissões do afiliado. Somente tipo "activation" funciona para primeiro acesso.
+                        Crédito descontado do saldo de comissões do afiliado. Somente tipo 'activation' funciona para primeiro acesso.
                       </p>
                     </div>
                     <div>
