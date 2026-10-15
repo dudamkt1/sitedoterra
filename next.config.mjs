@@ -65,6 +65,11 @@ const nextConfig = {
       },
     ];
   },
+  // A landpage estática (public/landpage.html — cópia fiel de
+  // landpage-doterra.html) é servida em /landpage sem alterar o HTML original.
+  async rewrites() {
+    return [{ source: "/landpage", destination: "/landpage.html" }];
+  },
 };
 
 export default nextConfig;
