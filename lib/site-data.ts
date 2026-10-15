@@ -185,15 +185,6 @@ export const DEFAULT_SITE_DATA: SiteData = {
     youtube: { enabled: false, url: "" },
   },
 };
-  })(),
-  video: { label: "Assistir vídeo • 8 min" },
-  social: {
-    whatsapp: true,
-    instagram: { enabled: true, url: "https://instagram.com/anabeatriz.doterra" },
-    facebook: { enabled: false, url: "" },
-    youtube: { enabled: false, url: "" },
-  },
-};
 
 /**
  * Logo da HOME MODELO (domínio principal e páginas da plataforma).
