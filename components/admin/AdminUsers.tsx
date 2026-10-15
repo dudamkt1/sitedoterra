@@ -64,6 +64,7 @@ export function AdminUsers({ rows, plans, currentUserId }: { rows: Row[]; plans:
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [creditAmount, setCreditAmount] = useState(0);
   const [creditKind, setCreditKind] = useState("activation");
+  const [creditMsg, setCreditMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   // ---- Modal de criação ----
   const [creating, setCreating] = useState(false);
