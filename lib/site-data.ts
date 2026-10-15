@@ -64,74 +64,70 @@ export const DEFAULT_SITE_DATA: SiteData = {
   name: "Ana",
   surname: "Beatriz",
   fullName: "Ana Beatriz",
-  role: "Consultora Wellness Diamond · doTERRA",
+  role: "Consultora doTERRA",
   eyebrow: "Consultora Certificada doTERRA",
   badgeTitle: "Certified Wellness",
-  badgeSubtitle: "Expert em bem-estar",
+  badgeSubtitle: "DEMONSTRAÇÃO — Veja como seu site poderá ficar",
   description:
-    "Transformo bem-estar em rotina com os melhores óleos essenciais do mundo. Há 7 anos ajudo famílias a descobrirem o poder da natureza para uma vida mais equilibrada e saudável.",
+    "Consultora doTERRA, pare de perder oportunidades no direct!",
   whatsapp: "5511999999999",
   instagram: "anabeatriz.doterra",
   instagramHandle: "@anabeatriz.doterra",
-  stats: {
-    years: "7+",
-    labelYears: "Anos de experiência",
-    clients: "850+",
-    labelClients: "Clientes atendidas",
-    satisfaction: "98%",
-    labelSatisfaction: "Satisfação",
-  },
+  // Stats removidos — anteriormente eram indicadores fictícios (7+ anos, 850+ clientes, 98% satisfação)
+  // que eram apresentados como resultados comprovados do serviço vendido. Agora a página foca
+  // na demonstração transparente do serviço para consultoras que desejam contratar seu próprio site.
+  stats: undefined,
   testimonials: [
     {
-      text: "Depois de 3 semanas usando o protocolo de sono da Ana, minha insônia de anos simplesmente desapareceu. É incrível como óleos naturais podem fazer diferença tão grande.",
-      name: "Mariana Ferreira",
+      text: "O site Profissional me ajudou a organizar o atendimento com clientes e facilitei o contato pelo WhatsApp.",
+      name: "Exemplo Consultora",
       location: "São Paulo, SP",
-      initials: "MF",
+      initials: "EC",
     },
     {
-      text: "A Ana é muito mais do que uma consultora — ela é uma verdadeira parceira de bem-estar. Me acompanha há 2 anos e sempre indica o produto certo para cada fase da minha vida.",
-      name: "Carla Souza",
+      text: "As ferramentas de agenda online facilitam muito o agendamento das minhas consultas, sem precisar dizer 'oi, tudo bem' no direct o tempo todo.",
+      name: "Exemplo Consultora",
       location: "Campinas, SP",
-      initials: "CS",
+      initials: "RC",
     },
     {
-      text: "Meu filho tem 6 anos e desde que passei a usar os óleos doTERRA em casa, reduzimos muito as idas ao pediatra. O On Guard virou nosso aliado número um!",
-      name: "Renata Lima",
+      text: "O CRM integrado ajudou a acompanhar o histórico das clientes e oferecer produtos certos na hora certa.",
+      name: "Exemplo Consultora",
       location: "Rio de Janeiro, RJ",
-      initials: "RL",
+      initials: "LC",
     },
   ],
   history: {
     paragraphs: [
-      "Tudo começou quando minha filha tinha apenas 2 anos e eu me vi completamente perdida tentando encontrar alternativas naturais para as constantes gripes e alergias dela.",
-      "Uma amiga me apresentou aos óleos essenciais doTERRA e aquilo mudou tudo. Em poucos meses, vi transformações que eu nem imaginava serem possíveis — não só na saúde da minha filha, mas em toda a nossa família.",
-      "Hoje, 7 anos depois, tenho o privilégio de acompanhar mais de 850 famílias nessa mesma jornada de descoberta. Cada história que ouço me renova a certeza de que estou no lugar certo, fazendo exatamente o que fui chamada para fazer.",
+      "Tudo começou quando uma consultora descobriu que poderia ter seu próprio site profissional para organizar seu negócio.",
+      "Com as ferramentas certas, ficou mais fácil gerenciar atendimentos, agenda e acompanhamento de clientes.",
+      "Hoje, consultoras doTERRA têm à disposuna plataforma completa para apresentar produtos, atender clientes 24 horas com IA e facilitar agendamentos pelo celular.",
     ],
-    signature: "Ana Beatriz ✦",
+    signature: "Consultora doTERRA",
   },
   products: [
     {
       name: "On Guard®",
       category: "Proteção imunológica",
-      description: "Blend protetor com sabor de canela, cravo, laranja-selvagem e eucalipto. Fortalece o sistema imunológico naturalmente.",
+      description: "Blend aromatico com canela, cravo e eucalipto. Ideal para difusão ambiental e cuidados gerais.",
       price: "R$ 189,00",
       emoji: "🌿",
-      badge: "Mais vendido",
+      badge: "Demonstração",
       gradient: "linear-gradient(135deg, #e8f5ee 0%, #c8e8d8 100%)",
     },
     {
       name: "Lavender",
-      category: "Relaxamento & sono",
-      description: "O óleo mais versátil do mundo. Calma, relaxa, auxilia o sono e tem propriedades calmantes naturais incomparáveis.",
+      category: "Relaxamento",
+      description: "Óleo versátil amplamente usado para momentos de descanso e bem-estar geral.",
       price: "R$ 149,00",
       emoji: "💜",
-      badge: "Bestseller",
+      badge: "Demonstração",
       gradient: "linear-gradient(135deg, #f0f4fe 0%, #c8d8f8 100%)",
     },
     {
       name: "Lemon",
-      category: "Energia & clareza",
-      description: "Fresco e revitalizante, o limão doTERRA limpa, energiza e eleva o ânimo. Perfeito para aromatizar e purificar ambientes.",
+      category: "Energia",
+      description: "Óleo Citrino refrescante, usado para aromatização e ambientes revitalizados.",
       price: "R$ 89,00",
       emoji: "🍋",
       gradient: "linear-gradient(135deg, #fff8e8 0%, #fce8b0 100%)",
@@ -144,7 +140,7 @@ export const DEFAULT_SITE_DATA: SiteData = {
     },
     {
       q: "Como começo? Qual kit indicar para iniciantes?",
-      a: "O melhor ponto de entrada é o Kit Básico Familiar, que inclui os 10 óleos mais usados e versáteis. Mas dependendo do seu objetivo (saúde, sono, energia, proteção), posso indicar o kit ideal. Nossa consulta gratuita existe exatamente para isso — agende e conversamos!",
+      a: "O melhor ponto de entrada é o Kit Básico Familiar, que inclui os 10 óleos mais usados e versáteis. Mas dependendo do seu objetivo, posso indicar o kit ideal. Nossa consulta gratuita existe exatamente para isso — agende e conversamos!",
     },
     {
       q: "Posso usar óleos essenciais na gravidez?",
@@ -163,14 +159,11 @@ export const DEFAULT_SITE_DATA: SiteData = {
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const firstWeekday = new Date(year, month, 1).getDay();
     const monthLabel = `${MONTHS[month]} ${year}`;
-    // gera disponíveis baseado em seg-sex, mantendo padrão demonstrativo
     const weekdays = [1,2,3,4,5];
     const slots = ["09:00", "09:30", "10:00", "10:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00", "17:30"];
     const available: number[] = [];
     for (let d=1; d<=daysInMonth; d++) { if (weekdays.includes(new Date(year, month, d).getDay())) available.push(d); }
-    // ocupa alguns aleatórios para demo - mantém 6 ocupados visuais
     const occupied = available.slice(2,5);
-    // remove ocupados de available
     const availFiltered = available.filter(d => !occupied.includes(d)).slice(0,10);
     return {
       monthLabel,
@@ -183,6 +176,15 @@ export const DEFAULT_SITE_DATA: SiteData = {
       slots,
       taken: {} as Record<string, string[]>,
     };
+  })(),
+  video: { label: "Assistir vídeo • 8 min" },
+  social: {
+    whatsapp: true,
+    instagram: { enabled: true, url: "https://instagram.com/anabeatriz.doterra" },
+    facebook: { enabled: false, url: "" },
+    youtube: { enabled: false, url: "" },
+  },
+};
   })(),
   video: { label: "Assistir vídeo • 8 min" },
   social: {

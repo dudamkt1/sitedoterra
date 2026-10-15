@@ -442,11 +442,7 @@ export function buildDemoSeed(): DemoData {
       faviconUrl: "",
       primaryColor: "#1D5C3A",
       accentColor: "#C7A661",
-      stats: {
-        years: "7+",
-        clients: "850+",
-        satisfaction: "98%",
-      },
+      stats: undefined,
       social: {
         instagram: { enabled: true, url: "https://instagram.com/carla.doterra" },
         facebook: { enabled: false, url: "" },

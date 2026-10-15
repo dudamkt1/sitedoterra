@@ -60,7 +60,7 @@ export function Products({ content, contactWhatsapp }: { content: ProductsConten
               <p className="produto-desc">{p.description}</p>
               <div className="produto-footer">
                 <span className="produto-price">{p.price}</span>
-                <a href={wppLink} target="_blank" className="produto-btn">Comprar</a>
+                <a href={wppLink} target="_blank" className="produto-btn">Saiba mais</a>
               </div>
             </div>
           </div>

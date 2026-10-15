@@ -111,20 +111,17 @@ export const DEFAULT_SECTION_CONTENT: Record<SectionType, Record<string, unknown
     eyebrow: "Consultora Certificada doTERRA",
     firstName: "Ana",
     lastName: "Beatriz",
-    role: "Consultora Wellness Diamond · doTERRA",
+    role: "Consultora doTERRA",
     description:
-      "Transformo bem-estar em rotina com os melhores óleos essenciais do mundo. Há 7 anos ajudo famílias a descobrirem o poder da natureza para uma vida mais equilibrada e saudável.",
+      "Consultora doTERRA, pare de perder oportunidades no direct!",
     image: null,
     imageAlt: "Foto da Consultora",
     badgeTitle: "Certified Wellness",
-    badgeSubtitle: "Expert em bem-estar",
-    primaryBtn: { text: "Falar com a IA", url: "#about" },
+    badgeSubtitle: "DEMONSTRAÇÃO — Veja como seu site poderá ficar",
+    primaryBtn: { text: "QUERO ATIVAR MEU SITE", url: "/cadastro" },
     secondaryBtn: { text: "Ver Produtos", url: "#products" },
-    stats: [
-      { value: "7+", label: "Anos de experiência" },
-      { value: "850+", label: "Clientes atendidas" },
-      { value: "98%", label: "Satisfação" },
-    ],
+    // stats removidos — anteriormente exibíam números fictícios (7+ anos, 850+ clientes, 98% satisfação)
+    // como se fossem resultados comprovados do serviço vendido. Substituídos por identificação de demonstração.
   },
   trustbar: {
     badge: "✨",
@@ -137,21 +134,20 @@ export const DEFAULT_SECTION_CONTENT: Record<SectionType, Record<string, unknown
     eyebrow: "Tecnologia + Natureza",
     title: "Especialista IA doTERRA",
     subtitle:
-      "Descreva como você está se sentindo — física ou emocionalmente — e nossa inteligência artificial vai indicar os melhores óleos essenciais para o seu momento.",
+      "Sua assistente virtual disponível 24 horas para ajudar no atendimento às suas clientes.",
     chips: [
-      { emoji: "😴", label: "Ansiedade e sono" },
-      { emoji: "🤕", label: "Dor de cabeça" },
-      { emoji: "🛡️", label: "Imunidade" },
-      { emoji: "⚡", label: "Energia e foco" },
-      { emoji: "🤢", label: "Digestão" },
-      { emoji: "💪", label: "Dores musculares" },
+      { emoji: "😴", label: "Sono e descanso" },
+      { emoji: "💆", label: "Bem-estar geral" },
+      { emoji: "🌿", label: "Conforto diário" },
+      { emoji: "⚡", label: "Energia e disposition" },
+      { emoji: "🍃", label: "Cuidado com o bem-estar" },
     ],
     chat: {
-      name: "Especialista IA doTERRA",
-      status: "Online agora",
+      name: "Assistente Virtual",
+      status: "Disponível",
       welcome:
-        "Olá! Sou a assistente especialista em óleos essenciais doTERRA 🌿 Me conte como você está se sentindo hoje — fisicamente ou emocionalmente — e vou indicar os melhores óleos para o seu momento!",
-      placeholder: "Como você está se sentindo?",
+        "Olá! Sou a assistente virtual doTERRA 🌿 Posso ajudar a apresentar informações sobre nossos produtos e apoiar no atendimento às suas clientes. Me conte mais sobre o que você gostaria de saber!",
+      placeholder: "What would you like to know?",
     },
   },
   portfolio: {
@@ -167,38 +163,38 @@ export const DEFAULT_SECTION_CONTENT: Record<SectionType, Record<string, unknown
   },
   testimonials: {
     eyebrow: "O que dizem por aí",
-    title: "Histórias que me inspiram todo dia",
-    subtitle: "Cada depoimento é uma vida transformada pela natureza.",
+    title: "Histórias ilustrativas",
+    subtitle: "Experiências de consultoras que utilizam as ferramentas do site doTERRA",
     items: [
       {
-        text: "Depois de 3 semanas usando o protocolo de sono, minha insônia de anos simplesmente desapareceu. É incrível como óleos naturais podem fazer diferença tão grande.",
-        name: "Mariana Ferreira",
+        text: "O site Profissional me ajudou a organizar o atendimento com clientes e facilitei o contato pelo WhatsApp.",
+        name: "Exemplo Consultora",
         location: "São Paulo, SP",
-        initials: "MF",
+        initials: "EC",
       },
       {
-        text: "Uma verdadeira parceira de bem-estar. Me acompanha há 2 anos e sempre indica o produto certo para cada fase da minha vida.",
-        name: "Carla Souza",
+        text: "As ferramentas de agenda online facilitaram muito o agendamento das minhas consultas, sem precisaholer 'oi, tudo bem' no direct o tempo todo.",
+        name: "Exemplo Consultora",
         location: "Campinas, SP",
-        initials: "CS",
+        initials: "RC",
       },
       {
-        text: "Meu filho tem 6 anos e desde que passei a usar os óleos em casa, reduzimos muito as idas ao pediatra. Virou nosso aliado número um!",
-        name: "Renata Lima",
+        text: "O CRM integrado ajudou a acompanhar o histórico das clientes e oferecer produtos certos na hora certa.",
+        name: "Exemplo Consultora",
         location: "Rio de Janeiro, RJ",
-        initials: "RL",
+        initials: "LC",
       },
     ],
   },
   story: {
     eyebrow: "Minha jornada",
-    title: "Uma história de cura e propósito",
+    title: "Uma história de propósito",
     paragraphs: [
-      "Tudo começou quando minha filha tinha apenas 2 anos e eu me vi completamente perdida tentando encontrar alternativas naturais para as constantes gripes e alergias dela.",
-      "Uma amiga me apresentou aos óleos essenciais e aquilo mudou tudo. Em poucos meses, vi transformações que eu nem imaginava serem possíveis — não só na saúde da minha filha, mas em toda a nossa família.",
-      "Hoje, 7 anos depois, tenho o privilégio de acompanhar mais de 850 famílias nessa mesma jornada de descoberta. Cada história que ouço me renova a certeza de que estou no lugar certo.",
+      "Tudo começou quando uma consultora decidiu criar seu próprio site para organizar seu negócio.",
+      "Com as ferramentas certas, ficou mais fácil gerenciar atendimentos, agenda e acompanhamento de clientes.",
+      "Hoje, consultoras doTERRA têm à disposa uma plataforma completa para apresentar produtos, atender clientes com apoio de IA e facilitar agendamentos pelo celular.",
     ],
-    signature: "Ana Beatriz ✦",
+    signature: "Consultora doTERRA",
     image: null,
     imageAlt: "Foto da Consultora",
     badgeValue: "7+",
@@ -216,7 +212,7 @@ export const DEFAULT_SECTION_CONTENT: Record<SectionType, Record<string, unknown
   booking: {
     eyebrow: "Agenda da consultora",
     title: "Agende sua consulta gratuita",
-    subtitle: "Escolha o melhor dia e horário. Após a seleção, você será direcionada ao WhatsApp para confirmar.",
+    subtitle: "Chega de 'oi, tudo bem' no direct — organize o atendimento e facilite o contato com suas clientes.",
     schedule: (() => {
       const now = new Date();
       const year = now.getFullYear();
@@ -258,32 +254,32 @@ export const DEFAULT_SECTION_CONTENT: Record<SectionType, Record<string, unknown
     ],
   },
   products: {
-    eyebrow: "Favoritos da Ana",
+    eyebrow: "Favoritos da demonstração",
     title: "Produtos em destaque",
     storeUrl: null,
     items: [
       {
         name: "On Guard®",
         category: "Proteção imunológica",
-        description: "Blend protetor com sabor de canela, cravo, laranja-selvagem e eucalipto. Fortalece o sistema imunológico naturalmente.",
+        description: "Blend aromatico com canela, cravo e eucalipto. Ideal para difusão ambiental e cuidados gerais.",
         price: "R$ 189,00",
         emoji: "🌿",
-        badge: "Mais vendido",
+        badge: "Demonstração",
         gradient: "linear-gradient(135deg, #e8f5ee 0%, #c8e8d8 100%)",
       },
       {
         name: "Lavender",
-        category: "Relaxamento & sono",
-        description: "O óleo mais versátil do mundo. Calma, relaxa, auxilia o sono e tem propriedades calmantes naturais incomparáveis.",
+        category: "Relaxamento",
+        description: "Óleo versátil amplamente usado para momentos de descanso e bem-estar geral.",
         price: "R$ 149,00",
         emoji: "💜",
-        badge: "Bestseller",
+        badge: "Demonstração",
         gradient: "linear-gradient(135deg, #f0f4fe 0%, #c8d8f8 100%)",
       },
       {
         name: "Lemon",
-        category: "Energia & clareza",
-        description: "Fresco e revitalizante, o limão doTERRA limpa, energiza e eleva o ânimo. Perfeito para aromatizar e purificar ambientes.",
+        category: "Energia",
+        description: "Óleo Citrino refrescante, usado para aromatização e ambientes revitalizados.",
         price: "R$ 89,00",
         emoji: "🍋",
         gradient: "linear-gradient(135deg, #fff8e8 0%, #fce8b0 100%)",
@@ -315,8 +311,8 @@ export const DEFAULT_SECTION_CONTENT: Record<SectionType, Record<string, unknown
   },
   pricing: {
     eyebrow: "Seja uma TopConsultora",
-    title: "Tenha um site assim hoje mesmo",
-    subtitle: "Seu negócio merece uma presença profissional na internet.",
+    title: "ATIVE SEU SITE PROFISSIONAL",
+    subtitle: "Tenha um site profissional com produtos, atendimento com inteligência artificial, agenda online e ferramentas para organizar e expandir seu negócio.",
     paymentConditions: {
       gateway: "mercadopago",
       pixDiscountPercent: 5,
@@ -332,7 +328,7 @@ export const DEFAULT_SECTION_CONTENT: Record<SectionType, Record<string, unknown
       monthlyPriceCents: 4700,
       savingsCents: 20000,
       promoText: "Condições especiais",
-      ctaText: "Quero meu site por R$ 97",
+      ctaText: "ATIVE SEU SITE PROFISSIONAL",
       transparencyText:
         "R$ 97,00 corresponde à ativação inicial do site. Após 1 mes, inicia-se a mensalidade de apenas R$ 47,00. Sem fidelidade e com cancelamento quando quiser.",
       cancelText: "Sem fidelidade. Cancele quando quiser.",
