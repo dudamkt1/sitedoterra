@@ -10,6 +10,7 @@ export type ContentFieldType =
   | "text"
   | "textarea"
   | "url"
+  | "anchor"
   | "image"
   | "color"
   | "boolean"
@@ -48,13 +49,13 @@ export const SECTION_CONTENT_FIELDS: Record<SectionType, ContentFieldDef[]> = {
     {
       key: "primaryBtn", label: "Botão principal", type: "object", fields: [
         { key: "text", label: "Texto", type: "text" },
-        { key: "url", label: "Link", type: "url" },
+        { key: "url", label: "Destino do botão (seção ou link)", type: "anchor" },
       ],
     },
     {
       key: "secondaryBtn", label: "Botão secundário", type: "object", fields: [
         { key: "text", label: "Texto", type: "text" },
-        { key: "url", label: "Link", type: "url" },
+        { key: "url", label: "Destino do botão (seção ou link)", type: "anchor" },
       ],
     },
     {
@@ -69,7 +70,7 @@ export const SECTION_CONTENT_FIELDS: Record<SectionType, ContentFieldDef[]> = {
     { key: "title", label: "Título da faixa", type: "text", ai: true, aiKind: "title" },
     { key: "subtitle", label: "Subtítulo", type: "text" },
     { key: "buttonText", label: "Texto do botão", type: "text" },
-    { key: "buttonUrl", label: "Link do botão", type: "url" },
+    { key: "buttonUrl", label: "Destino do botão (seção ou link)", type: "anchor" },
   ],
   about: [
     { key: "eyebrow", label: "Selo superior", type: "text" },
@@ -216,14 +217,14 @@ export const SECTION_CONTENT_FIELDS: Record<SectionType, ContentFieldDef[]> = {
     { key: "title", label: "Título", type: "text", ai: true, aiKind: "title" },
     { key: "subtitle", label: "Subtítulo", type: "text" },
     { key: "buttonText", label: "Texto do botão", type: "text" },
-    { key: "buttonUrl", label: "Link do botão", type: "url" },
+    { key: "buttonUrl", label: "Destino do botão (seção ou link)", type: "anchor" },
   ],
   portfolio: [
     { key: "eyebrow", label: "Selo superior", type: "text" },
     { key: "title", label: "Título", type: "text", ai: true, aiKind: "title" },
     { key: "subtitle", label: "Subtítulo", type: "textarea" },
     { key: "buttonText", label: "Texto do botão", type: "text" },
-    { key: "buttonUrl", label: "Link do botão", type: "url" },
+    { key: "buttonUrl", label: "Destino do botão (seção ou link)", type: "anchor" },
     { key: "primaryButtonText", label: "Texto do botão do card", type: "text" },
     { key: "secondaryButtonText", label: "Texto do link do card", type: "text" },
     { key: "maxModels", label: "Máximo de modelos na Home", type: "text" },

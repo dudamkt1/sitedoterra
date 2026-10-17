@@ -9,7 +9,7 @@ export interface TrustbarContent {
 export function Trustbar({ content }: { content: TrustbarContent }) {
   if (!content.title && !content.buttonText) return null;
   return (
-    <div className="vitrine-cta-banner">
+    <div className="vitrine-cta-banner" id="destaque" style={{ scrollMarginTop: 70 }}>
       <div className="vitrine-cta-text">
         <span className="star">{content.badge || "✨"}</span>
         <div>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { SectionPermissions, SectionType } from "@/types";
-import { SECTION_TYPE_ICONS } from "@/lib/site-sections";
+import { SECTION_TYPE_ICONS, buildAnchorOptions } from "@/lib/site-sections";
 import { SectionContentEditor } from "@/components/editors/SectionContentEditor";
 
 interface SectionView {
@@ -90,6 +90,16 @@ export function SiteSectionsManager({ slug, appUrl }: { slug: string; appUrl: st
 
   if (loading) return <p className="text-sm text-gray-400">Carregando seções...</p>;
 
+  const anchorOptions = buildAnchorOptions(
+    (data?.sections || []).map((s) => ({
+      type: s.type,
+      anchor: s.anchor,
+      enabled: s.enabled,
+      label: s.label,
+      navLabel: s.navLabel,
+    }))
+  );
+
   return (
     <div className="space-y-4">
       {message && (
@@ -170,7 +180,7 @@ export function SiteSectionsManager({ slug, appUrl }: { slug: string; appUrl: st
               {editing.can_edit ? "Salve suas alterações para refletir na página pública." : "Você não tem permissão para editar esta seção."}
             </p>
             <div className="max-h-[60vh] overflow-y-auto pr-2">
-              <SectionContentEditor sectionType={editing.type} value={draft} onChange={setDraft} mediaScope="tenant" />
+              <SectionContentEditor sectionType={editing.type} value={draft} onChange={setDraft} mediaScope="tenant" anchorOptions={anchorOptions} />
             </div>
             <div className="flex justify-end gap-2 mt-5">
               <button type="button" className="btn btn-outline" onClick={() => setEditing(null)}>Cancelar</button>

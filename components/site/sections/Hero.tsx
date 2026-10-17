@@ -27,6 +27,11 @@ interface HeroProps {
 
 function addRefParam(url: string, affiliateUserId?: string): string {
   if (!affiliateUserId) return url;
+  // Âncoras internas (#secao) NUNCA recebem `?ref=`: o fragmento passaria a
+  // ser "secao?ref=..." e deixaria de corresponder ao id da seção — era o
+  // motivo de o clique não rolar até a seção. A atribuição do afiliado já é
+  // registrada via cookie first-party (AffiliateAttribution).
+  if (url.startsWith("#")) return url;
   try {
     // Preserva qualquer `ref` já presente (ex.: link externo) e usa o do afiliado
     // como fallback — o AffiliateAttribution já registra a atribuição via cookie
@@ -50,7 +55,7 @@ export function Hero({ content, slug, affiliateUserId }: HeroProps) {
   const secondary = content.secondaryBtn || {};
 
   const primaryUrl = primary.url || (slug ? `/${slug}/checkout` : "/checkout");
-  const secondaryUrl = secondary.url || "#products";
+  const secondaryUrl = secondary.url || "#produtos";
 
   return (
     <section id="hero">

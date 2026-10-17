@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { SiteSection, SectionType, SectionPermissions } from "@/types";
-import { SECTION_TYPES, SECTION_TYPE_LABELS, SECTION_TYPE_ICONS, normalizeSectionPermissions } from "@/lib/site-sections";
+import { SECTION_TYPES, SECTION_TYPE_LABELS, SECTION_TYPE_ICONS, normalizeSectionPermissions, buildAnchorOptions } from "@/lib/site-sections";
 import { SectionContentEditor } from "@/components/editors/SectionContentEditor";
 
 interface HomeEditorProps {
@@ -108,6 +108,14 @@ export function HomeEditor({ initialSections, appUrl }: HomeEditorProps) {
   }
 
   const editing = draft;
+  const anchorOptions = buildAnchorOptions(
+    sections.map((s) => ({
+      type: s.type,
+      enabled: s.enabled,
+      label: s.label,
+      navLabel: (s.settings?.navLabel as string) || undefined,
+    }))
+  );
 
   return (
     <div className="space-y-4">
@@ -239,6 +247,7 @@ export function HomeEditor({ initialSections, appUrl }: HomeEditorProps) {
                   value={editing.content}
                   onChange={(content) => setDraft({ ...editing, content })}
                   mediaScope="system"
+                  anchorOptions={anchorOptions}
                 />
               </div>
             )}

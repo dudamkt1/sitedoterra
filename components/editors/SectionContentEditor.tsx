@@ -15,6 +15,12 @@ interface SectionContentEditorProps {
   mediaScope?: "tenant" | "system";
   /** Esconde o botão da biblioteca (usado na demonstração local). */
   disableLibrary?: boolean;
+  /**
+   * Seções ativas da HOME (âncora + rótulo) para os campos de "anchor".
+   * Quando ausente, o campo vira um input de link comum (ex.: editor de
+   * modelos que não conhece as seções do site).
+   */
+  anchorOptions?: { value: string; label: string }[];
 }
 
 interface Suggestion {
@@ -122,7 +128,79 @@ function ColorField({ value, onChange }: { value: string; onChange: (v: string) 
   );
 }
 
-export function SectionContentEditor({ sectionType, value, onChange, mediaScope, disableLibrary }: SectionContentEditorProps) {
+/**
+ * Campo de destino de botão com seletor de seções ativas.
+ * Em vez de digitar o link, o usuário escolhe a seção (âncora `#secao`) — ao
+ * clicar no botão na HOME a página rola suavemente até ela. Também permite um
+ * link personalizado (página interna `/...` ou URL externa) para páginas que
+ * não são seções.
+ */
+function AnchorField({
+  value,
+  options,
+  onChange,
+}: {
+  value: unknown;
+  options: { value: string; label: string }[];
+  onChange: (v: string) => void;
+}) {
+  const raw = typeof value === "string" ? value : "";
+  const isKnown = options.some((o) => o.value === raw);
+  const [customMode, setCustomMode] = useState(false);
+  const showCustom = customMode || (raw !== "" && !isKnown);
+
+  // Sem seções disponíveis (ex.: editor de modelos) → input de link comum.
+  if (options.length === 0) {
+    return (
+      <input
+        type="text"
+        className="input"
+        value={raw}
+        placeholder="Ex.: /cadastro, https://… ou #secao"
+        onChange={(e) => onChange(e.target.value)}
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <select
+        className="input"
+        value={showCustom ? "__custom__" : raw}
+        onChange={(e) => {
+          const v = e.target.value;
+          if (v === "__custom__") {
+            setCustomMode(true);
+            if (!showCustom) onChange("");
+          } else {
+            setCustomMode(false);
+            onChange(v);
+          }
+        }}
+      >
+        <option value="">— Sem link (apenas texto) —</option>
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+        <option value="__custom__">Outro — link personalizado ou página externa…</option>
+      </select>
+      {showCustom && (
+        <input
+          type="text"
+          className="input"
+          value={raw}
+          placeholder="Ex.: /cadastro, https://instagram.com/… ou #secao"
+          onChange={(e) => onChange(e.target.value)}
+        />
+      )}
+      {!showCustom && raw.startsWith("#") && (
+        <p className="text-[0.7rem] text-gray-400">Ao clicar, a página rola suavemente até a seção escolhida.</p>
+      )}
+    </div>
+  );
+}
+
+export function SectionContentEditor({ sectionType, value, onChange, mediaScope, disableLibrary, anchorOptions = [] }: SectionContentEditorProps) {
   const fields = useMemo(() => SECTION_CONTENT_FIELDS[sectionType] || [], [sectionType]);
   const [suggestions, setSuggestions] = useState<Record<string, Suggestion>>({});
 
@@ -200,6 +278,10 @@ export function SectionContentEditor({ sectionType, value, onChange, mediaScope,
               placeholder={field.placeholder}
               onChange={(e) => onChange(setPath(value, path, e.target.value))}
             />
+          );
+        case "anchor":
+          return (
+            <AnchorField value={current} options={anchorOptions} onChange={(v) => onChange(setPath(value, path, v))} />
           );
         case "image":
           return (

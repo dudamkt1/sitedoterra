@@ -90,6 +90,38 @@ export function anchorFor(type: SectionType): string {
   return map[type] || type;
 }
 
+export interface AnchorOption {
+  value: string;
+  label: string;
+}
+
+/**
+ * Monta a lista de destinos internos (âncoras) para o seletor de seções dos
+ * editores. Só entram seções ativas com âncora válida; "header" e "footer" são
+ * ignorados (não possuem id no DOM). Usado pelos campos de destino dos botões
+ * (Hero, Barra de destaque, etc.) para o usuário escolher a seção em vez de
+ * digitar o link — o clique rola suavemente até ela.
+ */
+export function buildAnchorOptions(
+  sections: Array<{ type: string; anchor?: string; enabled?: boolean; label?: string; navLabel?: string }>,
+  opts?: { excludeTypes?: string[] }
+): AnchorOption[] {
+  const exclude = new Set(opts?.excludeTypes || ["header", "footer"]);
+  const seen = new Set<string>();
+  const out: AnchorOption[] = [];
+  for (const s of sections) {
+    if (s.enabled === false) continue;
+    if (exclude.has(s.type)) continue;
+    const type = s.type as SectionType;
+    const anchor = s.anchor || (SECTION_TYPES.includes(type) ? anchorFor(type) : s.type);
+    if (!anchor || seen.has(anchor)) continue;
+    seen.add(anchor);
+    const label = s.navLabel || s.label || SECTION_TYPE_LABELS[type] || s.type;
+    out.push({ value: `#${anchor}`, label: `${label} (#${anchor})` });
+  }
+  return out;
+}
+
 const DEFAULT_PERMISSIONS: SectionPermissions = {
   can_edit: true,
   can_toggle: true,
@@ -119,7 +151,7 @@ export const DEFAULT_SECTION_CONTENT: Record<SectionType, Record<string, unknown
     badgeTitle: "Certified Wellness",
     badgeSubtitle: "DEMONSTRAÇÃO — Veja como seu site poderá ficar",
     primaryBtn: { text: "QUERO ATIVAR MEU SITE", url: "/cadastro" },
-    secondaryBtn: { text: "Ver Produtos", url: "#products" },
+    secondaryBtn: { text: "Ver Produtos", url: "#produtos" },
     // stats removidos — anteriormente exibíam números fictícios (7+ anos, 850+ clientes, 98% satisfação)
     // como se fossem resultados comprovados do serviço vendido. Substituídos por identificação de demonstração.
   },
