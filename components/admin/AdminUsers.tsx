@@ -214,18 +214,17 @@ export function AdminUsers({ rows, plans, currentUserId }: { rows: Row[]; plans:
       return;
     }
     const kind = creditKind || "activation";
-    setBusy(creditAmount.toString());
+    setBusy("credit");
     const { ok, json } = await api(`/api/admin/users/${selectedUserId}/credit`, { amount: creditAmount, kind }, "POST");
     setBusy(null);
     if (!ok) {
-      setCreditMsg({ ok: false, text: json.error || "Erro ao criar crédito." });
+      setCreditMsg({ ok: false, text: json.error || "Erro ao salvar crédito." });
       return;
     }
-    setCreditMsg({ ok: true, text: "Crédito criado com sucesso!" });
-    setEditing(null);
+    const kindLabel = kind === "both" ? "ativação e mensalidade" : kind === "subscription" ? "mensalidade" : "ativação";
+    setCreditMsg({ ok: true, text: `Crédito de ${formatBRL(creditAmount)} salvo para ${kindLabel}.` });
+    // Mantém a janela aberta para conferência; zera o valor para evitar envio duplicado.
     setCreditAmount(0);
-    setCreditKind("activation");
-    window.location.reload();
   }
 
   const filtered = useMemo(
@@ -600,13 +599,6 @@ export function AdminUsers({ rows, plans, currentUserId }: { rows: Row[]; plans:
 >
                    Salvar dados
                  </button>
-                 <button
-                   className="btn btn-outline !py-1.5 !px-4 text-xs mt-2"
-                   disabled={busy === editing.profile.user_id}
-                   onClick={createCredit}
-                 >
-                   Criar crédito
-                 </button>
                </section>
 
               <hr className="border-gray-100" />
@@ -777,9 +769,9 @@ export function AdminUsers({ rows, plans, currentUserId }: { rows: Row[]; plans:
 
                   <div className="flex items-center justify-between gap-3 flex-wrap">
                     <div>
-                      <p className="font-semibold text-sm text-red-700">Crédito para ativação</p>
+                      <p className="font-semibold text-sm text-red-700">Crédito para ativação e mensalidade</p>
                       <p className="text-xs text-gray-400">
-                        Crédito descontado do saldo de comissões do afiliado. Somente tipo &apos;activation&apos; funciona para primeiro acesso.
+                        Crédito descontado do saldo de comissões do afiliado. Escolha se vale para ativação, mensalidade ou ambos.
                       </p>
                     </div>
                     <div>
@@ -790,18 +782,34 @@ export function AdminUsers({ rows, plans, currentUserId }: { rows: Row[]; plans:
                       >
                         <option value="activation">Apenas ativação</option>
                         <option value="subscription">Mensalidade</option>
+                        <option value="both">Ambos (ativação e mensalidade)</option>
                       </select>
                     </div>
                   </div>
-                  <div className="mt-3">
-                    <label className="label">Valor do crédito (centavos)</label>
-                    <input
-                      className="input"
-                      value={creditAmount}
-                      onChange={(e) => setCreditAmount(parseInt(e.target.value) || 0)}
-                      min="1"
-                    />
+                  <div className="mt-3 flex items-end gap-3 flex-wrap">
+                    <div className="flex-1 min-w-[160px]">
+                      <label className="label">Valor do crédito (centavos)</label>
+                      <input
+                        type="number"
+                        className="input"
+                        value={creditAmount}
+                        onChange={(e) => setCreditAmount(parseInt(e.target.value) || 0)}
+                        min="1"
+                      />
+                    </div>
+                    <button
+                      className="btn btn-primary !py-1.5 !px-4 text-xs"
+                      disabled={busy === "credit" || creditAmount <= 0}
+                      onClick={createCredit}
+                    >
+                      {busy === "credit" ? "Salvando..." : "Salvar crédito"}
+                    </button>
                   </div>
+                  {creditMsg && (
+                    <p className={`text-xs rounded-lg px-3 py-2 ${creditMsg.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"}`}>
+                      {creditMsg.text}
+                    </p>
+                  )}
                   <hr className="border-gray-200/60" />
 
                   <div className="flex items-center justify-between gap-3 flex-wrap">

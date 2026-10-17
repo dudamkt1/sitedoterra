@@ -77,8 +77,8 @@ export async function POST(request: Request) {
 
     if (!userId) return NextResponse.json({ error: "ID do usuário não informado." }, { status: 400 });
     if (!amount || amount <= 0) return NextResponse.json({ error: "Informe um valor maior que zero." }, { status: 400 });
-    if (kind !== "activation" && kind !== "subscription") {
-      return NextResponse.json({ error: "Tipo de crédito inválido. Use 'activation' ou 'subscription'." }, { status: 400 });
+    if (kind !== "activation" && kind !== "subscription" && kind !== "both") {
+      return NextResponse.json({ error: "Tipo de crédito inválido. Use 'activation', 'subscription' ou 'both'." }, { status: 400 });
     }
 
     // Verifica se o usuário existe
