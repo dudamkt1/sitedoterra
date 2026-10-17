@@ -27,10 +27,12 @@ import {
   ChevronRight,
   BookOpen,
   LayoutGrid,
+  BarChart3,
 } from "lucide-react";
 
 const LINKS = [
   { href: "/admin", label: "Visão geral", icon: LayoutDashboard },
+  { href: "/admin/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/admin/usuarios", label: "Usuários", icon: Users },
   { href: "/admin/editor-home", label: "Editor da Home", icon: PenLine },
   { href: "/admin/modelos-portfolio", label: "Modelos de site", icon: LayoutGrid },

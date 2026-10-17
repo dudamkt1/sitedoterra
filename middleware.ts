@@ -1,6 +1,7 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, type NextFetchEvent, type NextRequest } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { isNonTenantHostname } from "@/lib/platform-domain";
+import { detectDevice, isBot, isTrackableRequest, referrerSource } from "@/lib/analytics";
 
 const PROTECTED_PREFIXES = ["/painel", "/admin"];
 const AUTH_PREFIXES = ["/login", "/cadastro", "/signup"];
@@ -127,7 +128,76 @@ async function resolveSlugByHostname(host: string): Promise<string | null> {
   }
 }
 
-export async function middleware(request: NextRequest) {
+// ---- Analytics da plataforma (primeira-parte, zero JS no cliente) ----
+// Só grava acessos às páginas PRÓPRIAS do domínio principal — nunca aos
+// sites dos usuários (/{slug} ou domínios próprios). A gravação é assíncrona
+// (waitUntil): não atrasa a resposta e nunca quebra a requisição.
+const VISITOR_SALT = process.env.ANALYTICS_SALT || "site-doterra-analytics";
+
+async function sha256Hex(message: string): Promise<string> {
+  const enc = new TextEncoder();
+  const digest = await crypto.subtle.digest("SHA-256", enc.encode(message));
+  return toHex(new Uint8Array(digest));
+}
+
+async function recordPageview(request: NextRequest): Promise<void> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anon) return;
+
+  const host = (request.headers.get("host") || "").toLowerCase();
+  const pathname = request.nextUrl.pathname;
+  const ua = request.headers.get("user-agent") || "";
+  const referrer = request.headers.get("referer") || "";
+  const ip = (request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || "")
+    .split(",")[0]
+    .trim();
+  // Hash anônimo e DIÁRIO — nunca guardamos o IP. Só permite contar
+  // visitantes únicos do dia, sem rastrear a pessoa entre dias.
+  const day = new Date().toISOString().slice(0, 10);
+  const visitor = await sha256Hex(`${VISITOR_SALT}|${day}|${ip}|${ua}`);
+
+  try {
+    await fetch(`${url}/rest/v1/rpc/track_pageview`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: anon,
+        Authorization: `Bearer ${anon}`,
+      },
+      body: JSON.stringify({
+        p_host: host,
+        p_path: pathname,
+        p_referrer: referrer || null,
+        p_source: referrerSource(referrer, host),
+        p_device: detectDevice(ua),
+        p_is_bot: isBot(ua),
+        p_visitor: visitor,
+      }),
+      cache: "no-store",
+    });
+  } catch {
+    // Analytics nunca deve impactar a navegação.
+  }
+}
+
+function schedulePageview(request: NextRequest, event: NextFetchEvent): void {
+  try {
+    if (request.method !== "GET") return;
+    // Ignora navegações client-side do Next (payloads RSC) e prefetch —
+    // senão a mesma página seria contada mais de uma vez.
+    if (request.headers.get("rsc") === "1") return;
+    if (request.headers.get("next-router-prefetch")) return;
+    const host = request.headers.get("host") || request.headers.get("x-forwarded-host") || "";
+    if (!isTrackableRequest(host, request.nextUrl.pathname)) return;
+    event.waitUntil(recordPageview(request));
+  } catch {
+    // silencioso
+  }
+}
+
+export async function middleware(request: NextRequest, event: NextFetchEvent) {
+  schedulePageview(request, event);
   try {
     return await handleMiddleware(request);
   } catch {
