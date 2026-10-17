@@ -38,12 +38,19 @@ function isMissingInfraError(e: unknown): boolean {
 }
 
 /**
- * Saldo de crédito disponível do usuário em centavos.
+ * Saldo de crédito disponível do usuário em centavos, somando:
+ *   - o saldo de comissões do afiliado (`get_affiliate_balance`), e
+ *   - o "Saldo em Conta" (crédito manual do admin, `get_account_credit_available`).
+ *
+ * Quando `kind` é informado, o Saldo em Conta considera apenas as concessões
+ * compatíveis com o tipo da compra (incluindo as marcadas como "both").
+ *
  * Retorna `enabled: false` quando a infra (migration 0045) ainda não existe —
  * nesse caso o checkout segue normalmente SEM crédito (fail closed).
  */
 export async function getAffiliateCreditBalance(
-  userId: string
+  userId: string,
+  kind?: ChargeKind
 ): Promise<{ cents: number; enabled: boolean }> {
   try {
     const admin = createAdminClient();
@@ -53,8 +60,25 @@ export async function getAffiliateCreditBalance(
       throw error;
     }
     // RPC retorna reais (numeric). Converte para centavos (piso — nunca a maior).
-    const cents = Math.max(0, Math.floor(Number(data || 0) * 100));
-    return { cents, enabled: true };
+    const affiliateCents = Math.max(0, Math.floor(Number(data || 0) * 100));
+
+    // Saldo em Conta (migration 0059). Ausente → conta como zero, sem quebrar.
+    let accountCents = 0;
+    try {
+      const { data: acct, error: acctError } = await admin.rpc(
+        "get_account_credit_available",
+        { p_user_id: userId, p_kind: kind || null }
+      );
+      if (acctError) {
+        if (!isMissingInfraError(acctError)) throw acctError;
+      } else {
+        accountCents = Math.max(0, Math.floor(Number(acct || 0) * 100));
+      }
+    } catch (e) {
+      if (!isMissingInfraError(e)) throw e;
+    }
+
+    return { cents: affiliateCents + accountCents, enabled: true };
   } catch (e) {
     if (isMissingInfraError(e)) return { cents: 0, enabled: false };
     throw e;

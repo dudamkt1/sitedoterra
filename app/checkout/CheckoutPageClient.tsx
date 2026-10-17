@@ -301,7 +301,7 @@ export default function CheckoutPageClient({
   useEffect(() => {
     if (!isAuthed) return;
     let alive = true;
-    fetch("/api/checkout/credit")
+    fetch(`/api/checkout/credit?type=${isMonthly ? "subscription" : "activation"}`)
       .then((r) => r.json())
       .then((j) => {
         if (!alive) return;
@@ -312,7 +312,7 @@ export default function CheckoutPageClient({
     return () => {
       alive = false;
     };
-  }, [isAuthed]);
+  }, [isAuthed, isMonthly]);
 
   /**
    * Carrega o PORTFÓLIO de modelos (só na ativação). Pré-seleciona o modelo

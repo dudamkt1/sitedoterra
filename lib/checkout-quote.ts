@@ -101,7 +101,7 @@ export async function buildCheckoutQuote(input: {
   let usageId: string | null = null;
 
   if (input.useAffiliateCredit && methodBaseCents > 0) {
-    const { cents: balanceCents } = await getAffiliateCreditBalance(input.userId);
+    const { cents: balanceCents } = await getAffiliateCreditBalance(input.userId, input.kind);
     if (balanceCents > 0) {
       const calc = calcAffiliateCredit(methodBaseCents, balanceCents);
       if (calc.creditCents > 0) {

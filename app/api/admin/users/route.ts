@@ -75,7 +75,7 @@ export async function POST(request: Request) {
   if (action === "create-credit") {
     const { userId, amount, kind } = body || {};
 
-    // Valor chega em CENTAVOS (painel) e a RPC trabalha em REAIS.
+    // Valor chega em CENTAVOS (painel) e o banco guarda em REAIS.
     const amountCents = Math.round(Number(amount));
     const amountReais = amountCents / 100;
 
@@ -90,27 +90,26 @@ export async function POST(request: Request) {
     const { data: user } = await admin.from("profiles").select("user_id, role").eq("user_id", userId).maybeSingle();
     if (!user) return NextResponse.json({ error: "Usuário não encontrado." }, { status: 404 });
 
-    // Reserva o crédito no sistema de affiliate credit (valores em REAIS)
-    const { data: usage, error: usageError } = await admin.rpc("reserve_affiliate_credit", {
-      p_user_id: userId,
-      p_amount: amountReais,
-      p_tenant_id: null,
-      p_kind: kind,
-      p_metadata: JSON.stringify({ created_by_superadmin: true, source: "admin_panel" }),
-    });
+    // Cria a concessão de "Saldo em Conta" (crédito manual, independente do
+    // saldo de comissões do afiliado). Valores em REAIS.
+    const { data: grant, error: grantError } = await admin
+      .from("account_credit_grants")
+      .insert({
+        user_id: userId,
+        kind,
+        amount: amountReais,
+        status: "active",
+        metadata: { created_by_superadmin: true, source: "admin_panel" },
+        created_by: actor.id,
+      })
+      .select("id")
+      .single();
 
-    if (usageError) {
-      const msg = usageError.message || "";
-      if (msg.includes("INSUFFICIENT_BALANCE")) {
-        return NextResponse.json(
-          { error: "Saldo de comissões do afiliado insuficiente para este crédito." },
-          { status: 400 }
-        );
-      }
-      return NextResponse.json({ error: msg }, { status: 400 });
+    if (grantError) {
+      return NextResponse.json({ error: grantError.message }, { status: 400 });
     }
 
-    return NextResponse.json({ success: true, usageId: usage.id, amountCents, amount: amountCents, kind });
+    return NextResponse.json({ success: true, grantId: grant.id, amountCents, amount: amountCents, kind });
   }
 
   // Action não reconhecido
