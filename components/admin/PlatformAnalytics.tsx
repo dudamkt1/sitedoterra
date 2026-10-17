@@ -12,6 +12,7 @@ export interface AnalyticsDashboard {
   generated_at: string;
   range: { from: string; to: string; days: number };
   prev_range: { from: string; to: string };
+  filter: { path: string | null };
   totals: { pageviews: number; visitors: number; per_visitor: number };
   previous: { pageviews: number; visitors: number };
   series: AnalyticsDayPoint[];
@@ -20,11 +21,27 @@ export interface AnalyticsDashboard {
   sources: { source: string; pageviews: number; visitors: number }[];
   devices: { device: string; pageviews: number; visitors: number }[];
   hosts: { host: string; pageviews: number }[];
+  paths: { path: string; pageviews: number; visitors: number }[];
 }
 
 interface RangeOption {
   key: string;
   label: string;
+}
+
+interface PathOption {
+  path: string;
+  pageviews: number;
+  visitors: number;
+}
+
+const MAIN_DOMAIN = "site.topconsultores.com.br";
+
+function analyticsHref(range: string, path: string | null): string {
+  const params = new URLSearchParams();
+  params.set("range", range);
+  if (path) params.set("path", path);
+  return `/admin/analytics?${params.toString()}`;
 }
 
 const DEVICE_LABELS: Record<string, string> = {
@@ -107,18 +124,22 @@ export function PlatformAnalytics({
   error,
   ranges,
   activeRange,
+  pathOptions,
+  activePath,
 }: {
   data: AnalyticsDashboard | null;
   error: string | null;
   ranges: RangeOption[];
   activeRange: string;
+  pathOptions: PathOption[];
+  activePath: string | null;
 }) {
   const tabs = (
-    <div className="mb-6 flex flex-wrap gap-2">
+    <div className="mb-4 flex flex-wrap gap-2">
       {ranges.map((r) => (
         <Link
           key={r.key}
-          href={`/admin/analytics?range=${r.key}`}
+          href={analyticsHref(r.key, activePath)}
           className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
             r.key === activeRange
               ? "bg-[#1d5c3a] text-white"
@@ -131,6 +152,43 @@ export function PlatformAnalytics({
     </div>
   );
 
+  const urlPicker = (
+    <div className="mb-6">
+      <span className="mb-2 block text-[11px] font-bold uppercase tracking-wider text-gray-400">
+        URL analisada
+      </span>
+      <div className="flex flex-wrap gap-2">
+        <Link
+          href={analyticsHref(activeRange, null)}
+          className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+            !activePath
+              ? "bg-emerald-950 text-white"
+              : "bg-white text-gray-600 ring-1 ring-gray-200 hover:bg-gray-50"
+          }`}
+        >
+          Todas as URLs
+        </Link>
+        {pathOptions.map((p) => (
+          <Link
+            key={p.path}
+            href={analyticsHref(activeRange, p.path)}
+            title={`https://${MAIN_DOMAIN}${p.path}`}
+            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+              p.path === activePath
+                ? "bg-emerald-950 text-white"
+                : "bg-white text-gray-600 ring-1 ring-gray-200 hover:bg-gray-50"
+            }`}
+          >
+            {p.path}
+            <span className={p.path === activePath ? "text-white/60" : "text-gray-400"}>
+              {p.pageviews > 0 ? ` · ${nf.format(p.pageviews)}` : ""}
+            </span>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+
   if (error || !data) {
     return (
       <div>
@@ -139,6 +197,7 @@ export function PlatformAnalytics({
         </h1>
         <p className="mb-8 text-sm text-gray-500">Acessos ao domínio principal da plataforma.</p>
         {tabs}
+        {urlPicker}
         <div className="card border border-amber-200 bg-amber-50">
           <h2 className="mb-2 text-base font-semibold text-amber-900">Analytics ainda não ativado no banco</h2>
           <p className="text-sm leading-relaxed text-amber-900/90">
@@ -173,11 +232,30 @@ export function PlatformAnalytics({
         Analytics
       </h1>
       <p className="mb-6 text-sm text-gray-500">
-        Acessos às páginas do <strong>domínio principal</strong> da plataforma ({fmtDay(range.from)} a{" "}
-        {fmtDay(range.to)}). Não inclui os sites dos usuários.
+        {activePath ? (
+          <>
+            Acessos à URL{" "}
+            <a
+              href={`https://${MAIN_DOMAIN}${activePath}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-emerald-800 hover:underline"
+            >
+              https://{MAIN_DOMAIN}
+              {activePath}
+            </a>{" "}
+            ({fmtDay(range.from)} a {fmtDay(range.to)}).
+          </>
+        ) : (
+          <>
+            Acessos às páginas do <strong>domínio principal</strong> da plataforma ({fmtDay(range.from)} a{" "}
+            {fmtDay(range.to)}). Não inclui os sites dos usuários.
+          </>
+        )}
       </p>
 
       {tabs}
+      {urlPicker}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
@@ -223,17 +301,19 @@ export function PlatformAnalytics({
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Section title="Páginas mais acessadas">
-          {top_pages.length === 0 ? (
-            <p className="py-6 text-center text-sm text-gray-400">Sem dados no período.</p>
-          ) : (
-            <div className="space-y-2.5">
-              {top_pages.map((p) => (
-                <BarRow key={p.path} label={p.path} value={p.pageviews} max={maxPage} hint={`${nf.format(p.visitors)} visit.`} />
-              ))}
-            </div>
-          )}
-        </Section>
+        {!activePath && (
+          <Section title="Páginas mais acessadas">
+            {top_pages.length === 0 ? (
+              <p className="py-6 text-center text-sm text-gray-400">Sem dados no período.</p>
+            ) : (
+              <div className="space-y-2.5">
+                {top_pages.map((p) => (
+                  <BarRow key={p.path} label={p.path} value={p.pageviews} max={maxPage} hint={`${nf.format(p.visitors)} visit.`} />
+                ))}
+              </div>
+            )}
+          </Section>
+        )}
 
         <Section title="Origem do tráfego">
           {sources.length === 0 ? (

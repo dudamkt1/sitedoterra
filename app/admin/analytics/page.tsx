@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { PLATFORM_TRACKED_PATHS } from "@/lib/analytics";
 import { PlatformAnalytics, type AnalyticsDashboard } from "@/components/admin/PlatformAnalytics";
 
 export const dynamic = "force-dynamic";
@@ -39,6 +40,10 @@ export default async function AdminAnalyticsPage({
   const rangeKey = RANGES.some((r) => r.key === rangeParam) ? rangeParam! : "30d";
   const days = RANGES.find((r) => r.key === rangeKey)!.days;
 
+  const rawPath = searchParams.path;
+  const activePath =
+    typeof rawPath === "string" && rawPath.startsWith("/") && rawPath.length <= 300 ? rawPath : null;
+
   const to = todaySaoPaulo();
   const from = addDays(to, -(days - 1));
 
@@ -47,14 +52,35 @@ export default async function AdminAnalyticsPage({
   }
 
   const admin = createAdminClient();
-  const { data, error } = await admin.rpc("admin_analytics_dashboard", { p_from: from, p_to: to });
+  const { data, error } = await admin.rpc("admin_analytics_dashboard", {
+    p_from: from,
+    p_to: to,
+    p_path: activePath,
+  });
+
+  const dashboard = (data as AnalyticsDashboard | null) ?? null;
+
+  // Seletor de URL: sempre inclui as páginas conhecidas da plataforma
+  // (garante, por exemplo, /landpage mesmo sem acessos) + o que foi visto.
+  const optionMap = new Map<string, { pageviews: number; visitors: number }>();
+  for (const p of PLATFORM_TRACKED_PATHS) {
+    if (p !== "/") optionMap.set(p, { pageviews: 0, visitors: 0 });
+  }
+  for (const p of dashboard?.paths || []) {
+    optionMap.set(p.path, { pageviews: p.pageviews, visitors: p.visitors });
+  }
+  const pathOptions = Array.from(optionMap.entries())
+    .map(([path, v]) => ({ path, ...v }))
+    .sort((a, b) => b.pageviews - a.pageviews || a.path.localeCompare(b.path));
 
   return (
     <PlatformAnalytics
-      data={(data as AnalyticsDashboard | null) ?? null}
+      data={dashboard}
       error={error ? error.message : null}
       ranges={RANGES.map(({ key, label }) => ({ key, label }))}
       activeRange={rangeKey}
+      pathOptions={pathOptions}
+      activePath={activePath}
     />
   );
 }

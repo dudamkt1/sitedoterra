@@ -95,12 +95,20 @@ begin
   grant execute on function public.track_pageview(text, text, text, text, text, boolean, text) to anon, authenticated;
 
   -- ===================== Leitura agregada (admin) =====================
-  create or replace function public.admin_analytics_dashboard(p_from date, p_to date)
+  -- Assinatura antiga (sem filtro de URL) — removida para não gerar ambiguidade.
+  drop function if exists public.admin_analytics_dashboard(date, date);
+
+  create or replace function public.admin_analytics_dashboard(
+    p_from date,
+    p_to date,
+    p_path text default null
+  )
   returns jsonb
   language plpgsql security definer set search_path = public as $dash$
   declare
     v_to date := coalesce(p_to, (now() at time zone 'America/Sao_Paulo')::date);
     v_from date := coalesce(p_from, v_to - 29);
+    v_path text := nullif(trim(coalesce(p_path, '')), '');
     v_days int;
     v_prev_to date;
     v_prev_from date;
@@ -117,6 +125,7 @@ begin
       'generated_at', now(),
       'range', jsonb_build_object('from', v_from, 'to', v_to, 'days', v_days),
       'prev_range', jsonb_build_object('from', v_prev_from, 'to', v_prev_to),
+      'filter', jsonb_build_object('path', v_path),
       'totals', (
         select jsonb_build_object(
           'pageviews', count(*),
@@ -128,6 +137,7 @@ begin
         )
         from public.platform_pageviews
         where day between v_from and v_to and not is_bot
+          and (v_path is null or path = v_path)
       ),
       'previous', (
         select jsonb_build_object(
@@ -136,6 +146,7 @@ begin
         )
         from public.platform_pageviews
         where day between v_prev_from and v_prev_to and not is_bot
+          and (v_path is null or path = v_path)
       ),
       'series', (
         select coalesce(jsonb_agg(row_to_json(x) order by x.day), '[]'::jsonb)
@@ -146,6 +157,7 @@ begin
           from generate_series(v_from::timestamp, v_to::timestamp, interval '1 day') g
           left join public.platform_pageviews pv
             on pv.day = g::date and not pv.is_bot
+           and (v_path is null or pv.path = v_path)
           group by g
         ) x
       ),
@@ -157,6 +169,7 @@ begin
                  count(distinct visitor_hash) as visitors
           from public.platform_pageviews
           where day between v_from and v_to and not is_bot
+            and (v_path is null or path = v_path)
           group by 1
         ) h
       ),
@@ -166,6 +179,7 @@ begin
           select path, count(*) as pageviews, count(distinct visitor_hash) as visitors
           from public.platform_pageviews
           where day between v_from and v_to and not is_bot
+            and (v_path is null or path = v_path)
           group by path
           order by pageviews desc
           limit 20
@@ -177,6 +191,7 @@ begin
           select source, count(*) as pageviews, count(distinct visitor_hash) as visitors
           from public.platform_pageviews
           where day between v_from and v_to and not is_bot
+            and (v_path is null or path = v_path)
           group by source
           order by pageviews desc
           limit 20
@@ -188,6 +203,7 @@ begin
           select device, count(*) as pageviews, count(distinct visitor_hash) as visitors
           from public.platform_pageviews
           where day between v_from and v_to and not is_bot
+            and (v_path is null or path = v_path)
           group by device
           order by pageviews desc
         ) d
@@ -198,10 +214,22 @@ begin
           select host, count(*) as pageviews
           from public.platform_pageviews
           where day between v_from and v_to and not is_bot
+            and (v_path is null or path = v_path)
           group by host
           order by pageviews desc
           limit 10
         ) hh
+      ),
+      -- Lista de URLs vistas no período (SEMPRE sem filtro de path) para
+      -- alimentar o seletor "URL específica" do painel.
+      'paths', (
+        select coalesce(jsonb_agg(row_to_json(pp) order by pp.pageviews desc), '[]'::jsonb)
+        from (
+          select path, count(*) as pageviews, count(distinct visitor_hash) as visitors
+          from public.platform_pageviews
+          where day between v_from and v_to and not is_bot
+          group by path
+        ) pp
       )
     ) into v_result;
 
@@ -210,8 +238,8 @@ begin
   $dash$;
 
   -- Só o service_role (admin) executa a leitura agregada.
-  revoke all on function public.admin_analytics_dashboard(date, date) from public;
-  grant execute on function public.admin_analytics_dashboard(date, date) to service_role;
+  revoke all on function public.admin_analytics_dashboard(date, date, text) from public;
+  grant execute on function public.admin_analytics_dashboard(date, date, text) to service_role;
 
   -- ==================== Limpeza opcional (retenção) ====================
   create or replace function public.prune_platform_pageviews(p_keep_days int default 400)
