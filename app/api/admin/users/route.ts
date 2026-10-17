@@ -75,8 +75,12 @@ export async function POST(request: Request) {
   if (action === "create-credit") {
     const { userId, amount, kind } = body || {};
 
+    // Valor chega em CENTAVOS (painel) e a RPC trabalha em REAIS.
+    const amountCents = Math.round(Number(amount));
+    const amountReais = amountCents / 100;
+
     if (!userId) return NextResponse.json({ error: "ID do usuário não informado." }, { status: 400 });
-    if (!amount || amount <= 0) return NextResponse.json({ error: "Informe um valor maior que zero." }, { status: 400 });
+    if (!amountCents || amountCents <= 0) return NextResponse.json({ error: "Informe um valor maior que zero." }, { status: 400 });
     if (kind !== "activation" && kind !== "subscription" && kind !== "both") {
       return NextResponse.json({ error: "Tipo de crédito inválido. Use 'activation', 'subscription' ou 'both'." }, { status: 400 });
     }
@@ -86,18 +90,27 @@ export async function POST(request: Request) {
     const { data: user } = await admin.from("profiles").select("user_id, role").eq("user_id", userId).maybeSingle();
     if (!user) return NextResponse.json({ error: "Usuário não encontrado." }, { status: 404 });
 
-    // Reserva o crédito no sistema de affiliate credit
+    // Reserva o crédito no sistema de affiliate credit (valores em REAIS)
     const { data: usage, error: usageError } = await admin.rpc("reserve_affiliate_credit", {
       p_user_id: userId,
-      p_amount: amount,
+      p_amount: amountReais,
       p_tenant_id: null,
       p_kind: kind,
       p_metadata: JSON.stringify({ created_by_superadmin: true, source: "admin_panel" }),
     });
 
-    if (usageError) return NextResponse.json({ error: usageError.message }, { status: 400 });
+    if (usageError) {
+      const msg = usageError.message || "";
+      if (msg.includes("INSUFFICIENT_BALANCE")) {
+        return NextResponse.json(
+          { error: "Saldo de comissões do afiliado insuficiente para este crédito." },
+          { status: 400 }
+        );
+      }
+      return NextResponse.json({ error: msg }, { status: 400 });
+    }
 
-    return NextResponse.json({ success: true, usageId: usage.id, amount, kind });
+    return NextResponse.json({ success: true, usageId: usage.id, amountCents, amount: amountCents, kind });
   }
 
   // Action não reconhecido
