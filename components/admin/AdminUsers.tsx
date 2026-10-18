@@ -66,6 +66,20 @@ interface CreditBalance {
   totalCents: number;
 }
 
+interface GrantRow {
+  id: string;
+  kind: "activation" | "subscription" | "both";
+  amountCents: number;
+  status: string;
+  createdAt: string;
+}
+
+const CREDIT_KIND_LABEL: Record<GrantRow["kind"], string> = {
+  activation: "Ativação",
+  subscription: "Mensalidade",
+  both: "Ativação + Mensalidade",
+};
+
 export function AdminUsers({ rows, plans, currentUserId }: { rows: Row[]; plans: any[]; currentUserId?: string | null }) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -85,6 +99,10 @@ export function AdminUsers({ rows, plans, currentUserId }: { rows: Row[]; plans:
   const [creditMsg, setCreditMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [creditBalance, setCreditBalance] = useState<CreditBalance | null>(null);
   const [loadingCredit, setLoadingCredit] = useState(false);
+  const [grants, setGrants] = useState<GrantRow[]>([]);
+  const [editingGrantId, setEditingGrantId] = useState<string | null>(null);
+  const [grantAmount, setGrantAmount] = useState(0);
+  const [grantKind, setGrantKind] = useState<GrantRow["kind"]>("activation");
 
   // ---- Modal de criação ----
   const [creating, setCreating] = useState(false);
@@ -106,6 +124,8 @@ export function AdminUsers({ rows, plans, currentUserId }: { rows: Row[]; plans:
     setCreditKind("activation");
     setCreditMsg(null);
     setCreditBalance(null);
+    setGrants([]);
+    setEditingGrantId(null);
     loadCredit(r.profile.user_id);
   }
 
@@ -116,12 +136,67 @@ export function AdminUsers({ rows, plans, currentUserId }: { rows: Row[]; plans:
     try {
       const res = await fetch(`/api/admin/users/${userId}/credit`);
       const json = await res.json().catch(() => ({}));
-      if (res.ok && json?.credit) setCreditBalance(json.credit as CreditBalance);
+      if (res.ok) {
+        if (json?.credit) setCreditBalance(json.credit as CreditBalance);
+        setGrants(Array.isArray(json?.grants) ? (json.grants as GrantRow[]) : []);
+      }
     } catch {
       // Silencioso: a conferência de saldo é informativa, não bloqueia a edição.
     } finally {
       setLoadingCredit(false);
     }
+  }
+
+  /** Aplica resposta de edição/exclusão de concessão (saldo + lista já vêm prontos). */
+  function applyCreditResponse(json: any) {
+    if (json?.credit) setCreditBalance(json.credit as CreditBalance);
+    if (Array.isArray(json?.grants)) setGrants(json.grants as GrantRow[]);
+  }
+
+  function startEditGrant(g: GrantRow) {
+    setEditingGrantId(g.id);
+    setGrantAmount(g.amountCents);
+    setGrantKind(g.kind);
+    setCreditMsg(null);
+  }
+
+  async function saveGrant(userId: string) {
+    if (!editingGrantId) return;
+    if (grantAmount <= 0) {
+      setCreditMsg({ ok: false, text: "Informe um valor maior que zero. Para zerar, exclua a concessão." });
+      return;
+    }
+    setBusy("credit");
+    setCreditMsg(null);
+    const { ok, json } = await api(
+      `/api/admin/users/${userId}/credit`,
+      { grantId: editingGrantId, amount: grantAmount, kind: grantKind },
+      "PATCH"
+    );
+    setBusy(null);
+    if (!ok) {
+      setCreditMsg({ ok: false, text: json.error || "Erro ao editar crédito." });
+      return;
+    }
+    applyCreditResponse(json);
+    setEditingGrantId(null);
+    setCreditMsg({ ok: true, text: `Crédito atualizado para ${formatBRL(grantAmount)}.` });
+  }
+
+  async function deleteGrant(userId: string, g: GrantRow) {
+    if (!window.confirm(`Excluir esta concessão de ${formatBRL(g.amountCents)} (${CREDIT_KIND_LABEL[g.kind]})?\n\nO saldo do usuário e o checkout serão atualizados imediatamente.`)) return;
+    setBusy("credit");
+    setCreditMsg(null);
+    const res = await fetch(`/api/admin/users/${userId}/credit?grantId=${encodeURIComponent(g.id)}`, { method: "DELETE" });
+    const json = await res.json().catch(() => ({}));
+    setBusy(null);
+    if (!res.ok) {
+      setCreditMsg({ ok: false, text: json.error || "Erro ao excluir crédito." });
+      return;
+    }
+    if (editingGrantId === g.id) setEditingGrantId(null);
+    applyCreditResponse(json);
+    setCreditMsg({ ok: true, text: `Concessão de ${formatBRL(g.amountCents)} excluída.` });
   }
 
   async function api(url: string, body: Record<string, unknown>, method = "PATCH") {
@@ -843,6 +918,84 @@ export function AdminUsers({ rows, plans, currentUserId }: { rows: Row[]; plans:
                       </>
                     )}
                   </div>
+
+                  {!loadingCredit && grants.length > 0 && (
+                    <div className="mt-3 rounded-lg border border-gray-100 divide-y divide-gray-100 overflow-hidden">
+                      <div className="px-3 py-2 text-xs font-medium text-gray-500 bg-gray-50">
+                        Concessões lançadas ({grants.length}) — edite ou exclua individualmente
+                      </div>
+                      {grants.map((g) => {
+                        const isEditing = editingGrantId === g.id;
+                        return (
+                          <div key={g.id} className="px-3 py-2 flex items-center gap-3 flex-wrap">
+                            {isEditing ? (
+                              <>
+                                <select
+                                  className="input !py-1 !px-2 text-xs w-auto"
+                                  value={grantKind}
+                                  onChange={(e) => setGrantKind(e.target.value as GrantRow["kind"])}
+                                >
+                                  <option value="activation">Ativação</option>
+                                  <option value="subscription">Mensalidade</option>
+                                  <option value="both">Ativação + Mensalidade</option>
+                                </select>
+                                <div className="relative w-[130px]">
+                                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">
+                                    R$
+                                  </span>
+                                  <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    className="input !py-1 !pl-7 text-xs"
+                                    value={grantAmount > 0 ? centsToInput(grantAmount) : ""}
+                                    onChange={(e) => setGrantAmount(inputToCents(e.target.value))}
+                                  />
+                                </div>
+                                <div className="ml-auto flex items-center gap-2">
+                                  <button
+                                    className="btn btn-primary !py-1 !px-3 text-xs"
+                                    disabled={busy === "credit"}
+                                    onClick={() => saveGrant(editing.profile.user_id)}
+                                  >
+                                    {busy === "credit" ? "Salvando…" : "Salvar"}
+                                  </button>
+                                  <button
+                                    className="btn btn-outline !py-1 !px-3 text-xs"
+                                    disabled={busy === "credit"}
+                                    onClick={() => setEditingGrantId(null)}
+                                  >
+                                    Cancelar
+                                  </button>
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <span className="text-sm font-semibold text-gray-800">{formatBRL(g.amountCents)}</span>
+                                <span className="text-xs text-gray-500">{CREDIT_KIND_LABEL[g.kind]}</span>
+                                <span className="text-[0.7rem] text-gray-400">{formatDate(g.createdAt)}</span>
+                                <div className="ml-auto flex items-center gap-2">
+                                  <button
+                                    className="btn btn-outline !py-1 !px-3 text-xs"
+                                    disabled={busy === "credit"}
+                                    onClick={() => startEditGrant(g)}
+                                  >
+                                    Editar
+                                  </button>
+                                  <button
+                                    className="btn btn-danger !py-1 !px-3 text-xs"
+                                    disabled={busy === "credit"}
+                                    onClick={() => deleteGrant(editing.profile.user_id, g)}
+                                  >
+                                    Excluir
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
 
                   <div className="mt-3 flex items-end gap-3 flex-wrap">
                     <div className="flex-1 min-w-[160px]">
