@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { StatusBadge } from "@/components/dashboard/ui";
 import { PasswordField } from "@/components/PasswordField";
-import { formatDate } from "@/lib/utils";
+import { formatDate, formatBRL } from "@/lib/utils";
 
 type Props = {
   profile: {
@@ -18,10 +18,15 @@ type Props = {
     suspended_at?: string | null;
     blocked_at?: string | null;
   };
+  accountCredit?: {
+    activationCents: number;
+    subscriptionCents: number;
+    totalCents: number;
+  };
   isDemo?: boolean;
 };
 
-export default function ContaForm({ profile, isDemo }: Props) {
+export default function ContaForm({ profile, accountCredit, isDemo }: Props) {
   const [name, setName] = useState(profile.name || "");
   const [email, setEmail] = useState(profile.email || "");
   const [phone, setPhone] = useState(profile.phone || "");
@@ -99,6 +104,47 @@ export default function ContaForm({ profile, isDemo }: Props) {
 
   return (
     <div className="space-y-6 max-w-3xl">
+      {/* Saldo em Conta (crédito do usuário) */}
+      <div className="card">
+        <h2 className="card-title mb-1">Saldo em Conta</h2>
+        <p className="text-xs text-gray-400 mb-4">
+          Crédito disponível para usar na ativação do site ou no pagamento da mensalidade.
+          O valor é abatido automaticamente no checkout.
+        </p>
+
+        {!accountCredit || accountCredit.totalCents <= 0 ? (
+          <div className="rounded-lg bg-gray-50 border border-gray-100 px-4 py-3 text-sm text-gray-500">
+            Você não possui crédito disponível no momento.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="rounded-lg bg-emerald-50 border border-emerald-100 px-4 py-3">
+              <div className="text-xs font-medium text-emerald-700">Total disponível</div>
+              <div className="text-2xl font-bold text-emerald-800">
+                {formatBRL(accountCredit.totalCents)}
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="rounded-lg border border-gray-100 px-4 py-3">
+                <div className="text-xs text-gray-500">Para ativar meu site</div>
+                <div className="font-semibold text-gray-800">
+                  {formatBRL(accountCredit.activationCents)}
+                </div>
+              </div>
+              <div className="rounded-lg border border-gray-100 px-4 py-3">
+                <div className="text-xs text-gray-500">Para pagar a mensalidade</div>
+                <div className="font-semibold text-gray-800">
+                  {formatBRL(accountCredit.subscriptionCents)}
+                </div>
+              </div>
+            </div>
+            <p className="text-[0.7rem] text-gray-400">
+              Créditos válidos para ativação <em>e</em> mensalidade aparecem nas duas opções.
+            </p>
+          </div>
+        )}
+      </div>
+
       {/* Dados editáveis */}
       <div className="card">
         <h2 className="card-title mb-1">Dados da conta</h2>

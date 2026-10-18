@@ -85,6 +85,53 @@ export async function getAffiliateCreditBalance(
   }
 }
 
+export interface AccountCreditBreakdown {
+  /** Disponível para ativação (inclui as concessões 'both'). */
+  activationCents: number;
+  /** Disponível para mensalidade (inclui as concessões 'both'). */
+  subscriptionCents: number;
+  /** Total disponível (concessões ativas − já consumido). */
+  totalCents: number;
+}
+
+/**
+ * Detalhamento do "Saldo em Conta" (crédito manual do admin) em centavos.
+ * Usado no painel para o usuário ver o que pode usar na ativação/mensalidade.
+ * Retorna zeros quando a infra (migration 0059) ainda não existe.
+ */
+export async function getAccountCreditBreakdown(
+  userId: string
+): Promise<AccountCreditBreakdown> {
+  const zero: AccountCreditBreakdown = {
+    activationCents: 0,
+    subscriptionCents: 0,
+    totalCents: 0,
+  };
+  try {
+    const admin = createAdminClient();
+    const toCents = (v: unknown) => Math.max(0, Math.floor(Number(v || 0) * 100));
+    const [act, sub, all] = await Promise.all([
+      admin.rpc("get_account_credit_available", { p_user_id: userId, p_kind: "activation" }),
+      admin.rpc("get_account_credit_available", { p_user_id: userId, p_kind: "subscription" }),
+      admin.rpc("get_account_credit_available", { p_user_id: userId, p_kind: null }),
+    ]);
+    for (const r of [act, sub, all]) {
+      if (r.error) {
+        if (isMissingInfraError(r.error)) return zero;
+        throw r.error;
+      }
+    }
+    return {
+      activationCents: toCents(act.data),
+      subscriptionCents: toCents(sub.data),
+      totalCents: toCents(all.data),
+    };
+  } catch (e) {
+    if (isMissingInfraError(e)) return zero;
+    throw e;
+  }
+}
+
 /**
  * Reserva o crédito para uma tentativa de pagamento.
  * Retorna null quando a infra está ausente (chamador segue sem crédito).
