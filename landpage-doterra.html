@@ -213,6 +213,7 @@ footer nav{display:flex;gap:20px;flex-wrap:wrap}footer p{max-width:70ch}
 .quotes figure{background:#fff;border:1px solid var(--line);border-radius:22px;padding:28px}.quotes blockquote{font-weight:600;line-height:1.5}.quotes figcaption{margin-top:16px;color:var(--muted);font-size:.9rem}
 .guarantee{margin:14px 0 0;font-size:.9rem;color:#D4E6DB}.guarantee b{color:var(--gold)}
 .included details{margin-top:18px}.aff-band{padding:clamp(48px,7vw,80px) 0}
+.mens .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:18px;margin-top:36px}.mens .c{background:#fff;border:1px solid var(--line);border-radius:22px;padding:28px}.mens .c.hl{background:var(--deep);border-color:var(--deep);color:#fff}.mens .num{font-size:2.4rem;font-weight:800;line-height:1;color:var(--forest)}.mens .hl .num{color:var(--gold)}.mens h3{margin:10px 0 8px;font-size:1.12rem}.mens ul{list-style:none;padding:0;margin:12px 0 0}.mens li{position:relative;padding:5px 0 5px 24px}.mens li:before{content:"✓";position:absolute;left:0;color:var(--forest);font-weight:700}.mens .hl p{color:#D4E6DB}.mens small{display:block;margin-top:12px;color:var(--muted);font-size:.8rem}.mens .hl small{color:#B9D3C3}.mens .close{margin-top:32px;text-align:center}.mens .close p{font-weight:600;margin:0 0 16px}
 </style>
 </head>
 <body>
@@ -336,12 +337,24 @@ footer nav{display:flex;gap:20px;flex-wrap:wrap}footer p{max-width:70ch}
 <div class="big"><small>R$</small>97</div>
 <p>Ativação do site, pagamento único</p>
 <p>Até 3x sem juros no cartão, ou R$ 92,15 no PIX com 5% de desconto.</p>
-<div class="then"><b>Depois de 1 mês: só R$ 47/mês</b> (menos de R$ 1,60 por dia).<br>Sem fidelidade. Cancele quando quiser.</div>
+<div class="then"><b>Depois de 1 mês: só R$ 47/mês</b> (menos de R$ 1,60 por dia). <a href="#mensalidade">Por que esse valor?</a><br>Sem fidelidade. Cancele quando quiser.</div>
 <a class="btn btn-gold" data-cta href="https://site.topconsultores.com.br/#planos" target="_blank" rel="noopener">Quero meu site: ativação R$ 97</a>
 <p class="guarantee"><b>Garantia de 7 dias:</b> não gostou, devolvemos seu dinheiro (direito previsto no Código de Defesa do Consumidor).</p></div>
 <div class="included"><h3>Tudo isso já vem liberado no seu painel</h3>
 <ul><li>Site profissional</li><li>Domínio personalizado</li><li>Painel exclusivo</li><li>CRM de clientes</li><li>Central de IA</li><li>Especialista IA no seu site</li></ul><details><summary>Ver tudo que está incluído</summary><ul><li>Agenda online</li><li>Ferramentas de marketing</li><li>Catálogo de produtos</li><li>Fidelidade e sorteios</li><li>Suporte por WhatsApp</li><li>Programa de afiliados</li></ul></details></div>
 </div>
+</div></section>
+
+<section class="mens" id="mensalidade"><div class="wrap">
+<span class="pill"><b></b>A pergunta que todo mundo faz</span>
+<h2>Por que R$ 47 por mês? <em>E como ele pode sair de graça.</em></h2>
+<p class="lead">A ativação de R$ 97 monta o seu site. A mensalidade mantém o seu escritório digital no ar, seguro e com suporte. Veja como ela se paga sozinha.</p>
+<div class="grid">
+<div class="c"><div class="num">R$ 1,55</div><h3>por dia, e você leva o escritório inteiro</h3><ul><li>Site no ar, com hospedagem e domínio</li><li>CRM para organizar e fidelizar clientes</li><li>Agenda online e Especialista IA 24h</li><li>Ferramentas de marketing e suporte por WhatsApp</li></ul></div>
+<div class="c hl"><div class="num">1 venda</div><h3>a mais por mês já cobre a mensalidade</h3><p>Uma venda extra de <b id="mtk">R$ 150</b> (ajuste o ticket no simulador acima) paga os R$ 47 com folga. O resto é seu.</p><small>Considera o valor da venda, não a sua comissão.</small></div>
+<div class="c"><div class="num">10 indicados</div><h3>ativos podem zerar a mensalidade</h3><p>No programa de afiliados você recebe 10% da mensalidade de cada consultor(a) que indicar (R$ 4,70 por indicado ativo). Com 10 ativos, são R$ 47 por mês.</p><small>Exemplo ilustrativo, sem promessa de ganho. Veja as regras do programa.</small></div>
+</div>
+<div class="close"><p>Sem fidelidade, mensalidade só após o 1º mês e garantia de 7 dias. Se não fizer sentido, você sai sem multa.</p><a class="btn btn-primary" data-cta href="https://site.topconsultores.com.br/#planos" target="_blank" rel="noopener">Quero meu site: ativação R$ 97</a></div>
 </div></section>
 
 <section class="faq" id="faq"><div class="wrap"><h2>Perguntas frequentes</h2>
@@ -428,5 +441,6 @@ function calc(){
 function earn(){var n=+$("sa").value,f=function(v){return v.toLocaleString("pt-BR",{style:"currency",currency:"BRL"})};$("a1").textContent=n;$("ar").textContent=f(n*9.7)+" na ativação";$("ar2").textContent="+ "+f(n*4.7)+" por mês em mensalidades"}
 $("sa").addEventListener("input",earn);earn();
 </script>
+<script>(function(){var t=document.getElementById("s3"),o=document.getElementById("mtk");if(!t||!o)return;function f(){o.textContent="R$ "+(+t.value).toLocaleString("pt-BR")}t.addEventListener("input",f);f()})();</script>
 </body>
 </html>
