@@ -48,6 +48,24 @@ function sortByMostRecent(rows: Row[]): Row[] {
   });
 }
 
+/** Formata centavos como "1.234,56" (sem "R$") para o input de crédito. */
+function centsToInput(cents: number): string {
+  const v = Math.max(0, Math.round(cents || 0));
+  return (v / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/** Converte o texto digitado (máscara R$ progressiva) de volta para centavos. */
+function inputToCents(raw: string): number {
+  const digits = String(raw || "").replace(/\D/g, "").slice(0, 12);
+  return digits ? Number(digits) : 0;
+}
+
+interface CreditBalance {
+  activationCents: number;
+  subscriptionCents: number;
+  totalCents: number;
+}
+
 export function AdminUsers({ rows, plans, currentUserId }: { rows: Row[]; plans: any[]; currentUserId?: string | null }) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -65,6 +83,8 @@ export function AdminUsers({ rows, plans, currentUserId }: { rows: Row[]; plans:
   const [creditAmount, setCreditAmount] = useState(0);
   const [creditKind, setCreditKind] = useState("activation");
   const [creditMsg, setCreditMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [creditBalance, setCreditBalance] = useState<CreditBalance | null>(null);
+  const [loadingCredit, setLoadingCredit] = useState(false);
 
   // ---- Modal de criação ----
   const [creating, setCreating] = useState(false);
@@ -84,6 +104,24 @@ export function AdminUsers({ rows, plans, currentUserId }: { rows: Row[]; plans:
     setMsg(null);
     setCreditAmount(0);
     setCreditKind("activation");
+    setCreditMsg(null);
+    setCreditBalance(null);
+    loadCredit(r.profile.user_id);
+  }
+
+  /** Carrega o Saldo em Conta atual do usuário (mesma visão do /painel/conta). */
+  async function loadCredit(userId: string) {
+    if (!userId) return;
+    setLoadingCredit(true);
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/credit`);
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && json?.credit) setCreditBalance(json.credit as CreditBalance);
+    } catch {
+      // Silencioso: a conferência de saldo é informativa, não bloqueia a edição.
+    } finally {
+      setLoadingCredit(false);
+    }
   }
 
   async function api(url: string, body: Record<string, unknown>, method = "PATCH") {
@@ -225,6 +263,8 @@ export function AdminUsers({ rows, plans, currentUserId }: { rows: Row[]; plans:
     setCreditMsg({ ok: true, text: `Crédito de ${formatBRL(creditAmount)} salvo para ${kindLabel}.` });
     // Mantém a janela aberta para conferência; zera o valor para evitar envio duplicado.
     setCreditAmount(0);
+    // Atualiza o saldo exibido com o valor recém-concedido.
+    loadCredit(selectedUserId);
   }
 
   const filtered = useMemo(
@@ -771,7 +811,7 @@ export function AdminUsers({ rows, plans, currentUserId }: { rows: Row[]; plans:
                     <div>
                       <p className="font-semibold text-sm text-red-700">Crédito para ativação e mensalidade</p>
                       <p className="text-xs text-gray-400">
-                        Crédito descontado do saldo de comissões do afiliado. Escolha se vale para ativação, mensalidade ou ambos.
+                        Crédito que o usuário pode usar na ativação do site ou na mensalidade. Escolha se o valor vale para ativação, mensalidade ou ambos.
                       </p>
                     </div>
                     <div>
@@ -786,23 +826,50 @@ export function AdminUsers({ rows, plans, currentUserId }: { rows: Row[]; plans:
                       </select>
                     </div>
                   </div>
+
+                  <div className="mt-3 rounded-lg bg-emerald-50 border border-emerald-100 px-4 py-3">
+                    <div className="text-xs font-medium text-emerald-700">Saldo em Conta atual</div>
+                    {loadingCredit ? (
+                      <div className="text-sm text-emerald-800/70">Carregando saldo…</div>
+                    ) : (
+                      <>
+                        <div className="text-xl font-bold text-emerald-800">
+                          {formatBRL(creditBalance?.totalCents || 0)}
+                        </div>
+                        <div className="text-[0.7rem] text-gray-500 mt-0.5">
+                          Ativação: {formatBRL(creditBalance?.activationCents || 0)} · Mensalidade:{" "}
+                          {formatBRL(creditBalance?.subscriptionCents || 0)}
+                        </div>
+                      </>
+                    )}
+                  </div>
+
                   <div className="mt-3 flex items-end gap-3 flex-wrap">
                     <div className="flex-1 min-w-[160px]">
-                      <label className="label">Valor do crédito (centavos)</label>
-                      <input
-                        type="number"
-                        className="input"
-                        value={creditAmount}
-                        onChange={(e) => setCreditAmount(parseInt(e.target.value) || 0)}
-                        min="1"
-                      />
+                      <label className="label">Valor do crédito (R$)</label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400 pointer-events-none">
+                          R$
+                        </span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          className="input !pl-9"
+                          placeholder="0,00"
+                          value={creditAmount > 0 ? centsToInput(creditAmount) : ""}
+                          onChange={(e) => setCreditAmount(inputToCents(e.target.value))}
+                        />
+                      </div>
+                      <p className="text-[0.7rem] text-gray-400 mt-1">
+                        Digite em reais. Ex.: <span className="font-medium">50,00</span> → {formatBRL(5000)}.
+                      </p>
                     </div>
                     <button
                       className="btn btn-primary !py-1.5 !px-4 text-xs"
                       disabled={busy === "credit" || creditAmount <= 0}
                       onClick={createCredit}
                     >
-                      {busy === "credit" ? "Salvando..." : "Salvar crédito"}
+                      {busy === "credit" ? "Salvando..." : "Adicionar crédito"}
                     </button>
                   </div>
                   {creditMsg && (

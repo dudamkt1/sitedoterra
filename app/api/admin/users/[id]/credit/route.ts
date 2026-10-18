@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser, getProfile } from "@/lib/auth";
+import { getAccountCreditBreakdown } from "@/lib/affiliate-credit";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 /**
  * Super Admin cria crédito para um usuário.
@@ -19,6 +21,29 @@ export const runtime = "nodejs";
  */
 const CREDIT_KINDS = ["activation", "subscription", "both"] as const;
 type CreditKind = (typeof CREDIT_KINDS)[number];
+
+/**
+ * GET /api/admin/users/[id]/credit — Saldo em Conta atual do usuário (em
+ * centavos), para o superadmin conferir o crédito já concedido ao editar a
+ * conta. Espelha exatamente o que o usuário vê em /painel/conta.
+ */
+export async function GET(
+  _request: Request,
+  { params }: { params: { id: string } }
+) {
+  const actor = await getCurrentUser();
+  if (!actor) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+  const actorProfile = await getProfile(actor.id);
+  if (actorProfile?.role !== "superadmin") {
+    return NextResponse.json({ error: "Acesso negado" }, { status: 403 });
+  }
+
+  const { id: userId } = params;
+  if (!userId) return NextResponse.json({ error: "ID do usuário não informado." }, { status: 400 });
+
+  const credit = await getAccountCreditBreakdown(userId);
+  return NextResponse.json({ credit });
+}
 
 export async function POST(
   request: Request,
