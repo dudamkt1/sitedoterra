@@ -94,6 +94,55 @@ export interface AccountCreditBreakdown {
   totalCents: number;
 }
 
+export interface AccountCreditSummary extends AccountCreditBreakdown {
+  /** Total efetivamente concedido pelo superadmin (concessões ativas). */
+  grantedCents: number;
+  /** Já utilizado (concedido − disponível). Nunca negativo. */
+  usedCents: number;
+}
+
+/**
+ * Visão completa do "Saldo em Conta" (crédito manual do admin) para exibição
+ * no painel: disponível (por tipo + total), total concedido e já utilizado.
+ * Nunca lança — devolve zeros quando a infra (migration 0059) não existe.
+ */
+export async function getAccountCreditSummary(
+  userId: string
+): Promise<AccountCreditSummary> {
+  const zero: AccountCreditSummary = {
+    grantedCents: 0,
+    usedCents: 0,
+    activationCents: 0,
+    subscriptionCents: 0,
+    totalCents: 0,
+  };
+  try {
+    const admin = createAdminClient();
+    const breakdown = await getAccountCreditBreakdown(userId);
+    const { data: grants, error } = await admin
+      .from("account_credit_grants")
+      .select("amount, status")
+      .eq("user_id", userId)
+      .eq("status", "active");
+    if (error) {
+      if (isMissingInfraError(error)) return { ...zero, ...breakdown };
+      throw error;
+    }
+    const grantedCents = ((grants || []) as { amount: number | string }[]).reduce(
+      (sum, g) => sum + Math.round(Number(g.amount) * 100),
+      0
+    );
+    return {
+      ...breakdown,
+      grantedCents,
+      usedCents: Math.max(0, grantedCents - breakdown.totalCents),
+    };
+  } catch (e) {
+    if (isMissingInfraError(e)) return zero;
+    return zero;
+  }
+}
+
 /**
  * Detalhamento do "Saldo em Conta" (crédito manual do admin) em centavos.
  * Usado no painel para o usuário ver o que pode usar na ativação/mensalidade.

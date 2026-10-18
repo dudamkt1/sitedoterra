@@ -5,6 +5,9 @@ import { SubscriptionManager } from "@/components/dashboard/SubscriptionManager"
 import { getActivationPrice, getMonthlyPrice } from "@/lib/billing";
 import { getActiveOffer } from "@/lib/commercial";
 import { getActiveGateway, resolveGateways } from "@/lib/gateway-config";
+import { getAccountCreditSummary, type AccountCreditSummary } from "@/lib/affiliate-credit";
+import { getAffiliateBalanceView, type AffiliateBalanceView } from "@/lib/affiliate";
+import type { Plan } from "@/types";
 
 export const dynamic = "force-dynamic";
 
@@ -90,19 +93,61 @@ export default async function AssinaturaPage(p: { demoCtx?: DashboardContext }) 
   }
 
   const offer = await getActiveOffer();
-  let activationPriceCents = offer?.activation_price_cents || 0;
-  let activationRegularPriceCents = offer?.activation_regular_price_cents || 0;
-  let monthlyPriceCents = offer?.monthly_price_cents || 0;
-  let allowCancel = offer ? offer.allow_cancel !== false : true;
-  const trialMonths = offer?.trial_months || 3;
-  if (!activationPriceCents || !monthlyPriceCents) {
+  // PLANO DE VERDADE que governa preços/prazos exibidos: o plano da assinatura
+  // do usuário quando existir; senão, a oferta ativa (a MESMA que o checkout
+  // usará por padrão). Isso evita mostrar a mensalidade/período de OUTRO plano.
+  const displayPlan: Plan | null =
+    ((ctx.subscription as { plan?: Plan | null } | null)?.plan as Plan | null) ||
+    ((ctx.plans as Plan[] | undefined)?.[0] ?? null) ||
+    offer ||
+    null;
+
+  let activationPriceCents = displayPlan?.activation_price_cents ?? 0;
+  let activationRegularPriceCents = displayPlan?.activation_regular_price_cents ?? 0;
+  let monthlyPriceCents = displayPlan?.monthly_price_cents ?? 0;
+  const allowCancel = displayPlan ? displayPlan.allow_cancel !== false : true;
+  // trial_months = 0 é uma condição VÁLIDA ("sem meses inclusos") e NÃO pode
+  // cair no fallback de 3 meses. Só usamos 3 quando o campo não é numérico.
+  const rawTrialMonths = displayPlan?.trial_months;
+  const trialMonths =
+    displayPlan == null ? 3 : Number.isFinite(Number(rawTrialMonths)) ? Number(rawTrialMonths) : 3;
+  const planName = displayPlan?.name ?? null;
+
+  // Fallback ao Stripe SOMENTE quando não há plano em banco — nunca sobrescreve
+  // o valor real do plano (0 é um preço válido, ex.: ativação inclusa).
+  if (!displayPlan) {
     try {
       const [actPrice, monPrice] = await Promise.all([getActivationPrice(), getMonthlyPrice()]);
-      if (!activationPriceCents) activationPriceCents = actPrice.unit_amount || 0;
-      if (!monthlyPriceCents) monthlyPriceCents = monPrice.unit_amount || 0;
+      activationPriceCents = actPrice.unit_amount || 0;
+      monthlyPriceCents = monPrice.unit_amount || 0;
     } catch (e) {
       console.warn("Preços do Stripe não configurados/indisponíveis:", e);
     }
+  }
+
+  // Saldos do usuário (crédito do admin + programa de afiliados), mostrados
+  // separadamente. Falhas nunca quebram a página (helpers devolvem zeros).
+  let accountCredit: AccountCreditSummary = {
+    grantedCents: 0,
+    usedCents: 0,
+    activationCents: 0,
+    subscriptionCents: 0,
+    totalCents: 0,
+  };
+  let affiliateBalance: AffiliateBalanceView = {
+    availableCents: 0,
+    pendingCents: 0,
+    paidCents: 0,
+    programActive: false,
+  };
+  const userId = (ctx.profile as { user_id?: string } | null)?.user_id || "";
+  if (userId && !p.demoCtx) {
+    const [ac, ab] = await Promise.all([
+      getAccountCreditSummary(userId),
+      getAffiliateBalanceView(userId),
+    ]);
+    accountCredit = ac;
+    affiliateBalance = ab;
   }
 
   const mp = await gatewayConditions();
@@ -137,6 +182,9 @@ export default async function AssinaturaPage(p: { demoCtx?: DashboardContext }) 
         monthlyPriceCents={monthlyPriceCents}
         allowCancel={allowCancel}
         trialMonths={trialMonths}
+        planName={planName}
+        accountCredit={accountCredit}
+        affiliateBalance={affiliateBalance}
         billingEnabled={ctx.tenant?.monthly_billing_enabled !== false}
         activeGateway={await getActiveGateway()}
         siteActive={ctx.tenant?.site_status === "active"}

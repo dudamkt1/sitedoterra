@@ -134,6 +134,55 @@ export async function getAffiliateDashboardSummary(userId: string): Promise<Affi
   };
 }
 
+export interface AffiliateBalanceView {
+  /** Saldo disponível para USO (RPC get_affiliate_balance, já descontando usos). */
+  availableCents: number;
+  /** Comissões pendentes (aguardando liberação), em centavos. */
+  pendingCents: number;
+  /** Total já pago em saques (histórico), em centavos. */
+  paidCents: number;
+  /** Programa de afiliados ativo globalmente. */
+  programActive: boolean;
+}
+
+/**
+ * Visão do SALDO DO PROGRAMA DE AFILIADOS para exibição no painel — distinta
+ * do "Saldo em Conta" (crédito manual do admin). Usa as MESMAS RPCs do
+ * sistema de pagamento, então o valor exibido é exatamente o que pode ser
+ * usado no checkout. Nunca lança (devolve zeros em falha).
+ */
+export async function getAffiliateBalanceView(userId: string): Promise<AffiliateBalanceView> {
+  const zero: AffiliateBalanceView = {
+    availableCents: 0,
+    pendingCents: 0,
+    paidCents: 0,
+    programActive: false,
+  };
+  try {
+    const admin = createAdminClient();
+    const [bal, pend, paid, settings] = await Promise.all([
+      admin.rpc("get_affiliate_balance", { p_user_id: userId }),
+      admin.rpc("get_affiliate_pending_balance", { p_user_id: userId }),
+      admin.from("affiliate_payouts").select("amount").eq("affiliate_user_id", userId).eq("status", "pago"),
+      getAffiliateSettings(),
+    ]);
+    const avail = bal.error ? 0 : Number(bal.data || 0);
+    const pendv = pend.error ? 0 : Number(pend.data || 0);
+    const paidv = ((paid.data || []) as { amount: number | string }[]).reduce(
+      (sum, p) => sum + Number(p.amount),
+      0
+    );
+    return {
+      availableCents: Math.max(0, Math.floor(avail * 100)),
+      pendingCents: Math.max(0, Math.floor(pendv * 100)),
+      paidCents: Math.max(0, Math.floor(paidv * 100)),
+      programActive: settings?.program_active === true,
+    };
+  } catch {
+    return zero;
+  }
+}
+
 /** Lista conversões do afiliado */
 export async function getAffiliateConversions(userId: string, limit = 50, offset = 0) {
   const admin = createAdminClient();

@@ -8,6 +8,29 @@ import { formatBRL, formatDate } from "@/lib/utils";
 /** Versão dos Termos e compromisso exibidos nesta tela. */
 const SITE_TERMS_VERSION = "1.0";
 
+/** Saldo em Conta (crédito concedido manualmente pelo superadmin). */
+interface AccountCreditSummary {
+  grantedCents: number;
+  usedCents: number;
+  activationCents: number;
+  subscriptionCents: number;
+  totalCents: number;
+}
+
+/** Saldo do programa de afiliados (comissões). */
+interface AffiliateBalanceView {
+  availableCents: number;
+  pendingCents: number;
+  paidCents: number;
+  programActive: boolean;
+}
+
+/** "3 meses inclusos" / "1 mês incluso" / null quando não há período grátis. */
+function trialLabel(months: number): string | null {
+  if (!months || months <= 0) return null;
+  return `${months} ${months === 1 ? "mês incluso" : "meses inclusos"}`;
+}
+
 /**
  * Mesmo evento em `billing_history` + `payments`: mostra APENAS a última
  * ação (sem "Pago 2x" / "Reembolsado 2x"). Agrupa pela referência do gateway
@@ -89,6 +112,12 @@ interface SubManagerProps {
   refundPending?: boolean;
   /** Status da última ativação (succeeded | refund_pending | refunded | null). */
   latestActivationStatus?: string | null;
+  /** Nome do plano que governa os preços exibidos (plano do usuário ou oferta). */
+  planName?: string | null;
+  /** Saldo em Conta (crédito do admin) — exibido separado do saldo de afiliados. */
+  accountCredit?: AccountCreditSummary | null;
+  /** Saldo do programa de afiliados. */
+  affiliateBalance?: AffiliateBalanceView | null;
 }
 
 export function SubscriptionManager({
@@ -98,7 +127,7 @@ export function SubscriptionManager({
   payments,
   activation,
   activationPriceCents,
-  activationRegularPriceCents,
+  activationRegularPriceCents = 0,
   monthlyPriceCents,
   allowCancel = true,
   trialMonths = 3,
@@ -111,6 +140,9 @@ export function SubscriptionManager({
   guaranteeUntil = null,
   refundPending = false,
   latestActivationStatus = null,
+  planName = null,
+  accountCredit = null,
+  affiliateBalance = null,
 }: SubManagerProps) {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
@@ -138,6 +170,18 @@ export function SubscriptionManager({
   const [revertLoading, setRevertLoading] = useState(false);
   /** Abertura do painel de demonstração ("Ainda tem dúvidas?"). */
   const [demoLoading, setDemoLoading] = useState(false);
+  /** Autorização do usuário para usar os saldos (crédito + afiliados) no pagamento. */
+  const [useCredit, setUseCredit] = useState(false);
+
+  const accountTotalCents = accountCredit?.totalCents || 0;
+  const affiliateAvailableCents = affiliateBalance?.availableCents || 0;
+  const affiliatePendingCents = affiliateBalance?.pendingCents || 0;
+  const hasAnyBalance = accountTotalCents > 0 || affiliateAvailableCents > 0 || affiliatePendingCents > 0;
+
+  // Quando há saldo elegível, já sugerimos utilizá-lo (o usuário pode desmarcar).
+  useEffect(() => {
+    if (accountTotalCents > 0 || affiliateAvailableCents > 0) setUseCredit(true);
+  }, [accountTotalCents, affiliateAvailableCents]);
 
   useEffect(() => {
     try {
@@ -176,6 +220,18 @@ export function SubscriptionManager({
     ? Math.round((activationPriceCents * (100 - pixDiscountPercent)) / 100)
     : activationPriceCents;
 
+  /** Saldo elegível para um tipo de cobrança (crédito do tipo + saldo de afiliados). */
+  function eligibleBalanceCents(kind: "activation" | "subscription") {
+    const account =
+      kind === "subscription" ? accountCredit?.subscriptionCents || 0 : accountCredit?.activationCents || 0;
+    return account + affiliateAvailableCents;
+  }
+  const activationEligibleCents = eligibleBalanceCents("activation");
+  // Estimativa mostrada ao usuário — o valor REAL é sempre recalculado no backend.
+  const estimatedCreditApplied = useCredit ? Math.min(activationEligibleCents, activationPriceCents) : 0;
+  const estimatedTotalCents = Math.max(0, activationPriceCents - estimatedCreditApplied);
+  const trialText = trialLabel(trialMonths);
+
   async function recordTermsAcceptance() {
     try {
       await fetch("/api/subscription/terms", {
@@ -202,13 +258,25 @@ export function SubscriptionManager({
   async function checkout(planId: string) {
     setLoading(true);
     setMsg(null);
-    // O servidor decide o gateway conforme /admin/pagamentos.
+    // O servidor decide o gateway conforme /admin/pagamentos. O uso de saldos
+    // é apenas uma INTENÇÃO — o backend recalcula e faz a reserva atômica.
     const res = await fetch("/api/checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ planId, successPath: "/painel/meu-site?ativado=1" }),
+      body: JSON.stringify({
+        planId,
+        successPath: "/painel/meu-site?ativado=1",
+        useAffiliateCredit: useCredit && activationEligibleCents > 0,
+      }),
     });
     const data = await res.json();
+    // Saldo cobriu 100% da ativação: sem gateway, ativado de forma síncrona.
+    if (data.zeroCharge) {
+      setLoading(false);
+      setMsg({ ok: true, text: "Seus saldos cobriram a ativação! Seu site está sendo ativado — aguarde alguns instantes." });
+      setTimeout(() => window.location.reload(), 2500);
+      return;
+    }
     if (data.url) {
       // Abre o pagamento em nova aba; ao concluir, o usuário volta para /painel/meu-site.
       try {
@@ -428,6 +496,78 @@ export function SubscriptionManager({
         </p>
       )}
 
+      {/* ===== Saldos disponíveis (crédito do admin + programa de afiliados) ===== */}
+      {hasAnyBalance && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Crédito concedido pelo administrador */}
+          <div className="card border-emerald-100">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="font-semibold text-sm text-emerald-800">Seus créditos disponíveis</h3>
+              <span className="text-[0.62rem] uppercase tracking-wider text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-full px-2 py-0.5">
+                Crédito da equipe
+              </span>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Crédito concedido pela equipe Top Consultores. É abatido automaticamente no checkout.
+            </p>
+            {accountTotalCents > 0 ? (
+              <>
+                <p className="mt-3 text-2xl font-bold text-emerald-800">{formatBRL(accountTotalCents)}</p>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                  <div className="rounded-lg bg-gray-50 px-3 py-2">
+                    <div className="text-gray-400">Para ativação</div>
+                    <div className="font-semibold text-gray-700">{formatBRL(accountCredit?.activationCents || 0)}</div>
+                  </div>
+                  <div className="rounded-lg bg-gray-50 px-3 py-2">
+                    <div className="text-gray-400">Para mensalidade</div>
+                    <div className="font-semibold text-gray-700">{formatBRL(accountCredit?.subscriptionCents || 0)}</div>
+                  </div>
+                </div>
+                {(accountCredit?.grantedCents || 0) > 0 && (
+                  <p className="mt-3 text-[0.72rem] text-gray-400">
+                    Concedido: {formatBRL(accountCredit?.grantedCents || 0)} · Já utilizado:{" "}
+                    {formatBRL(accountCredit?.usedCents || 0)}
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="mt-3 text-sm text-gray-400">Nenhum crédito concedido no momento.</p>
+            )}
+          </div>
+
+          {/* Saldo do programa de afiliados */}
+          <div className="card border-[#e3d3a1]">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="font-semibold text-sm text-[#8a6d1f]">Saldo do programa de afiliados</h3>
+              <span className="text-[0.62rem] uppercase tracking-wider text-[#8a6d1f] bg-[#fffdf5] border border-[#e3d3a1] rounded-full px-2 py-0.5">
+                Comissões
+              </span>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Suas comissões por indicações. O saldo disponível pode ser usado na ativação ou na mensalidade.
+            </p>
+            {affiliateAvailableCents > 0 ? (
+              <p className="mt-3 text-2xl font-bold text-[#8a6d1f]">{formatBRL(affiliateAvailableCents)}</p>
+            ) : (
+              <p className="mt-3 text-sm text-gray-400">Nenhum saldo disponível para uso.</p>
+            )}
+            <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+              <div className="rounded-lg bg-gray-50 px-3 py-2">
+                <div className="text-gray-400">Pendente</div>
+                <div className="font-semibold text-gray-700">{formatBRL(affiliatePendingCents)}</div>
+              </div>
+              <div className="rounded-lg bg-gray-50 px-3 py-2">
+                <div className="text-gray-400">Já recebido</div>
+                <div className="font-semibold text-gray-700">{formatBRL(affiliateBalance?.paidCents || 0)}</div>
+              </div>
+            </div>
+            <p className="mt-3 text-[0.72rem] text-gray-400">
+              Comissões pendentes só entram no saldo após a liberação (7 dias).
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Ações */}
       <div className="card" id="assinatura-acoes" style={{ scrollMarginTop: 90 }}>
         <h2 className="card-title mb-4">Ações</h2>
@@ -456,8 +596,9 @@ export function SubscriptionManager({
         )}
         {isTrialVigente && siteActive && !isRefundPending && (
           <div className="mb-4 w-full rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-            ✅ Site ativo — {trialMonths} {trialMonths === 1 ? "mês incluso" : "meses inclusos"} após a ativação.
-            Primeira mensalidade em <strong>{formatDate(nextBilling)}</strong> ({formatBRL(monthlyPriceCents)}/mês, sem fidelidade — cancele quando quiser).
+            ✅ Site ativo
+            {trialText ? ` — ${trialText} após a ativação.` : "."}
+            {" "}Primeira mensalidade em <strong>{formatDate(nextBilling)}</strong> ({formatBRL(monthlyPriceCents)}/mês, sem fidelidade — cancele quando quiser).
           </div>
         )}
         <div className="flex flex-wrap gap-3">
@@ -558,18 +699,24 @@ export function SubscriptionManager({
             <div className="w-full space-y-4">
               <div className="rounded-xl border border-[#e3d3a1] bg-[#fffdf5] p-4 sm:p-5">
                 <div className="rounded-xl border-2 border-[#1d5c3a] bg-gradient-to-br from-[#f0faf3] to-[#fffdf5] p-4 text-center mb-4">
-                  <p className="text-xs uppercase tracking-wider text-gray-500 font-semibold">Oferta de lançamento</p>
-                  {(activationRegularPriceCents || 150000) > (activationPriceCents || 29700) ? (
+                  <p className="text-xs uppercase tracking-wider text-gray-500 font-semibold">
+                    {planName || "Ativação do site"}
+                  </p>
+                  {activationRegularPriceCents > activationPriceCents ? (
                     <p className="mt-1 text-2xl sm:text-3xl font-bold" style={{ fontFamily: "var(--font-display)" }}>
-                      <span className="text-gray-400 line-through text-lg mr-2">De {formatBRL(activationRegularPriceCents || 150000)}</span>
-                      por apenas <span className="text-[#1d5c3a]">{formatBRL(activationPriceCents || 29700)}</span>
+                      <span className="text-gray-400 line-through text-lg mr-2">De {formatBRL(activationRegularPriceCents)}</span>
+                      por apenas <span className="text-[#1d5c3a]">{formatBRL(activationPriceCents)}</span>
                     </p>
                   ) : (
                     <p className="mt-1 text-2xl sm:text-3xl font-bold text-[#1d5c3a]" style={{ fontFamily: "var(--font-display)" }}>
-                      {formatBRL(activationPriceCents || 29700)}
+                      {formatBRL(activationPriceCents)}
                     </p>
                   )}
-                  <p className="text-xs text-gray-500 mt-1">pagamento único da ativação + {trialMonths} {trialMonths === 1 ? "mês" : "meses"} sem mensalidade</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {trialText
+                      ? `pagamento único da ativação + ${trialText} sem mensalidade`
+                      : "pagamento único da ativação"}
+                  </p>
                 </div>
               <p className="font-semibold text-base sm:text-lg" style={{ fontFamily: "var(--font-display)" }}>
                 ⚡ Ativar Site Profissional — {formatBRL(activationPriceCents)}
@@ -584,8 +731,15 @@ export function SubscriptionManager({
                   {activeGateway === "mercadopago" && installments > 0 && (
                     <li>💳 <strong>Cartão:</strong> em até {installments}x{installmentsWithoutInterest ? " sem juros" : ""} de {formatBRL(Math.round(activationPriceCents / installments))}</li>
                   )}
-                  <li>🎁 <strong>Primeiros {trialMonths} {trialMonths === 1 ? "mês" : "meses"}: sem cobrança da mensalidade</strong></li>
-                  <li>🔁 <strong>Após os {trialMonths} {trialMonths === 1 ? "mês" : "meses"}:</strong> {formatBRL(monthlyPriceCents)}/mês</li>
+                  {trialText && (
+                    <>
+                      <li>🎁 <strong>Primeiros {trialMonths} {trialMonths === 1 ? "mês" : "meses"}: sem cobrança da mensalidade</strong></li>
+                      <li>🔁 <strong>Após os {trialMonths} {trialMonths === 1 ? "mês" : "meses"}:</strong> {formatBRL(monthlyPriceCents)}/mês</li>
+                    </>
+                  )}
+                  {!trialText && (
+                    <li>🔁 <strong>Mensalidade:</strong> {formatBRL(monthlyPriceCents)}/mês após a ativação</li>
+                  )}
                   <li>✅ <strong>Sem fidelidade — cancele quando quiser</strong></li>
                 </ul>
                 <div className="rounded-xl border border-gray-200 bg-white p-4">
@@ -597,8 +751,12 @@ export function SubscriptionManager({
                   </ul>
                   <p className="mt-2 text-sm text-gray-700">
                     Aqui você leva <strong>tudo junto</strong> — site + CRM + agendamento + IA — por{" "}
-                    <strong>{formatBRL(activationPriceCents || 29700)}</strong> na ativação e{" "}
-                    <strong>{formatBRL(monthlyPriceCents)}/mês</strong> após os {trialMonths} {trialMonths === 1 ? "mês" : "meses"} iniciais.
+                    <strong>{formatBRL(activationPriceCents)}</strong> na ativação
+                    {trialText ? (
+                      <> e <strong>{formatBRL(monthlyPriceCents)}/mês</strong> após os {trialMonths} {trialMonths === 1 ? "mês" : "meses"} iniciais.</>
+                    ) : (
+                      <> e <strong>{formatBRL(monthlyPriceCents)}/mês</strong>.</>
+                    )}
                   </p>
                 </div>
               <p className="w-full text-xs text-gray-400 mt-3">
@@ -624,6 +782,42 @@ export function SubscriptionManager({
                   </ul>
                 </div>
               </div>
+
+              {activationEligibleCents > 0 && (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4">
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 h-4 w-4 accent-[#1d5c3a]"
+                      checked={useCredit}
+                      onChange={(e) => setUseCredit(e.target.checked)}
+                    />
+                    <span className="text-sm text-gray-800">
+                      <strong>Usar meus saldos nesta ativação</strong>
+                      <span className="block text-xs text-gray-500 mt-0.5">
+                        Disponível: {formatBRL(activationEligibleCents)} (créditos da equipe + programa de afiliados).
+                        O valor final é confirmado no servidor no momento do pagamento.
+                      </span>
+                    </span>
+                  </label>
+                  <div className="mt-3 space-y-1.5 border-t border-emerald-100 pt-3 text-sm">
+                    <div className="flex items-center justify-between text-gray-600">
+                      <span>Valor da ativação</span>
+                      <span>{formatBRL(activationPriceCents)}</span>
+                    </div>
+                    {estimatedCreditApplied > 0 && (
+                      <div className="flex items-center justify-between text-emerald-700">
+                        <span>Abatimento com saldos</span>
+                        <span>- {formatBRL(estimatedCreditApplied)}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between font-semibold text-gray-900 text-base">
+                      <span>Você paga agora</span>
+                      <span>{estimatedTotalCents === 0 ? "R$ 0,00 (saldos)" : formatBRL(estimatedTotalCents)}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -671,11 +865,23 @@ export function SubscriptionManager({
                 </div>
               )}
 
-              {plans.map((p) => (
-                <button key={p.id} className="btn btn-gold !py-3 w-full sm:w-auto !text-base" onClick={() => handleActivate(p.id)} disabled={loading}>
-                  {loading ? "Processando..." : "⚡ Ativar Site Profissional"}
+              {plans.length > 0 ? (
+                <button
+                  className="btn btn-gold !py-3 w-full sm:w-auto !text-base"
+                  onClick={() => handleActivate(plans[0].id)}
+                  disabled={loading}
+                >
+                  {loading
+                    ? "Processando..."
+                    : useCredit && activationEligibleCents > 0 && estimatedTotalCents === 0
+                    ? "Confirmar e continuar"
+                    : `Confirmar e continuar — ${formatBRL(estimatedTotalCents)}`}
                 </button>
-              ))}
+              ) : (
+                <p className="text-sm text-amber-700 bg-amber-50 rounded-lg px-4 py-3">
+                  Nenhum plano disponível para ativação no momento. Fale com o suporte.
+                </p>
+              )}
               <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
                 <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#1d5c3a] text-xl text-white" role="img" aria-label="Garantia">🛡️</span>
                 <div>
@@ -726,7 +932,7 @@ export function SubscriptionManager({
           <div className="card">
             <p className="text-xs uppercase tracking-wider text-gray-400 font-semibold">Plano</p>
             <p className="mt-2 text-xl font-semibold" style={{ fontFamily: "var(--font-display)" }}>
-              {subscription?.plan?.name || "Nenhum plano ativo"}
+              {subscription?.plan?.name || planName || "Nenhum plano ativo"}
             </p>
             {monthlyPriceCents > 0 && <p className="text-sm text-gray-400 mt-1">{formatBRL(monthlyPriceCents)}/mês</p>}
             {subscription?.gateway === "mercadopago" && (
