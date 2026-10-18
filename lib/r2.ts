@@ -48,6 +48,16 @@ export function getR2Client(): S3Client {
         accessKeyId: env.accessKeyId,
         secretAccessKey: env.secretAccessKey,
       },
+      // OBRIGATÓRIO com @aws-sdk/client-s3 >= 3.729.0: a partir dessa versão o
+      // SDK passa a calcular um checksum CRC32 por padrão em todo PUT. O R2 NÃO
+      // implementa exatamente como o S3 puro e, em URLs PRÉ-ASSINADAS, o
+      // checksum é assinado a partir de um corpo vazio — então o navegador envia
+      // o arquivo real sem esse checksum e o R2 rejeita o PUT. Isso voltava como
+      // "Falha de rede no upload." no browser (erro sem header CORS).
+      // WHEN_REQUIRED desativa o cálculo automático e mantém o comportamento
+      // clássico, compatível com o R2.
+      requestChecksumCalculation: "WHEN_REQUIRED",
+      responseChecksumValidation: "WHEN_REQUIRED",
     });
   }
   return client;
