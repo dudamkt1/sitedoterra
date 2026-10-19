@@ -100,6 +100,7 @@ export default function DashboardSidebar({
   const router = useRouter();
   const [leaving, setLeaving] = useState(false);
   const [open, setOpen] = useState(false);
+  const [contaUnread, setContaUnread] = useState<number | null>(null);
 
   useEffect(() => {
     setOpen(false);
@@ -111,6 +112,21 @@ export default function DashboardSidebar({
       document.body.style.overflow = "";
     };
   }, [open ]);
+
+  useEffect(() => {
+    if (isDemo) return;
+    (async () => {
+      try {
+        const res = await fetch("/api/user/notifications?unread=1", { cache: "no-store" });
+        if (res.ok) {
+          const json = await res.json();
+          setContaUnread(Number(json?.unreadCount || 0));
+        }
+      } catch {
+        // silencioso: não quebra a navegação
+      }
+    })();
+  }, [isDemo]);
 
   const currentLabel = useMemo(
     () =>
@@ -194,6 +210,13 @@ export default function DashboardSidebar({
                 )}
               </span>
               <span className="min-w-0 flex-1 truncate">{l.label}</span>
+              {l.href === "/painel/conta" &&
+                typeof contaUnread === "number" &&
+                contaUnread > 0 && (
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-600 px-1.5 text-[10px] font-bold text-white shadow-sm">
+                    {contaUnread > 9 ? "9+" : contaUnread}
+                  </span>
+                )}
               {active && !compact && !isLocked && <ChevronRight className="h-4 w-4 shrink-0 opacity-70" />}
               {isLocked && !compact && (
                 <span className="h-4 w-4 shrink-0 opacity-70" title="Ative seu site para desbloquear todo o painel">

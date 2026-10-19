@@ -1,6 +1,7 @@
 import { getPainelContext } from "@/lib/demo/painel-context";
 import { SectionTitle } from "@/components/dashboard/ui";
 import ContaForm from "@/components/painel/ContaForm";
+import { MarkContaNotificationsRead } from "@/components/painel/ContaNotificationsMarker";
 import { getAccountCreditBreakdown } from "@/lib/affiliate-credit";
 
 export default async function ContaPage() {
@@ -38,6 +39,7 @@ export default async function ContaPage() {
         }}
         isDemo={isDemo}
       />
+      {!isDemo && <MarkContaNotificationsRead />}
     </div>
   );
 }

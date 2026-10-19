@@ -3,6 +3,31 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser, getProfile } from "@/lib/auth";
 import { getAccountCreditBreakdown } from "@/lib/affiliate-credit";
 
+function brl(cents: number): string {
+  return (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+/** Cria uma notificação para o usuário informar sobre uma mudança de crédito. */
+async function notifyCreditChange(
+  admin: ReturnType<typeof createAdminClient>,
+  userId: string,
+  title: string,
+  detail: string
+) {
+  try {
+    await admin.from("user_notifications").insert({
+      user_id: userId,
+      kind: "credit",
+      title,
+      detail,
+      href: "/painel/conta",
+      read: false,
+    });
+  } catch {
+    // Não deve quebrar o fluxo de crédito se a notificação falhar.
+  }
+}
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -120,6 +145,13 @@ export async function POST(
     return NextResponse.json({ error: grantError.message }, { status: 400 });
   }
 
+  await notifyCreditChange(
+    admin,
+    userId,
+    "Crédito adicionado ao Saldo em Conta",
+    `Você recebeu ${brl(amountCents)} de crédito para usar na ativação e/ou mensalidade do seu site.`
+  );
+
   return NextResponse.json({ success: true, grantId: grant.id, amountCents, amount: amountCents, kind });
 }
 
@@ -186,6 +218,13 @@ export async function PATCH(
     .eq("user_id", userId);
   if (updateError) return NextResponse.json({ error: updateError.message }, { status: 400 });
 
+  await notifyCreditChange(
+    admin,
+    userId,
+    "Crédito do Saldo em Conta atualizado",
+    `O valor do seu crédito foi alterado para ${brl(amountCents)}.`
+  );
+
   const credit = await getAccountCreditBreakdown(userId);
   const { data: grants } = await admin
     .from("account_credit_grants")
@@ -225,12 +264,14 @@ export async function DELETE(
   if (!grant) return NextResponse.json({ error: "Concessão não encontrada." }, { status: 404 });
 
   // Trava de segurança: só exclui o que ainda não foi consumido.
+  let oldCents = Math.round(Number(grant.amount) * 100);
   if (grant.status === "active") {
     const breakdown = await getAccountCreditBreakdown(userId);
-    const oldCents = Math.round(Number(grant.amount) * 100);
-    const oldAct = affectsActivation(grant.kind) ? oldCents : 0;
-    const oldSub = affectsSubscription(grant.kind) ? oldCents : 0;
-    if (breakdown.activationCents < oldAct || breakdown.subscriptionCents < oldSub || breakdown.totalCents < oldCents) {
+    const grantCents = Math.round(Number(grant.amount) * 100);
+    oldCents = grantCents;
+    const oldAct = affectsActivation(grant.kind) ? grantCents : 0;
+    const oldSub = affectsSubscription(grant.kind) ? grantCents : 0;
+    if (breakdown.activationCents < oldAct || breakdown.subscriptionCents < oldSub || breakdown.totalCents < grantCents) {
       return NextResponse.json(
         { error: "Parte deste crédito já foi utilizada pelo usuário e não pode ser excluída." },
         { status: 400 }
@@ -244,6 +285,13 @@ export async function DELETE(
     .eq("id", grantId)
     .eq("user_id", userId);
   if (deleteError) return NextResponse.json({ error: deleteError.message }, { status: 400 });
+
+  await notifyCreditChange(
+    admin,
+    userId,
+    "Crédito do Saldo em Conta removido",
+    `Uma concessão de ${brl(oldCents)} do seu Saldo em Conta foi removida.`
+  );
 
   const credit = await getAccountCreditBreakdown(userId);
   const { data: grants } = await admin
