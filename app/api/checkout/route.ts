@@ -131,11 +131,21 @@ export async function POST(request: Request) {
   const pendingMetaBase = {
     type: kind,
     plan_id: plan.id,
+    pay_method: quote.payMethod,
+    payment_method: quote.paymentMethod,
     ...(quote.subscriptionId ? { subscription_id: quote.subscriptionId } : {}),
     ...(quote.usageId ? { credit_usage_id: quote.usageId } : {}),
     ...(quote.creditCents > 0
       ? { credit_applied_cents: quote.creditCents, original_amount_cents: quote.originalCents }
       : {}),
+  };
+
+  // Colunas estruturadas de rastreabilidade (forma de pagamento + abatimento
+  // por saldo/crédito) gravadas nas tentativas — sobrevivem até o webhook.
+  const methodColumns = {
+    payment_method: quote.paymentMethod,
+    credit_applied_cents: quote.creditCents,
+    original_amount_cents: quote.originalCents,
   };
 
   if (gateways.gateway === "mercadopago") {
@@ -173,6 +183,8 @@ export async function POST(request: Request) {
         amount_cents: quote.totalCents,
         currency: "brl",
         status: "pending",
+        gateway: "mercadopago",
+        ...methodColumns,
         metadata: { gateway: "mercadopago", preference_id: preference.id, ...pendingMetaBase },
       });
       // Transparente: devolve initPoint para iframe; fluxo normal devolve url para redirect.
@@ -271,6 +283,8 @@ export async function POST(request: Request) {
         amount_cents: quote.totalCents,
         currency: "brl",
         status: "pending",
+        gateway: "stripe",
+        ...methodColumns,
         metadata: { gateway: "stripe", stripe_checkout_session_id: (session as any).id, ...pendingMetaBase },
       });
       return NextResponse.json({ gateway: "stripe", clientSecret: (session as any).client_secret, url: session.url, embedded: true, credit: creditPayload });
@@ -299,6 +313,8 @@ export async function POST(request: Request) {
       amount_cents: quote.totalCents,
       currency: "brl",
       status: "pending",
+      gateway: "stripe",
+      ...methodColumns,
       metadata: { gateway: "stripe", stripe_checkout_session_id: session.id, ...pendingMetaBase },
     });
 

@@ -1,7 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { formatBRL, formatDateTime } from "@/lib/utils";
+
+export type AdminPlanGateway = "stripe" | "mercadopago";
 
 interface PlanRow {
   id: string;
@@ -27,6 +30,8 @@ interface PlanRow {
   stripe_product_id: string | null;
   activation_price_id: string | null;
   monthly_price_id: string | null;
+  mercadopago_plan_id: string | null;
+  mercadopago_plan_amount_cents: number | null;
   is_active: boolean;
 }
 
@@ -82,14 +87,30 @@ function MoneyField({ value, onChange }: { value: number; onChange: (cents: numb
   );
 }
 
-export function AdminPlans({ plans, history }: { plans: PlanRow[]; history: HistoryRow[] }) {
+export function AdminPlans({
+  plans,
+  history,
+  gateway,
+}: {
+  plans: PlanRow[];
+  history: HistoryRow[];
+  gateway: AdminPlanGateway;
+}) {
+  const router = useRouter();
   const [list, setList] = useState<PlanRow[]>(plans);
   const [editing, setEditing] = useState<PlanRow | null>(null);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [showHistory, setShowHistory] = useState<string | null>(null);
 
+  // Mantém a lista sincronizada após `router.refresh()` (dados recarregados
+  // do servidor) sem perder a atualização otimista feita em `save()`.
+  useEffect(() => {
+    setList(plans);
+  }, [plans]);
+
   const activeOffer = list.find((p) => p.is_active) || list[0];
+  const isMercadoPago = gateway === "mercadopago";
 
   function startNew() {
     setEditing({
@@ -117,6 +138,8 @@ export function AdminPlans({ plans, history }: { plans: PlanRow[]; history: Hist
       stripe_product_id: "",
       activation_price_id: "",
       monthly_price_id: "",
+      mercadopago_plan_id: null,
+      mercadopago_plan_amount_cents: null,
       is_active: true,
     });
   }
@@ -125,31 +148,52 @@ export function AdminPlans({ plans, history }: { plans: PlanRow[]; history: Hist
     if (!editing) return;
     setSaving(true);
     setMsg(null);
-    const res = await fetch("/api/admin/plans", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(editing),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      setMsg({ ok: false, text: data.error || "Erro ao salvar." });
-    } else {
-      const warnings = Array.isArray(data.warnings) && data.warnings.length ? data.warnings : null;
-      const saved: PlanRow = editing.id
-        ? editing
-        : { ...editing, id: `local-${Date.now()}` };
-      setList((prev) => {
-        const exists = prev.some((p) => p.id === saved.id);
-        return exists ? prev.map((p) => (p.id === saved.id ? saved : p)) : [...prev, saved];
+    try {
+      const res = await fetch("/api/admin/plans", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editing),
       });
+      const data = await res.json();
+      if (!res.ok) {
+        setMsg({ ok: false, text: data.error || "Erro ao salvar." });
+        setSaving(false);
+        return;
+      }
+
+      // Usa a linha devolvida pelo banco (id real, valores normalizados).
+      // Sem isso, uma oferta recém-criada ficava com id local e a edição
+      // seguinte era descartada pelo servidor.
+      const saved = data.plan as PlanRow | undefined;
+      if (saved) {
+        setList((prev) => {
+          const exists = prev.some((p) => p.id === saved.id);
+          return exists ? prev.map((p) => (p.id === saved.id ? saved : p)) : [...prev, saved];
+        });
+      }
+
+      const warnings = Array.isArray(data.warnings) && data.warnings.length
+        ? (data.warnings as string[])
+        : [];
+      const notes: string[] = [];
+      if (data.mpPlanReset) {
+        notes.push("O plano recorrente do Mercado Pago será recriado com o novo valor na próxima assinatura.");
+      }
+
       setEditing(null);
       setMsg({
         ok: true,
-        text: warnings
-          ? `Oferta salva. ${warnings.join(" ")}`
-          : "Oferta salva. A HOME e o checkout já utilizam os novos valores.",
+        text:
+          warnings.length > 0
+            ? `Oferta salva. Atenção: ${warnings.join(" ")}`
+            : `Oferta salva com sucesso via ${isMercadoPago ? "Mercado Pago" : "Stripe"}. A HOME e o checkout já utilizam os novos valores.${notes.length ? ` ${notes.join(" ")}` : ""}`,
       });
-      if (!warnings) window.location.reload();
+
+      // Atualiza os dados do servidor (histórico, oferta atual e demais telas)
+      // sem depender de um reload completo da página.
+      router.refresh();
+    } catch {
+      setMsg({ ok: false, text: "Falha de conexão ao salvar a oferta." });
     }
     setSaving(false);
   }
@@ -247,6 +291,24 @@ export function AdminPlans({ plans, history }: { plans: PlanRow[]; history: Hist
         <p className={`rounded-lg px-4 py-3 text-sm ${msg.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"}`}>{msg.text}</p>
       )}
 
+      {/* ---------- GATEWAY ATIVO ---------- */}
+      <div
+        className={`rounded-xl border px-4 py-3 text-sm ${
+          isMercadoPago
+            ? "border-[#00b8ea]/40 bg-[#eaf9fe] text-[#075985]"
+            : "border-[#635bff]/30 bg-[#f4f2ff] text-[#4338ca]"
+        }`}
+      >
+        <p className="font-semibold">
+          Gateway ativo: {isMercadoPago ? "🇧🇷 Mercado Pago" : "💳 Stripe"}
+        </p>
+        <p className="text-xs mt-1 leading-5 opacity-80">
+          {isMercadoPago
+            ? "A ativação e a mensalidade são cobradas pelo Mercado Pago. Os Price IDs do Stripe ficam apenas como legado e não são usados enquanto o Mercado Pago estiver ativo. O plano recorrente do MP é criado/atualizado automaticamente quando a mensalidade muda."
+            : "A ativação e a mensalidade são cobradas pelo Stripe. Para trocar de gateway, acesse /admin/pagamentos."}
+        </p>
+      </div>
+
       {/* ---------- OFERTA ATUAL (resumo) ---------- */}
       {activeOffer && (
         <div className="card">
@@ -288,9 +350,25 @@ export function AdminPlans({ plans, history }: { plans: PlanRow[]; history: Hist
               <dd className="text-xs text-gray-400 mt-0.5">{activeOffer.cancel_text || "—"}</dd>
             </div>
             <div className="rounded-lg bg-gray-50 p-3">
-              <dt className="text-gray-400 text-xs mb-1">STRIPE</dt>
-              <dd className="font-mono text-xs truncate">ativ: {activeOffer.activation_price_id || "—"}</dd>
-              <dd className="font-mono text-xs truncate mt-0.5">mensal: {activeOffer.monthly_price_id || "—"}</dd>
+              {isMercadoPago ? (
+                <>
+                  <dt className="text-gray-400 text-xs mb-1">MERCADO PAGO</dt>
+                  <dd className="font-mono text-xs truncate">
+                    plano: {activeOffer.mercadopago_plan_id || "criado no 1º checkout"}
+                  </dd>
+                  <dd className="text-xs text-gray-500 mt-0.5">
+                    {activeOffer.mercadopago_plan_amount_cents != null
+                      ? `cache: ${formatBRL(activeOffer.mercadopago_plan_amount_cents)}`
+                      : "sem cache (será criado com o valor atual)"}
+                  </dd>
+                </>
+              ) : (
+                <>
+                  <dt className="text-gray-400 text-xs mb-1">STRIPE</dt>
+                  <dd className="font-mono text-xs truncate">ativ: {activeOffer.activation_price_id || "—"}</dd>
+                  <dd className="font-mono text-xs truncate mt-0.5">mensal: {activeOffer.monthly_price_id || "—"}</dd>
+                </>
+              )}
             </div>
           </dl>
         </div>
@@ -385,13 +463,36 @@ export function AdminPlans({ plans, history }: { plans: PlanRow[]; history: Hist
                 </div>
                 {money("Valor normal da ativação (De R$)", "activation_regular_price_cents")}
                 {money("Valor promocional da ativação (Por R$)", "activation_price_cents")}
-                {input("Price ID da ativação (Stripe)", "activation_price_id")}
+                {!isMercadoPago && input("Price ID da ativação (Stripe)", "activation_price_id")}
 
                 <div className="sm:col-span-2 border-t border-gray-100 pt-3">
                   <p className="text-xs uppercase tracking-wider text-gray-400 font-semibold mb-3">Assinatura (recorrente)</p>
                 </div>
                 {money("Valor da mensalidade (R$/mês)", "monthly_price_cents")}
-                {input("Price ID da mensalidade (Stripe)", "monthly_price_id")}
+                {!isMercadoPago && input("Price ID da mensalidade (Stripe)", "monthly_price_id")}
+                {isMercadoPago && (
+                  <div className="sm:col-span-2 rounded-lg border border-[#00b8ea]/30 bg-[#eaf9fe]/60 px-3 py-2.5 text-xs text-[#075985]">
+                    <p className="font-semibold">Assinatura pelo Mercado Pago</p>
+                    <p className="mt-1 leading-5">
+                      Nenhum Price ID é necessário: o plano recorrente é criado automaticamente
+                      com o valor acima no primeiro checkout.
+                    </p>
+                    <p className="mt-1 leading-5">
+                      Plano MP atual:{" "}
+                      <span className="font-mono">{editing.mercadopago_plan_id || "ainda não criado"}</span>
+                      {editing.mercadopago_plan_id && editing.mercadopago_plan_amount_cents != null && (
+                        <> · cache {formatBRL(editing.mercadopago_plan_amount_cents)}</>
+                      )}
+                    </p>
+                    {editing.mercadopago_plan_id &&
+                      editing.mercadopago_plan_amount_cents != null &&
+                      editing.mercadopago_plan_amount_cents !== editing.monthly_price_cents && (
+                        <p className="mt-1 font-medium text-amber-700">
+                          O valor mudou: ao salvar, o plano MP será recriado na próxima assinatura.
+                        </p>
+                      )}
+                  </div>
+                )}
                 <div>
                   <label className="label">Período de cobrança</label>
                   <select className="input" value={editing.billing_interval} onChange={(e) => set("billing_interval", e.target.value)}>
@@ -422,9 +523,15 @@ export function AdminPlans({ plans, history }: { plans: PlanRow[]; history: Hist
                 {benefitControls()}
 
                 <div className="sm:col-span-2 border-t border-gray-100 pt-3">
-                  <p className="text-xs uppercase tracking-wider text-gray-400 font-semibold mb-3">Stripe e status</p>
+                  <p className="text-xs uppercase tracking-wider text-gray-400 font-semibold mb-3">Gateway e status</p>
                 </div>
-                {input("Stripe Product ID", "stripe_product_id")}
+                {!isMercadoPago && input("Stripe Product ID", "stripe_product_id")}
+                {isMercadoPago && (
+                  <div className="sm:col-span-2 text-xs text-gray-500 leading-5">
+                    Price IDs e Product ID do Stripe são mantidos apenas como histórico/legado.
+                    O gateway ativo é definido em <strong>/admin/pagamentos</strong>.
+                  </div>
+                )}
                 <div>
                   <label className="label">Limite de armazenamento de mídia (MB)</label>
                   <input

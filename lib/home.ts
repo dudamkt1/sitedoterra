@@ -65,6 +65,15 @@ export function invalidateGlobalSectionsCache(): void {
   globalSectionsCache = null;
 }
 
+/**
+ * Invalida o cache da oferta comercial ativa (tabela `plans`). Chamar após
+ * salvar preços/textos em /admin/planos para que a HOME não continue exibindo
+ * o nome/valor antigo por até 60s.
+ */
+export function invalidateActiveOfferCache(): void {
+  activeOfferCache = null;
+}
+
 export async function getGlobalSections(): Promise<SiteSection[]> {
   if (!hasSupabaseEnv()) return DEFAULT_SECTIONS;
   if (globalSectionsCache && Date.now() - globalSectionsCache.ts < 60_000) return globalSectionsCache.data;

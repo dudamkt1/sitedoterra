@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser, getProfile } from "@/lib/auth";
-import { getStripeSecretKeyResolved } from "@/lib/gateway-config";
+import { resolveGateways } from "@/lib/gateway-config";
+import { invalidateActiveOfferCache } from "@/lib/home";
 
 export const runtime = "nodejs";
 
@@ -9,11 +11,13 @@ export const runtime = "nodejs";
  * Cria/atualiza planos e a configuração comercial (Super Admin).
  * POST /api/admin/plans
  *
- * - Preços, mensalidade, benefícios, textos e Price IDs do Stripe são
- *   gerenciados aqui (fonte de verdade central).
+ * - Preços, mensalidade, benefícios e textos são gerenciados aqui (fonte de
+ *   verdade central).
  * - Toda alteração de preço é registrada em `price_history` (auditoria).
- * - Quando STRIPE_SECRET_KEY está configurada, valida se o valor dos Price
- *   IDs cadastrados corresponde ao valor configurado (consistência).
+ * - Valida a consistência apenas do GATEWAY ATIVO: Stripe (Price IDs) ou
+ *   Mercado Pago (mensalidade > 0). Campos do gateway inativo são legado.
+ * - Ao mudar a mensalidade com Mercado Pago ativo, invalida o cache do plano
+ *   recorrente para que um novo plano MP seja criado com o valor novo.
  */
 export async function POST(request: Request) {
   const actor = await getCurrentUser();
@@ -25,6 +29,12 @@ export async function POST(request: Request) {
 
   const body = await request.json();
   const admin = createAdminClient();
+  const gateways = await resolveGateways();
+  const activeGateway = gateways.gateway;
+  // Ids "local-*" só existiam no estado otimista de versões antigas do
+  // formulário. Nunca são UUIDs: tratá-los como criação evita perder a edição.
+  const existingId =
+    typeof body.id === "string" && body.id && !body.id.startsWith("local-") ? body.id : null;
 
   const int = (v: unknown, fallback = 0) => Math.max(0, Math.round(Number(v) || fallback));
   const text = (v: unknown) => (v === undefined || v === null || v === "" ? null : String(v));
@@ -58,25 +68,35 @@ export async function POST(request: Request) {
     is_active: Boolean(body.is_active),
   };
 
-  if (body.id) {
-    // ---------- Histórico de preços (auditoria) ----------
-    const { data: previous } = await admin
+  // ---------- Mercado Pago: plano recorrente em cache ----------
+  // O plano recorrente no MP é criado automaticamente no primeiro checkout.
+  // Quando a mensalidade muda, invalidamos o cache para que `ensureRecurringPlan`
+  // crie um novo plano com o valor novo (as assinaturas existentes mantêm o
+  // preço contratado — o snapshot fica no próprio MP).
+  let mpPlanReset = false;
+  let previous: Record<string, unknown> | null = null;
+
+  if (existingId) {
+    // ---------- Estado anterior (histórico + consistência) ----------
+    const { data } = await admin
       .from("plans")
       .select(
-        "activation_regular_price_cents, activation_price_cents, monthly_price_cents, status"
+        "activation_regular_price_cents, activation_price_cents, monthly_price_cents, mercadopago_plan_id, mercadopago_plan_amount_cents, status"
       )
-      .eq("id", body.id)
+      .eq("id", existingId)
       .maybeSingle();
+    previous = (data as Record<string, unknown> | null) || null;
+
     if (previous) {
       const priceFields: { field: string; prev: number; next: number }[] = [
-        { field: "activation_regular_price_cents", prev: previous.activation_regular_price_cents || 0, next: payload.activation_regular_price_cents as number },
-        { field: "activation_price_cents", prev: previous.activation_price_cents || 0, next: payload.activation_price_cents as number },
-        { field: "monthly_price_cents", prev: previous.monthly_price_cents || 0, next: payload.monthly_price_cents as number },
+        { field: "activation_regular_price_cents", prev: Number(previous.activation_regular_price_cents) || 0, next: payload.activation_regular_price_cents as number },
+        { field: "activation_price_cents", prev: Number(previous.activation_price_cents) || 0, next: payload.activation_price_cents as number },
+        { field: "monthly_price_cents", prev: Number(previous.monthly_price_cents) || 0, next: payload.monthly_price_cents as number },
       ];
       for (const p of priceFields) {
         if (p.prev !== p.next) {
           await admin.from("price_history").insert({
-            plan_id: body.id,
+            plan_id: existingId,
             field: p.field,
             previous_value_cents: p.prev,
             new_value_cents: p.next,
@@ -84,18 +104,44 @@ export async function POST(request: Request) {
           });
         }
       }
-    }
 
-    const { error } = await admin.from("plans").update(payload).eq("id", body.id);
-    if (error) return NextResponse.json({ error: "Erro ao atualizar oferta" }, { status: 500 });
+      if (
+        activeGateway === "mercadopago" &&
+        (Number(previous.monthly_price_cents) || 0) !== (payload.monthly_price_cents as number)
+      ) {
+        payload.mercadopago_plan_id = null;
+        payload.mercadopago_plan_amount_cents = null;
+        mpPlanReset = true;
+      }
+    }
+  }
+
+  let savedPlan: Record<string, unknown> | null = null;
+
+  if (existingId) {
+    const { data, error } = await admin
+      .from("plans")
+      .update(payload)
+      .eq("id", existingId)
+      .select("*")
+      .maybeSingle();
+    if (error) {
+      console.error("[admin/plans] update:", error.message);
+      return NextResponse.json({ error: "Erro ao atualizar oferta" }, { status: 500 });
+    }
+    savedPlan = (data as Record<string, unknown> | null) || null;
   } else {
-    const { data: created, error } = await admin
+    const { data, error } = await admin
       .from("plans")
       .insert(payload)
-      .select("id")
+      .select("*")
       .single();
-    if (error) return NextResponse.json({ error: "Erro ao criar oferta" }, { status: 500 });
-    body.id = created.id;
+    if (error) {
+      console.error("[admin/plans] insert:", error.message);
+      return NextResponse.json({ error: "Erro ao criar oferta" }, { status: 500 });
+    }
+    savedPlan = data as Record<string, unknown>;
+    body.id = data.id;
   }
 
   await admin.from("audit_logs").insert({
@@ -107,9 +153,16 @@ export async function POST(request: Request) {
     metadata: { ...payload },
   });
 
-  // ---------- Consistência com o Stripe (soft warning, não bloqueia) ----------
+  // A HOME mantém um cache curto da oferta ativa. Invalida para que a
+  // alteração apareça imediatamente (e não "volte" ao valor antigo).
+  invalidateActiveOfferCache();
+  revalidatePath("/");
+  revalidatePath("/admin/planos");
+  revalidatePath("/admin/pagamentos");
+
+  // ---------- Consistência do gateway ATIVO (soft warning, não bloqueia) ----------
   const warnings: string[] = [];
-  if (process.env.STRIPE_SECRET_KEY || (await getStripeSecretKeyResolved())) {
+  if (activeGateway === "stripe" && gateways.stripe.secretKey) {
     try {
       const { getStripeResolved } = await import("@/lib/stripe");
       const stripe = await getStripeResolved();
@@ -140,7 +193,9 @@ export async function POST(request: Request) {
     } catch {
       warnings.push("Não foi possível validar os Price IDs no Stripe.");
     }
+  } else if (activeGateway === "mercadopago" && (payload.monthly_price_cents as number) <= 0) {
+    warnings.push("⚠️ Mercado Pago: a mensalidade está zerada. Configure um valor para criar a assinatura recorrente.");
   }
 
-  return NextResponse.json({ success: true, warnings });
+  return NextResponse.json({ success: true, gateway: activeGateway, plan: savedPlan, warnings, mpPlanReset });
 }

@@ -1,8 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { formatBRL } from "@/lib/utils";
 
-export function SiteActivationRequired() {
+interface SiteActivationRequiredProps {
+  activationPriceCents?: number | null;
+}
+
+export function SiteActivationRequired({ activationPriceCents }: SiteActivationRequiredProps) {
+  const activationPrice = activationPriceCents != null ? formatBRL(activationPriceCents) : "R$ 97,00";
   return (
     <div className="card max-w-2xl mx-auto mt-10 text-center">
       <div className="p-10">
@@ -29,7 +35,7 @@ export function SiteActivationRequired() {
           </div>
           <div className="flex items-center justify-center gap-3 text-sm text-gray-700">
             <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-[#1d5c3a] font-bold">2</span>
-            <span>Conclua o pagamento da ativação (R$ 297,00)</span>
+            <span>Conclua o pagamento da ativação (R$ {activationPrice})</span>
           </div>
           <div className="flex items-center justify-center gap-3 text-sm text-gray-700">
             <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-[#1d5c3a] font-bold">3</span>

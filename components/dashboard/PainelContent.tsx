@@ -11,6 +11,7 @@ interface PainelContentProps {
   isDemo: boolean;
   isSuperAdmin: boolean;
   siteActivated: boolean;
+  activationPriceCents?: number | null;
 }
 
 /**
@@ -43,6 +44,7 @@ export function PainelContent({
   isDemo,
   isSuperAdmin,
   siteActivated,
+  activationPriceCents,
 }: PainelContentProps) {
   const pathname = usePathname();
   const locked = !siteActivated && !isSuperAdmin && !isDemo;
@@ -54,7 +56,7 @@ export function PainelContent({
   // Categoria "geral" (/painel): mantém a mensagem completa atual,
   // direcionando para AFILIADOS.
   if (pathname === "/painel") {
-    return <SiteActivationRequired />;
+    return <SiteActivationRequired activationPriceCents={activationPriceCents} />;
   }
 
   // Rotas sempre abertas (afiliados, assinatura, conta).

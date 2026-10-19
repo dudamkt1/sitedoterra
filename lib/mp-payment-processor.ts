@@ -5,6 +5,11 @@ import { registerAffiliateConversionForVisitor } from "@/lib/affiliate";
 import { applyAffiliateCredit, releaseAffiliateCredit } from "@/lib/affiliate-credit";
 import { extendSubscriptionPeriod } from "@/lib/checkout-quote";
 import {
+  resolvePaymentMethod,
+  normalizePaymentMethod,
+  type PaymentMethod,
+} from "@/lib/payment-method";
+import {
   cancelMpSubscription,
   createRecurringSubscriptionMp,
   getMpSubscription,
@@ -60,6 +65,12 @@ export async function reconcileSucceededPayment(
     amountCents: number;
     paidAt: string;
     metadata: Record<string, unknown>;
+    /** Forma de pagamento efetiva (pix | card | credit | mixed). */
+    paymentMethod?: PaymentMethod | null;
+    /** Valor abatido por saldo/crédito (centavos). */
+    creditAppliedCents?: number | null;
+    /** Valor original antes do abatimento (centavos). */
+    originalAmountCents?: number | null;
   }
 ): Promise<{ id: string | null; status: string }> {
   const mpId = String(opts.payment.id);
@@ -97,6 +108,14 @@ export async function reconcileSucceededPayment(
     currency: (opts.payment.currency_id || "brl").toLowerCase(),
     status: "succeeded",
     paid_at: opts.paidAt,
+    gateway: "mercadopago",
+    ...(opts.paymentMethod ? { payment_method: opts.paymentMethod } : {}),
+    ...(typeof opts.creditAppliedCents === "number"
+      ? { credit_applied_cents: opts.creditAppliedCents }
+      : {}),
+    ...(typeof opts.originalAmountCents === "number"
+      ? { original_amount_cents: opts.originalAmountCents }
+      : {}),
   };
 
   if (match) {
@@ -299,15 +318,32 @@ async function ensurePendingRow(payment: MpPayment): Promise<void> {
     .limit(1)
     .maybeSingle();
   if (pending) return;
+  const amountCents = Math.round((payment.transaction_amount || 0) * 100);
+  const creditApplied = Number(payment.metadata?.credit_applied_cents || 0) || 0;
+  const originalAmount = Number(payment.metadata?.original_amount_cents || 0) || 0;
+  const method = resolvePaymentMethod({
+    payMethod: (payment.metadata?.pay_method as string | undefined) || null,
+    creditAppliedCents: creditApplied,
+    amountCents,
+  });
   await admin.from("payments").insert({
     tenant_id: tenantId,
     mercadopago_payment_id: mpId,
     mercadopago_preference_id: payment.preference_id || null,
     type,
-    amount_cents: Math.round((payment.transaction_amount || 0) * 100),
+    amount_cents: amountCents,
     currency: (payment.currency_id || "brl").toLowerCase(),
     status: "pending",
-    metadata: { gateway: "mercadopago", external_reference: ref, mp_status: payment.status },
+    gateway: "mercadopago",
+    payment_method: method,
+    credit_applied_cents: creditApplied,
+    original_amount_cents: originalAmount || null,
+    metadata: {
+      gateway: "mercadopago",
+      external_reference: ref,
+      mp_status: payment.status,
+      ...(payment.metadata?.pay_method ? { pay_method: payment.metadata.pay_method } : {}),
+    },
   });
 }
 
@@ -360,6 +396,13 @@ async function handleActivationPayment(payment: MpPayment) {
 
   const amountCents = Math.round((payment.transaction_amount || 0) * 100);
   const creditUsageId = (payment.metadata?.credit_usage_id as string | undefined) || null;
+  const creditAppliedCents = Number(payment.metadata?.credit_applied_cents || 0) || 0;
+  const originalAmountCents = Number(payment.metadata?.original_amount_cents || 0) || 0;
+  const paymentMethod = resolvePaymentMethod({
+    payMethod: (payment.metadata?.pay_method as string | undefined) || null,
+    creditAppliedCents,
+    amountCents,
+  });
 
   // Validação de valor (§17): pago x esperado (desconto PIX + crédito).
   const amountCheck = checkPaidAmount(payment, amountCents);
@@ -378,10 +421,14 @@ async function handleActivationPayment(payment: MpPayment) {
     payment,
     amountCents,
     paidAt,
+    paymentMethod,
+    creditAppliedCents,
+    originalAmountCents: originalAmountCents || undefined,
     metadata: {
       plan_id: planId,
       gateway: "mercadopago",
       external_reference: ref,
+      ...(payment.metadata?.pay_method ? { pay_method: payment.metadata.pay_method } : {}),
       ...(creditUsageId ? { credit_usage_id: creditUsageId } : {}),
       ...(typeof payment.metadata?.credit_applied_cents !== "undefined"
         ? { credit_applied_cents: payment.metadata.credit_applied_cents }
@@ -430,6 +477,10 @@ async function handleActivationPayment(payment: MpPayment) {
       amount_cents: amountCents,
       currency: "brl",
       status: "succeeded",
+      gateway: "mercadopago",
+      payment_method: paymentMethod,
+      credit_applied_cents: creditAppliedCents,
+      original_amount_cents: originalAmountCents || null,
     },
     { onConflict: "mercadopago_payment_id" }
   );

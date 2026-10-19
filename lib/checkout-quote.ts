@@ -10,6 +10,7 @@ import {
   type CreditBreakdown,
   type ReservedCredit,
 } from "@/lib/affiliate-credit";
+import { resolvePaymentMethod, type PaymentMethod } from "@/lib/payment-method";
 import type { Plan } from "@/types";
 
 /**
@@ -28,6 +29,8 @@ export interface CheckoutQuote extends ReservedCredit {
   payMethod: "pix" | "card";
   /** Assinatura local (só quando kind = subscription). */
   subscriptionId: string | null;
+  /** Forma de pagamento efetiva (pix | card | credit | mixed). */
+  paymentMethod: PaymentMethod;
 }
 
 export class QuoteError extends Error {
@@ -131,6 +134,11 @@ export async function buildCheckoutQuote(input: {
     creditCents: breakdown.creditCents,
     totalCents: breakdown.totalCents,
     usageId,
+    paymentMethod: resolvePaymentMethod({
+      payMethod: input.payMethod,
+      creditAppliedCents: breakdown.creditCents,
+      amountCents: breakdown.totalCents,
+    }),
   };
 }
 
@@ -153,6 +161,7 @@ export async function fulfillZeroChargePayment(input: {
 
   const creditMeta = {
     gateway: "affiliate_credit",
+    method: "credit",
     type: quote.kind,
     plan_id: quote.plan.id,
     credit_usage_id: quote.usageId,
@@ -171,6 +180,10 @@ export async function fulfillZeroChargePayment(input: {
       currency: "brl",
       status: "succeeded",
       paid_at: new Date().toISOString(),
+      gateway: "affiliate_credit",
+      payment_method: "credit",
+      credit_applied_cents: quote.creditCents,
+      original_amount_cents: quote.originalCents,
       metadata: creditMeta,
     })
     .select("id")
@@ -194,6 +207,10 @@ export async function fulfillZeroChargePayment(input: {
     amount_cents: 0,
     currency: "brl",
     status: "succeeded",
+    gateway: "affiliate_credit",
+    payment_method: "credit",
+    credit_applied_cents: quote.creditCents,
+    original_amount_cents: quote.originalCents,
   });
 
   if (quote.kind === "activation") {

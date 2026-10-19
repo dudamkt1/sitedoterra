@@ -5,15 +5,18 @@ import { DemoFetchBridge } from "@/components/demo/DemoFetchBridge";
 import { getPainelContext } from "@/lib/demo/painel-context";
 import FeedbackBanner from "@/components/feedback/FeedbackBanner";
 import { isSiteActivated } from "@/lib/painel-access";
+import { getActiveOffer } from "@/lib/commercial";
 import { PainelContent } from "@/components/dashboard/PainelContent";
 
 export default async function PainelLayout({ children }: { children: ReactNode }) {
   const { isDemo, ctx } = await getPainelContext();
+  const offer = await getActiveOffer();
 
   const name = isDemo ? "Acesso Rápido" : ctx.profile!.name || ctx.profile!.email;
   const email = isDemo ? "Demonstração • salva só neste dispositivo" : ctx.profile!.email;
   const siteSlug = isDemo ? null : ctx.tenant?.slug ?? null;
   const isSuperAdmin = !isDemo && ctx.profile?.role === "superadmin";
+  const activationPriceCents = offer?.activation_price_cents ?? null;
 
   // Verifica se o site está ativado (apenas para usuários reais, não demo)
   const siteActivated = !isDemo && isSiteActivated(ctx as any);
@@ -33,7 +36,12 @@ export default async function PainelLayout({ children }: { children: ReactNode }
         <div className="mx-auto w-full min-w-0 max-w-6xl">
           {isDemo && <DashboardBannerDemo />}
           {!isDemo && <FeedbackBanner />}
-          <PainelContent isDemo={isDemo} isSuperAdmin={isSuperAdmin} siteActivated={siteActivated}>
+          <PainelContent
+            isDemo={isDemo}
+            isSuperAdmin={isSuperAdmin}
+            siteActivated={siteActivated}
+            activationPriceCents={activationPriceCents}
+          >
             {children}
           </PainelContent>
         </div>
