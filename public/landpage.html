@@ -439,5 +439,28 @@ function earn(){var n=+$("sa").value,f=function(v){return v.toLocaleString("pt-B
 $("sa").addEventListener("input",earn);earn();
 </script>
 <script>(function(){var t=document.getElementById("s3"),o=document.getElementById("mtk");if(!t||!o)return;function f(){o.textContent="R$ "+(+t.value).toLocaleString("pt-BR")}t.addEventListener("input",f);f()})();</script>
+
+<script>
+(function(){
+  try {
+    var params = new URLSearchParams(window.location.search);
+    var ref = params.get("ref");
+    if (!ref) return;
+    if (!/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(ref)) return;
+    var subdomain = window.location.host || "unknown";
+    fetch("/api/affiliate/click", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ref: ref, subdomain: subdomain }),
+      credentials: "include"
+    }).catch(function(){ /* falha silenciosa: nunca quebra a landpage */ });
+    try {
+      var url = new URL(window.location.href);
+      url.searchParams.delete("ref");
+      window.history.replaceState(null, "", url.pathname + (url.search ? url.search : "") + url.hash);
+    } catch (e) { /* ignora */ }
+  } catch (e) { /* ignora */ }
+})();
+</script>
 </body>
 </html>
